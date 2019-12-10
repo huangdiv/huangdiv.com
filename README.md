@@ -1,2 +1,2 @@
 # huangdiv.com
-Blog source code.
+Source code of `huangdiv.com`.
