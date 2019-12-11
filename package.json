@@ -1,0 +1,31 @@
+{
+    "name": "huangdiv.com",
+    "version": "1.0.0",
+    "description": "HuangDi Blog",
+    "main": "index.js",
+    "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1",
+      "build": "git config --global core.quotePath false && hugo --gc --minify --cleanDestinationDir && ./node_modules/gulp/bin/gulp.js build"
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/huangdiv/huangdiv.com.git"
+    },
+    "keywords": [
+      "blog",
+      "hugo"
+    ],
+    "author": "huangdiv",
+    "license": "CC-BY-NC-SA-4.0",
+    "bugs": {
+      "url": "https://github.com/huangdiv/huangdiv.com/issues"
+    },
+    "homepage": "https://github.com/huangdiv/huangdiv.com#readme",
+    "devDependencies": {
+      "gulp": "^4.0.2",
+      "gulp-uglify": "^3.0.2",
+      "readable-stream": "^3.4.0",
+      "uglify-es": "^3.3.9",
+      "workbox-build": "^4.3.1"
+    }
+  }
