@@ -1,5 +1,5 @@
 ---
-title: "About"
+title: "关于"
 date: 2019-11-14T15:56:54Z
 meta: false
 displayCopyright: false
@@ -13,8 +13,8 @@ comments: true
 
 热衷钻研编程技术，业余自学C++，Javascript，Python语言，写一些脚本和小程序。
 
-已婚，是两个孩子的父亲。
+已婚，育有两个孩子。
 
 ---
 
-这是我业余时间用hugo搭建的个人网站，记录技术学习和生活随笔。欢迎留言探讨技术问题。
+这是我业余时间用hugo搭建的个人网站，记录技术学习和生活随笔。欢迎留言探讨问题。
