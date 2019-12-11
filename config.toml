@@ -1038,7 +1038,7 @@ uglyURLs = false
     enableBackToTop = true
 
     # 是否在首页显示
-    displayBackToTopInHome = false
+    displayBackToTopInHome = true
 
     # 按钮图标
     backToTopIcon = "arrow-up"
