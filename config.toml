@@ -12,7 +12,7 @@ copyright = "[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0
 theme = "meme"
 
 # `hugo new` 新建文章自动打开的文本编辑器
-newContentEditor = "code"
+newContentEditor = ""
 
 # i18n
 defaultContentLanguage = "zh-cn"
@@ -195,26 +195,26 @@ uglyURLs = false
         name = "Linkedin"
         weight = 1
         pre = "external"
-        post = ""
+        post = "linkedin"
     [[menu.socials]]
         url = "https://github.com/huangdiv"
         name = "Github"
         weight = 2
         pre = "external"
-        post = ""
+        post = "github"
 
     [[menu.links]]
         url = "https://t.me/huangdiv"
         name = "Telegram"
         weight = 1
         pre = "external"
-        post = ""
+        post = "telegram"
     [[menu.links]]
         url = "mailto:i@huangdiv.com"
         name = "Email"
         weight = 2
         pre = "external"
-        post = ""
+        post = "mail"
 
 ##########################################
 # 主题配置
@@ -238,8 +238,8 @@ uglyURLs = false
     # 如果是，请将你的 SVG 放到 `SVG.toml` 文
     # 件内，并配置以下项。单位：px。
     siteBrandSVGWidth = 250
-    siteBrandSVGHeight = 100
-    siteBrandSVGFill = "#515151"
+    siteBrandSVGHeight = 40
+    siteBrandSVGFill = "white"
     # 如果否，则会使用你的站点标题作为默认值，并
     # 以文字的形式显示，下方可配置字号和字色。字
     # 体请到底部的字体部分配置。单位：em。
@@ -346,7 +346,9 @@ uglyURLs = false
     # 注意：如果你设置为 `sections`，请务必将
     #      此配置文件中的类别（taxonomies）中
     #      的 `categories` 删除，不然分类页
-    #      面会失效。
+    #      面会失效。同时，你还需要自己新建一个
+    #      `content/categories/_index.md`
+    #      文件。
 
 
     ######################################
@@ -537,6 +539,15 @@ uglyURLs = false
 
 
     ######################################
+    # MathJax 公式支持（包括化学方程式）
+
+    # 是否开启（全局设置）
+    enableMathJax = false
+    # 说明：文章的 Front Matter 中的 `mathjax`
+    #      的优先级高于此处
+
+
+    ######################################
     # 评论
 
     # 说明：仅在生产环境（production）下渲染
@@ -546,12 +557,22 @@ uglyURLs = false
     # 说明：文章的 Front Matter 中的 `comments`
     #      的优先级高于此处
 
+    # Valine Special
+    enableValineSpecial = true
+    valineSpecialAdminEmail = "i@huangdiv.com"
+    valineSpecialAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
+    valineSpecialAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
+    valineSpecialPlaceholder = "说点什么吧..."
+    # 说明：enableValineSpecial 的优先级高于其他
+    #      评论开关。 ValineSpecial 的教程，参见
+    #      https://deserts.io/diy-a-comment-system/
+
     ## Disqus
     enableDisqus = false
     disqusShortname = ""
 
     ## Valine
-    enableValine = true
+    enableValine = false
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valinePlaceholder = "说点什么吧..."
@@ -808,7 +829,7 @@ uglyURLs = false
     # 菜单栏
     fontFamilyMenu = ""
     # 文章标题、文章副标题、列表标题、列表的年份和月份标题、相关文章标题、文章上下篇标题、表格的表头、定义列表中的术语
-    fontFamilyTitle = "'Cinzel Decorative', 'Noto Serif SC', serif"
+    fontFamilyTitle = "'Noto Serif SC', 'EB Garamond', serif"
     # 分节标题、目录标题
     fontFamilyHeadings = "'Noto Serif SC', 'EB Garamond', serif"
     # 代码、上标、文章元信息、文章更新徽章、文章的 Git 版本信息、极简页脚
@@ -1026,6 +1047,10 @@ uglyURLs = false
 
     # 是否开启
     enableMinimalFooter = true
+    enableVerticalBarStructure = true
+    # 说明：如果开启此项，显示在右边的部类或分区
+    #      将会包含全部的第一级部类或分区，并且
+    #      以竖线（|）分隔开来。
 
     # 是否开启关于页面的极简页脚
     enableAboutPageMinimalFooter = true
@@ -1103,6 +1128,18 @@ uglyURLs = false
     # 是否开启
     enableFingerprint = true
     # 说明：仅对 MemE 生成的 CSS 和 JS 有效
+
+
+    ######################################
+    # HTTPS 强制跳转
+
+    # 说明：仅在生产环境（production）下渲染
+
+    # 是否开启
+    enableForceHTTPS = false
+    # 说明：使用 JavaScript 来实现跳转。如果你
+    #      的服务器不支持强制 HTTPS 跳转，则可
+    #      开启此选项。
 
 
     ######################################
