@@ -1109,9 +1109,9 @@ uglyURLs = false
     customFooter = ""
 
     displayBusuanziSiteUVAndPV = true
-    busuanziSiteUVText = "本站访客数"
+    busuanziSiteUVText = ""
     busuanziSiteUVIcon = "user"
-    busuanziSitePVText = "本站访问量"
+    busuanziSitePVText = ""
     busuanziSitePVIcon = "eye"
     # 说明：仅在生产环境（production）下渲染
     #      文本或图标，留空（""）则无
