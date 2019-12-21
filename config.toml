@@ -198,7 +198,7 @@ uglyURLs = false
         post = "linkedin"
     [[menu.socials]]
         url = "https://github.com/huangdiv"
-        name = "Github"
+        name = "GitHub"
         weight = 2
         pre = "external"
         post = "github"
@@ -211,7 +211,7 @@ uglyURLs = false
         post = "telegram"
     [[menu.links]]
         url = "mailto:i@huangdiv.com"
-        name = "Email"
+        name = "E-mail"
         weight = 2
         pre = "external"
         post = "mail"
@@ -589,6 +589,15 @@ uglyURLs = false
     valineRecordIP = false
     valineServerURLs = ""
     # 说明：https://valine.js.org/
+
+    ## Utterances
+    enableUtterances = false
+    utterancesRepo = ""
+    utterancesIssueTerm = "pathname"
+    utterancesTheme = "github-light"
+    utterancesThemeDark = "photon-dark"
+    utterancesLabel = ""
+    # 说明：https://utteranc.es/
 
 
     ######################################

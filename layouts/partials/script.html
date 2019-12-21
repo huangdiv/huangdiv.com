@@ -60,8 +60,11 @@
                 {{ partial "third-party/valine.html" . }}
             {{ end }} 
 
-        {{ end }}
+            {{ if .Site.Params.enableUtterances }}
+                {{ partial "third-party/utterances.html" . }}
+            {{ end }}
 
+        {{ end }}
     {{ end }}
 {{ end }}
 
