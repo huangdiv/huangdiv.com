@@ -6,6 +6,7 @@ tags: ["about"]
 displayCopyright: false
 badge: false
 gitinfo: false
+dropCap: true
 comments: true
 ---
 黄笛，中学物理教师，毕业于西南大学。
