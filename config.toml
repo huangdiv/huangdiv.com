@@ -39,12 +39,6 @@ enableRobotsTXT = false
 # 每一分页的文章数（仅对「文章摘要」首页布局有效）
 paginate = 5
 
-# 代码高亮
-pygmentsCodefences = true
-pygmentsUseClasses = true
-pygmentsCodefencesGuessSyntax = true
-pygmentsOptions = "linenos=table"
-
 # URL 相关
 disablePathToLower = false
 relativeURLs = true
@@ -64,18 +58,36 @@ uglyURLs = false
 [frontmatter]
     lastmod = ["lastmod", ":git", ":fileModTime", ":default"]
 
-# v0.60.0
-[markup]
-    defaultMarkdownHandler = "blackfriday"
-
 # Markdown 渲染器
-[blackfriday]
-    # 是否开启智能标点符号替换
-    smartypants = false
-    # 是否在新标签页打开外链
-    hrefTargetBlank = true
-    # 屏蔽的扩展
-    extensionsmask = ["hardLineBreak", "backslashLineBreak"]
+[markup]
+    defaultMarkdownHandler = "goldmark"
+    [markup.goldmark]
+        [markup.goldmark.extensions]
+            definitionList = true
+            footnote = true
+            linkify = true
+            strikethrough = true
+            table = true
+            taskList = true
+            typographer = false
+        [markup.goldmark.parser]
+            attribute = true
+            autoHeadingID = true
+            autoHeadingIDType = "github"
+        [markup.goldmark.renderer]
+            hardWraps = false
+            unsafe = true
+            xHTML = false
+    [markup.highlight]
+        codeFences = true
+        guessSyntax = false
+        lineNos = true
+        lineNumbersInTable = true
+        noClasses = false
+    [markup.tableOfContents]
+        startLevel = 2
+        endLevel = 6
+        ordered = true
 
 # 作者信息
 [author]
@@ -552,6 +564,9 @@ uglyURLs = false
     # 说明：文章的 Front Matter 中的 `mathjax`
     #      的优先级高于此处
 
+    # 是否禁用 MathJax 的右键菜单
+    disableMathJaxMenu = false
+
 
     ######################################
     # 评论
@@ -569,9 +584,7 @@ uglyURLs = false
     valineSpecialAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineSpecialAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valineSpecialPlaceholder = "说点什么吧..."
-    # 说明：enableValineSpecial 的优先级高于其他
-    #      评论开关。 ValineSpecial 的教程，参见
-    #      https://deserts.io/diy-a-comment-system/
+    # 说明：https://deserts.io/diy-a-comment-system/
 
     ## Disqus
     enableDisqus = false
@@ -730,6 +743,15 @@ uglyURLs = false
     #      https://busuanzi.ibruce.info/
 
 
+    ######################################
+    # Markdown 相关
+
+    # 在新标签页打开外链？
+    hrefTargetBlank = true
+
+    # 与 LaTeX 的兼容性？
+    compatibleWithLaTeX = false
+
 
     ######################################
     # 文章目录
@@ -856,7 +878,7 @@ uglyURLs = false
     fontFamilyTitle = "'Noto Serif SC', 'EB Garamond', serif"
     # 分节标题、目录标题
     fontFamilyHeadings = "'Noto Serif SC', 'EB Garamond', serif"
-    # 代码、上标、文章元信息、文章更新徽章、文章的 Git 版本信息、极简页脚
+    # 代码、上标、文章元信息、文章更新徽章、文章的 Git 版本信息、极简页脚、不蒜子站点浏览计数
     fontFamilyCode = "'Source Code Pro', 'Noto Serif SC', monospace"
     # 引用
     fontFamilyQuote = ""
@@ -881,6 +903,11 @@ uglyURLs = false
     ## 字号（单位：px）
 
     fontSize = 17
+
+    ######################################
+    ## 制表符的宽度
+
+    tabSize = 4
 
     ######################################
     ## 行间距
@@ -1086,6 +1113,9 @@ uglyURLs = false
     # 是否开启
     enableBackToTop = true
 
+    # 是否开启自动隐藏
+    enableBackToTopAutoHide = true
+
     # 是否在首页显示
     displayBackToTopInHome = true
 
@@ -1169,10 +1199,25 @@ uglyURLs = false
     # 说明：仅在生产环境（production）下渲染
 
     # 是否开启
-    enableForceHTTPS = true
+    enableForceHTTPS = false
     # 说明：使用 JavaScript 来实现跳转。如果你
     #      的服务器不支持强制 HTTPS 跳转，则可
     #      开启此选项。
+
+
+    ######################################
+    # 平滑滚动
+
+    # 是否开启
+    enableSmoothScroll = true
+    # 说明：https://github.com/cferdinandi/smooth-scroll
+
+
+    ######################################
+    # 图片缩放
+
+    enableMediumZoom = true
+    # 说明：https://github.com/francoischalifour/medium-zoom
 
 
     ######################################
