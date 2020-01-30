@@ -1153,7 +1153,7 @@ uglyURLs = false
     # 自定义页脚（支持 Markdown）
     customFooter = ""
 
-    displayBusuanziSiteUVAndPV = true
+    displayBusuanziSiteUVAndPV = false
     busuanziSiteUVText = ""
     busuanziSiteUVIcon = "user"
     busuanziSitePVText = ""
