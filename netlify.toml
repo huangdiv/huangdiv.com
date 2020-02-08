@@ -1,11 +1,11 @@
 [build]
-publish = "public"
-command = "npm run build && npm run ipfs-deploy"
+  publish = "public"
+  command = "npm run build && npm run ipfs-deploy"
 
-[context.production.environment]
-HUGO_VERSION = "0.62.2"
-HUGO_ENV = "production"
-HUGO_ENABLEGITINFO = "true"
+[build.environment]
+  HUGO_VERSION = "0.64.0"
+  HUGO_ENV = "production"
+  HUGO_ENABLEGITINFO = "true"
 
 [[redirects]]
   from = "https://huangdiv.netlify.com/*"
