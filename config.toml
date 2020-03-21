@@ -15,7 +15,7 @@ theme = "meme"
 newContentEditor = ""
 
 # i18n
-defaultContentLanguage = "zh-cn"
+defaultContentLanguage = "zh"
 defaultContentLanguageInSubdir = false
 
 # 是否复数化列表页面的标题
@@ -155,7 +155,8 @@ uglyURLs = false
 # 菜单配置
 
 # MemE 主题支持以下四种菜单：
-# 1. main       顶栏下方的菜单栏
+# 1. main       顶栏下方（居中布局）或里面（弹性
+#               布局）的菜单栏
 # 2. home       首页的底部链接（适用于「诗意
 #               人生」和「视频片段」布局）
 # 3. socials    社交栏（关于页面的极简页脚）
@@ -168,15 +169,18 @@ uglyURLs = false
 # pre           内链（internal）或外链（external）
 # post          图标（留空（""）则无）
 # identifier    图标的 Class 名（菜单栏无效）
+#               （对于弹性布局的顶栏有两个特殊
+#               的值：`theme-switcher`、
+#               `lang-switcher`）
 
 [menu]
     ## 菜单栏
-    [[menu.main]]
-        url = "/"
-        name = "首页"
-        weight = 1
-        pre = "internal"
-        post = "home"
+    # [[menu.main]]
+    #     url = "/"
+    #     name = "首页"
+    #     weight = 1
+    #     pre = "internal"
+    #     post = "home"
     [[menu.main]]
         url = "/edu/"
         name = "教育"
@@ -207,6 +211,12 @@ uglyURLs = false
         weight = 6
         pre = "internal"
         post = "user-circle"
+    [[menu.main]]
+        weight = 7
+        identifier = "theme-switcher"
+    [[menu.main]]
+        weight = 8
+        identifier = "lang-switcher"
 
     [[menu.socials]]
         url = "https://linkedin.com/in/huangdiv"
@@ -246,6 +256,29 @@ uglyURLs = false
 
     # 是否在首页显示
     displayHeaderInHome = true
+    # 说明：对弹性布局的顶栏无效
+    
+    # 背景
+    headerBackground = "linear-gradient(90deg, #f795331a 0, #f370551a 15%, #ef4e7b1a 30%, #a166ab1a 44%, #5073b81a 58%, #1098ad1a 72%, #07b39b1a 86%, #6dba821a 100%)"
+    # 说明：https://developer.mozilla.org/zh-CN/docs/Web/CSS/background
+
+    # 顶栏布局
+    headerLayout = "flex"
+    # 说明：居中布局（center）或弹性布局（flex）
+
+    # 顶栏宽度的回退值
+    headerFallbackWidth = "36em"
+    # 说明：默认情况，MemE 使用 main-inner 元素
+    #      的宽度作为顶栏宽度，但是在一些页面（比
+    #      如「诗意人生」和「视频片段」布局的首页），
+    #      不存在 main-inner 元素，所以你需要为
+    #      这种情况给一个回退值。
+
+    # 在窄视图下隐藏菜单栏并显示一个按钮？
+    enableNavToggle = true
+
+    navHeight = "7em"
+    # 说明：菜单栏展开时的高度
 
 
     ######################################
@@ -255,20 +288,14 @@ uglyURLs = false
     siteBrandSVG = true
     # 如果是，请将你的 SVG 放到 `SVG.toml` 文
     # 件内，并配置以下项。单位：px。
-    siteBrandSVGWidth = 250
-    siteBrandSVGHeight = 40
-    siteBrandSVGFill = "white"
+    siteBrandSVGWidth = 30
+    siteBrandSVGHeight = 30
+    siteBrandSVGFill = "#fff"
     # 如果否，则会使用你的站点标题作为默认值，并
     # 以文字的形式显示，下方可配置字号和字色。字
     # 体请到底部的字体部分配置。单位：em。
-    siteBrandFontSize = 3
-    siteBrandFontColor = "#fff"
-
-    # 背景色
-    # siteBrandBackgroundColor = "hsl(240, 35%, 35%)"
-    # 背景图片
-    siteBrandBackgroundImage = "linear-gradient(90deg, #f79533 0, #f37055 15%, #ef4e7b 30%, #a166ab 44%, #5073b8 58%, #1098ad 72%, #07b39b 86%, #6dba82 100%)"
-    # 注意：背景色和背景图片只能二选一
+    siteBrandFontSize = 1
+    siteBrandFontColor = "var(--color-contrast-high)"
 
 
     ######################################
@@ -276,10 +303,12 @@ uglyURLs = false
 
     # 是否开启
     enableMenu = true
-
+    # 说明：对弹性布局的顶栏无效
+    
     # 是否在首页显示
     displayMenuInHome = true
-
+    # 说明：对弹性布局的顶栏无效
+    
     # 是否按文章分区高亮当前菜单项
     activeInSection = true
     # 说明：如果开启，那么当某一文章的分区名是某
@@ -328,11 +357,6 @@ uglyURLs = false
     siteDescription = "黄笛，中学物理老师，业余程序员，生活探险家 | 这里是 黄笛 的博客，与你一起发现更大的世界。"
     # 说明：用于 HTML 的头部元数据、JSON-LD、
     #      Open Graph、Atom、RSS
-
-    # 站点的关键词
-    siteKeywords = ['黄笛', 'huangdi', 'HuangDi', 'Huangdi', '黄笛的网络日志', '黄笛的博客', 'HuangDi Blog', '博客', '个人网站', '互联网', 'Web', '教师', 'teacher', '物理', 'physics', '中学', '高中']
-    # 说明：如果留空（[]），则会取站点的所有类别名、分
-    #      区名（如果按分区分类）作为默认值
 
     # 站点的创建时间
     siteCreatedTime = "2019-08-01T08:00:00+08:00"
@@ -423,9 +447,9 @@ uglyURLs = false
     chineseZodiac = true
 
     # 是否翻译年份（仅对年份标题有效）
-    i18nYear = false
+    i18nYear = true
     # 是否翻译月份（仅对月份标题有效）
-    i18nMonth = false
+    i18nMonth = true
 
 
     ######################################
@@ -532,12 +556,6 @@ uglyURLs = false
 
 
     ######################################
-    # InstantClick
-
-    enableInstantClick = true
-
-
-    ######################################
     # Service Worker
 
     # 说明：仅在生产环境（production）下渲染
@@ -566,6 +584,15 @@ uglyURLs = false
 
     # 是否禁用 MathJax 的右键菜单
     disableMathJaxMenu = false
+
+
+    ######################################
+    # Mermaid (https://github.com/mermaid-js/mermaid)
+
+    # 是否开启（全局设置）
+    enableMermaid = false
+    # 说明：文章的 Front Matter 中的 `mermaid`
+    #      的优先级高于此处
 
 
     ######################################
@@ -749,9 +776,6 @@ uglyURLs = false
     # 在新标签页打开外链？
     hrefTargetBlank = true
 
-    # 与 LaTeX 的兼容性？
-    compatibleWithLaTeX = false
-
 
     ######################################
     # 文章目录
@@ -764,6 +788,11 @@ uglyURLs = false
     # 是否显示目录标题
     displayTOCTitle = true
 
+    # 是否显示数字（全局设置）
+    displayTOCNum = true
+    # 说明：文章的 Front Matter 中的 `tocNum`
+    #      的优先级高于此处
+    
     # 是否链接文章的分节标题到目录
     linkHeadingsToTOC = true
 
@@ -831,6 +860,9 @@ uglyURLs = false
     #
     #      只支持相对于站点根目录的绝对链接
     #      比如：/videos/meme.mp4
+    #
+    #      且你添加的 HTML 代码必需以以下开头：
+    #      `<video src="`
 
     # 是否开启
     enableVideoHost = false
@@ -921,6 +953,11 @@ uglyURLs = false
     # 是否开启
     enableParagraphIndent = true
 
+    # 是否缩进第一段（全局设置）
+    indentFirstParagraph = false
+    # 说明：文章的 Front Matter 中的 `indentFirstParagraph`
+    #      的优先级高于此处
+
     # 分段样式（全局设置）
     paragraphStyle = "margin"
     # 说明：段间距式（margin）或段首缩排（indent）
@@ -933,7 +970,7 @@ uglyURLs = false
     # 是否开启（全局设置）
     enableJustify = true
     # 说明：文章的 Front Matter 中的 `align`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     ######################################
     ## 首字下沉
@@ -941,17 +978,17 @@ uglyURLs = false
     # 是否开启（全局设置）
     enableDropCap = false
     # 说明：文章的 Front Matter 中的 `dropCap`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     # 是否在每一分隔线之后首字下沉（全局设置）
     enableDropCapAfterHr = false
     # 说明：文章的 Front Matter 中的 `dropCapAfterHr`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     # 是否删除首字下沉前的分隔线（全局设置）
     deleteHrBeforeDropCap = false
     # 说明：文章的 Front Matter 中的 `deleteHrBeforeDropCap`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     ######################################
     ## 大型小写（英文）
@@ -960,7 +997,7 @@ uglyURLs = false
     enableSmallCaps = false
     # 说明：只会应用到分节标题和目录标题
     #      文章的 Front Matter 中的 `smallCaps`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     ######################################
     ## 着重号
@@ -987,7 +1024,7 @@ uglyURLs = false
     # 是否显示（全局设置）
     displayPostCopyright = false
     # 说明：文章的 Front Matter 中的 `displayCopyright`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
 
     ######################################
@@ -999,7 +1036,7 @@ uglyURLs = false
     # 是否显示（全局设置）
     displayUpdatedBadge = false
     # 说明：文章的 Front Matter 中的 `badge`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     # 是否添加 `title`
     enableBadgeTitle = true
@@ -1016,7 +1053,7 @@ uglyURLs = false
     # 是否显示（全局设置）
     displayPostGitInfo = false
     # 说明：文章的 Front Matter 中的 `gitinfo`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     # 仓库地址
     repoURL = "https://github.com/huangdiv/huangdiv.com"
@@ -1049,6 +1086,31 @@ uglyURLs = false
 
 
     ######################################
+    # 文章分享
+
+    # 是否开启
+    enablePostShare = true
+
+    # 是否显示（全局设置）
+    displayPostShare = true
+    # 说明：文章的 Front Matter 中的 `share`
+    #      的优先级高于此处
+
+    displayShareOnText = false
+
+    shareOnTwitter = true
+    shareOnFacebook = true
+    shareOnLinkedIn = true
+    shareOnTelegram = true
+    shareOnWeibo = true
+    shareOnDouban = true
+    shareOnQQ = true
+    shareOnQzone = true
+
+    shareViaQRCode = true
+
+
+    ######################################
     # 相关文章
 
     # 是否开启
@@ -1057,7 +1119,7 @@ uglyURLs = false
     # 是否显示（全局设置）
     displayRelatedPosts = false
     # 说明：文章的 Front Matter 中的 `related`
-    #      的的优先级高于此处
+    #      的优先级高于此处
 
     # 相关文章数
     relatedPostsNumber = 5
@@ -1128,8 +1190,9 @@ uglyURLs = false
 
     # 是否开启
     enableFooter = true
-    # 说明：「诗意人生」和「视频片段」首页布局
-    #      的首页没有页脚
+
+    # 是否在首页显示
+    displayFooterInHome = true
 
     # 是否显示版权符号（©）
     displayCopyrightSymbol = true
@@ -1179,10 +1242,21 @@ uglyURLs = false
 
 
     ######################################
-    # 代码高亮
+    # 代码块
 
-    # 是否开启
+    # 是否开启高亮
     enableHighlight = true
+
+    # 是否开启竖直滚动
+    enableOverflowY = true
+    # 最大高度
+    maxHeight = 20
+    # 单位：em
+
+    # 是否开启复制
+    enableCopy = true
+    # 是否开启自动隐藏
+    enableCopyAutoHide = true
 
 
     ######################################
@@ -1218,6 +1292,13 @@ uglyURLs = false
 
     enableMediumZoom = true
     # 说明：https://github.com/francoischalifour/medium-zoom
+
+
+    ######################################
+    # Instant Page
+
+    enableInstantPage = true
+    # 说明：https://github.com/instantpage/instant.page
 
 
     ######################################
