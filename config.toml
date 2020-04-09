@@ -168,7 +168,7 @@ uglyURLs = false
 # weight        位置
 # pre           内链（internal）或外链（external）
 # post          图标（留空（""）则无）
-# identifier    图标的 Class 名（菜单栏无效）
+# identifier    图标的 Class 名
 #               （对于弹性布局的顶栏有两个特殊
 #               的值：`theme-switcher`、
 #               `lang-switcher`）
@@ -257,7 +257,7 @@ uglyURLs = false
     # 是否在首页显示
     displayHeaderInHome = true
     # 说明：对弹性布局的顶栏无效
-    
+
     # 背景
     headerBackground = "linear-gradient(90deg, #f795331a 0, #f370551a 15%, #ef4e7b1a 30%, #a166ab1a 44%, #5073b81a 58%, #1098ad1a 72%, #07b39b1a 86%, #6dba821a 100%)"
     # 说明：https://developer.mozilla.org/zh-CN/docs/Web/CSS/background
@@ -304,11 +304,11 @@ uglyURLs = false
     # 是否开启
     enableMenu = true
     # 说明：对弹性布局的顶栏无效
-    
+
     # 是否在首页显示
     displayMenuInHome = true
     # 说明：对弹性布局的顶栏无效
-    
+
     # 是否按文章分区高亮当前菜单项
     activeInSection = true
     # 说明：如果开启，那么当某一文章的分区名是某
@@ -792,7 +792,7 @@ uglyURLs = false
     displayTOCNum = true
     # 说明：文章的 Front Matter 中的 `tocNum`
     #      的优先级高于此处
-    
+
     # 是否链接文章的分节标题到目录
     linkHeadingsToTOC = true
 
@@ -858,7 +858,7 @@ uglyURLs = false
 
     # 说明：仅在生产环境（production）下渲染
     #
-    #      只支持相对于站点根目录的绝对链接
+    #      只支持相对于网站根目录的绝对链接
     #      比如：/videos/meme.mp4
     #
     #      且你添加的 HTML 代码必需以以下开头：
@@ -924,7 +924,7 @@ uglyURLs = false
     fontFamilyBody = "'EB Garamond', 'Noto Serif SC', serif"
 
     # 网络字体链接
-    fontsLink = "https://fonts.googleapis.com/css?family=EB+Garamond:400,400i,500,700,700i|Noto+Serif+SC:400,500,700|Source+Code+Pro:400,400i,700,700i&display=swap&subset=chinese-simplified"
+    fontsLink = "https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400;1,700&family=Noto+Serif+SC:wght@400;500;700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap"
     # 说明：要想读者一定体验到你设置的字体，最好
     #      采用网络字体。MemE 主题目前仅支持
     #      Google Fonts 的链接，请前往
