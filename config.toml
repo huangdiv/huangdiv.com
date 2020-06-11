@@ -586,7 +586,7 @@ uglyURLs = false
     #      的优先级高于此处
 
     # Valine Special
-    enableValineSpecial = true
+    enableValineSpecial = false
     valineSpecialAdminEmail = "i@huangdiv.com"
     valineSpecialAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineSpecialAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
@@ -598,7 +598,7 @@ uglyURLs = false
     disqusShortname = ""
 
     ## Valine
-    enableValine = false
+    enableValine = true
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valinePlaceholder = "说点什么吧..."
@@ -614,7 +614,7 @@ uglyURLs = false
     valineServerURLs = ""
     valineEmojiCDN = ""
     valineEmojiMaps = {}
-    valineEnableQQ = false
+    valineEnableQQ = true
     valineRequiredFields = []
     # 说明：https://valine.js.org/
 
