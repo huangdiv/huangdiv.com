@@ -591,7 +591,7 @@ uglyURLs = false
     #      的优先级高于此处
 
     # Valine Special
-    enableValineSpecial = false
+    enableValineSpecial = true
     valineSpecialAdminEmail = "i@huangdiv.com"
     valineSpecialAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineSpecialAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
@@ -603,7 +603,7 @@ uglyURLs = false
     disqusShortname = ""
 
     ## Valine
-    enableValine = true
+    enableValine = false
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valinePlaceholder = "说点什么吧..."
@@ -1083,7 +1083,7 @@ uglyURLs = false
     # 说明：文章的 Front Matter 中的 `share`
     #      的优先级高于此处
 
-    displayShareOnText = false
+    displayShareOnText = true
 
     shareOnTwitter = true
     shareOnFacebook = true
