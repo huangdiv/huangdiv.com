@@ -16,7 +16,7 @@
             document.body.appendChild(script);
         };
         getScript({
-            src: '{{ .Site.Params.valineSpecialSrc }}',
+            src: {{ .Site.Params.valineSpecialSrc }},
             onload: () => {
                 newValine();
             }
@@ -24,16 +24,15 @@
         function newValine() {
             new Valine({
                 el: '#vscomments',
-                count_el: 'span.comment-count',
-                lang: '{{ .Site.Params.valineSpecialLang }}',
-                admin_email_hash: '{{ .Site.Params.valineSpecialAdminEmaiHash}}',
-                appId: '{{ .Site.Params.valineSpecialAppId }}',
-                appKey: '{{ .Site.Params.valineSpecialAppKey }}',
-                placeholder: '{{ .Site.Params.valineSpecialPlaceholder }}',
-                emoticon_url: '{{ .Site.Params.valineSpecialEmotionUrl }}',
-                emoticon_list: '{{ .Site.Params.valineSpecialEmotionList }}',
-                max_nest: '{{ .Site.Params.valineSpecialMaxNest }}',
-                page_size: '{{ .Site.Params.valineSpecialPageSize }}'
+                lang: {{ .Site.Params.valineSpecialLang }},
+                admin_email_hash: {{ .Site.Params.valineSpecialAdminEmailHash }},
+                appId: {{ .Site.Params.valineSpecialAppId }},
+                appKey: {{ .Site.Params.valineSpecialAppKey }},
+                placeholder: {{ .Site.Params.valineSpecialPlaceholder }},
+                emoticon_url: {{ .Site.Params.valineSpecialEmotionUrl }},
+                emoticon_list: {{ .Site.Params.valineSpecialEmotionList }},
+                max_nest: {{ .Site.Params.valineSpecialMaxNest }},
+                page_size: {{ .Site.Params.valineSpecialPageSize }}
             });
         }
     }
