@@ -5,29 +5,33 @@
         vscommentsdiv.id = "vscomments";
         vscommentsdiv.style = "margin-top: 2em;";
         document.querySelector('.load-comments').parentNode.appendChild(vscommentsdiv);
-        var getScript = (options) => {
-            var script = document.createElement('script');
-            script.defer = true;
-            script.crossOrigin = 'anonymous';
-            script['data-no-instant'] = true;
-            Object.keys(options).forEach((key) => {
-                script[key] = options[key];
+        if (typeof Valine === 'undefined') {
+            var getScript = (options) => {
+                var script = document.createElement('script');
+                script.defer = true;
+                script.crossOrigin = 'anonymous';
+                Object.keys(options).forEach((key) => {
+                    script[key] = options[key];
+                });
+                document.body.appendChild(script);
+            };
+            getScript({
+                src: {{ .Site.Params.valineSpecialSrcCDN }},
+                onload: () => {
+                    newValine();
+                }
             });
-            document.body.appendChild(script);
-        };
-        getScript({
-            src: {{ .Site.Params.valineSpecialSrc }},
-            onload: () => {
-                newValine();
-            }
-        });
-        function newValine() {
+        } else {
+            newValine();
+        }
+    }
+    function newValine() {
             new Valine({
                 el: '#vscomments',
                 lang: {{ .Site.Params.valineSpecialLang }},
                 admin_email_hash: {{ .Site.Params.valineSpecialAdminEmailHash }},
-                appId: {{ .Site.Params.valineSpecialAppId }},
-                appKey: {{ .Site.Params.valineSpecialAppKey }},
+                app_id: {{ .Site.Params.valineSpecialAppId }},
+                app_key: {{ .Site.Params.valineSpecialAppKey }},
                 placeholder: {{ .Site.Params.valineSpecialPlaceholder }},
                 emoticon_url: {{ .Site.Params.valineSpecialEmotionUrl }},
                 emoticon_list: {{ .Site.Params.valineSpecialEmotionList }},
@@ -35,6 +39,5 @@
                 page_size: {{ .Site.Params.valineSpecialPageSize }}
             });
         }
-    }
     //loadComments();
 </script>
