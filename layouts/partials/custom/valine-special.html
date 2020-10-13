@@ -21,35 +21,23 @@
                     newValine();
                 }
             });
-<<<<<<< HEAD
         } else {
             newValine();
         }
     }
     function newValine() {
-=======
-            document.body.appendChild(script);
-        };
-        getScript({
-            src: {{ .Site.Params.valineSpecialSrcCDN }},
-            onload: () => {
-                newValine();
-            }
+        new Valine({
+            el: '#vscomments',
+            lang: {{ .Site.Params.valineSpecialLang }},
+            admin_email_hash: {{ .Site.Params.valineSpecialAdminEmailHash }},
+            app_id: {{ .Site.Params.valineSpecialAppId }},
+            app_key: {{ .Site.Params.valineSpecialAppKey }},
+            placeholder: {{ .Site.Params.valineSpecialPlaceholder }},
+            emoticon_url: {{ .Site.Params.valineSpecialEmotionUrl }},
+            emoticon_list: {{ .Site.Params.valineSpecialEmotionList }},
+            max_nest: {{ .Site.Params.valineSpecialMaxNest }},
+            page_size: {{ .Site.Params.valineSpecialPageSize }}
         });
-        function newValine() {
->>>>>>> 4368d09b09bf9446466448f89196a6b9fca620e8
-            new Valine({
-                el: '#vscomments',
-                lang: {{ .Site.Params.valineSpecialLang }},
-                admin_email_hash: {{ .Site.Params.valineSpecialAdminEmailHash }},
-                app_id: {{ .Site.Params.valineSpecialAppId }},
-                app_key: {{ .Site.Params.valineSpecialAppKey }},
-                placeholder: {{ .Site.Params.valineSpecialPlaceholder }},
-                emoticon_url: {{ .Site.Params.valineSpecialEmotionUrl }},
-                emoticon_list: {{ .Site.Params.valineSpecialEmotionList }},
-                max_nest: {{ .Site.Params.valineSpecialMaxNest }},
-                page_size: {{ .Site.Params.valineSpecialPageSize }}
-            });
-        }
+    }
     //loadComments();
 </script>
