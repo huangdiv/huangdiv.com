@@ -16,7 +16,7 @@
             document.body.appendChild(script);
         };
         getScript({
-            src: {{ .Site.Params.valineSpecialSrc }},
+            src: {{ .Site.Params.valineSpecialSrcCDN. }},
             onload: () => {
                 newValine();
             }
@@ -26,8 +26,8 @@
                 el: '#vscomments',
                 lang: {{ .Site.Params.valineSpecialLang }},
                 admin_email_hash: {{ .Site.Params.valineSpecialAdminEmailHash }},
-                appId: {{ .Site.Params.valineSpecialAppId }},
-                appKey: {{ .Site.Params.valineSpecialAppKey }},
+                app_id: {{ .Site.Params.valineSpecialAppId }},
+                app_key: {{ .Site.Params.valineSpecialAppKey }},
                 placeholder: {{ .Site.Params.valineSpecialPlaceholder }},
                 emoticon_url: {{ .Site.Params.valineSpecialEmotionUrl }},
                 emoticon_list: {{ .Site.Params.valineSpecialEmotionList }},

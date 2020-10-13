@@ -592,7 +592,7 @@ uglyURLs = false
 
     # Valine Special
     enableValineSpecial = true
-    valineSpecialSrc = "https://cdn.jsdelivr.net/gh/track23/blog-static/Valine.min.js"
+    valineSpecialSrcCDN = "https://cdn.jsdelivr.net/gh/track23/blog-static/Valine.min.js"
     valineSpecialLang = "zh-cn"
     valineSpecialAdminEmal = "c18ed822903aed06b25ae54c9d81a39a"
     valineSpecialAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
