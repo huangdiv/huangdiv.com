@@ -594,7 +594,7 @@ uglyURLs = false
     enableValineSpecial = true
     valineSpecialSrcCDN = "https://cdn.jsdelivr.net/gh/track23/blog-static/Valine.min.js"
     valineSpecialLang = "zh-cn"
-    valineSpecialAdminEmal = "c18ed822903aed06b25ae54c9d81a39a"
+    valineSpecialAdminEmailHash = "c18ed822903aed06b25ae54c9d81a39a"
     valineSpecialAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineSpecialAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valineSpecialPlaceholder = "说点什么吧..."
@@ -1089,7 +1089,7 @@ uglyURLs = false
     # 说明：文章的 Front Matter 中的 `share`
     #      的优先级高于此处
 
-    displayShareOnText = false
+    displayShareOnText = true
 
     shareOnTwitter = true
     shareOnFacebook = true

@@ -16,7 +16,7 @@
             document.body.appendChild(script);
         };
         getScript({
-            src: {{ .Site.Params.valineSpecialSrcCDN. }},
+            src: {{ .Site.Params.valineSpecialSrcCDN }},
             onload: () => {
                 newValine();
             }
