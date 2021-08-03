@@ -41,7 +41,7 @@ paginate = 5
 
 # URL 相关
 disablePathToLower = false
-relativeURLs = true
+relativeURLs = false
 uglyURLs = false
 
 # URL 结构
@@ -81,7 +81,7 @@ uglyURLs = false
     [markup.highlight]
         codeFences = true
         guessSyntax = false
-        lineNos = true
+        lineNos = false
         lineNumbersInTable = true
         noClasses = false
     [markup.tableOfContents]
@@ -555,7 +555,7 @@ uglyURLs = false
 
     # 说明：仅在生产环境（production）下渲染
 
-    enableServiceWorker = true
+    enableServiceWorker = false
 
 
     ######################################
@@ -847,7 +847,7 @@ uglyURLs = false
     #      默认值：§
 
     # 锚点图标
-    anchorIcon = "link"
+    anchorIcon = ""
     # 说明：留空（""）则回退到锚点符号
 
     # 是否开启锚点链接
@@ -911,7 +911,7 @@ uglyURLs = false
     squareBrackets = true
 
     # 替换脚注的返回链接中的文本为图标
-    footnoteReturnLinkIcon = "angle-up"
+    footnoteReturnLinkIcon = ""
     # 说明：如果不为空（""），则会用图标替换
     #      `footnoteReturnLinkContents`
 
@@ -1337,20 +1337,20 @@ uglyURLs = false
     # 平滑滚动
 
     # 是否开启
-    enableSmoothScroll = true
+    enableSmoothScroll = false
 
 
     ######################################
     # 图片缩放
 
-    enableMediumZoom = true
+    enableMediumZoom = false
     # 说明：https://github.com/francoischalifour/medium-zoom
 
 
     ######################################
     # Instant Page
 
-    enableInstantPage = true
+    enableInstantPage = false
     # 说明：https://github.com/instantpage/instant.page
 
 
