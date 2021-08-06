@@ -25,6 +25,6 @@ comments: true
 
 ---
 
-这是我业余时间用[Hugo](https://github.com/gohugoio/hugo)搭建的个人博客，主题是[MemE](https://github.com/reuixiy/hugo-theme-meme)，源码放在[Github](https://github.com/huangdiv/huangdiv.com)，通过[Netlify](https://www.netlify.com/)生成，部署在星际文件系统 [IPFS](https://ipfs.io/) 上，主要记录教育教学笔记，技术学习经历和生活随想。
+这是我业余时间用[Hugo](https://github.com/gohugoio/hugo)搭建的个人博客，主题是[MemE](https://github.com/reuixiy/hugo-theme-meme)，源码放在[Github](https://github.com/huangdiv/huangdiv.com)，通过[Github Actions](https://github.com/huangdiv/huangdiv.com/actions)和[Github Pages](https://github.com/huangdiv/huangdiv.github.io/tree/build)自动生成和部署，主要记录教育教学笔记，技术学习经历和生活随想。
 
 欢迎在评论区留言或通过其他链接探讨问题。博客订阅地址: <a href="/atom.xml" target="_blank" rel="noopener">Atom</a>╱<a href="/rss.xml" target="_blank" rel="noopener">RSS</a>。
