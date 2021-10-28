@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>jumpto</title>
+<script>
+function myFunction(){
+    //alert("Hello!");
+    var searchURL = window.location.search;
+    var targetPage = searchURL.substring(1);
+    if (targetPage.match(/((http|ftp|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?)/)) {
+        window.location.href = targetPage;
+    }
+}
+</script>
+</head>
+<body onload="myFunction()">
+<h1>Hello World!</h1>
+</body>
