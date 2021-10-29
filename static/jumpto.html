@@ -2,20 +2,119 @@
 
 <!DOCTYPE html>
 <html>
+
 <head>
-<meta charset="utf-8">
-<title>jumpto</title>
-<script>
-function myFunction(){
-    //alert("Hello!");
-    var searchURL = window.location.search;
-    var targetPage = searchURL.substring(1);
-    if (targetPage.match(/((http|ftp|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?)/)) {
-        window.location.href = targetPage;
-    }
-}
-</script>
+    <meta charset="utf-8">
+    <title>jumpto</title>
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            padding: 0px;
+            font-family: Helvetica, Arial;
+        }
+
+        body {
+            background: #ececec;
+        }
+
+        #outer {
+            position: absolute;
+            top: 50%;
+            left: 0px;
+            width: 100%;
+            height: 1px;
+            overflow: visible;
+        }
+
+        #inner {
+            display: block;
+
+            width: 500px;
+            height: 480px;
+
+            position: absolute;
+            margin-left: -250px;
+            /* =>  width / 2  */
+            top: -240px;
+            /* =>  height / 2  */
+            left: 50%;
+        }
+
+        #inner p {
+            font-size: 29px;
+            color: #535559;
+            text-align: center;
+            text-shadow: 0px 2px 1px #fff;
+        }
+
+        #inner a.me,
+        #inner a.me:active,
+        #inner a.me:visited,
+        #inner a.me:hover {
+            display: inline-block;
+            width: 60px;
+            height: 28px;
+
+            font-size: 0;
+            text-shadow: none;
+            color: #294995;
+
+            background: url("me.png") no-repeat;
+            background-size: 60px 28px;
+
+            vertical-align: middle;
+            text-decoration: none;
+        }
+
+        span.target-name {
+            font-weight: bold;
+        }
+
+        #inner b,
+        #inner a {
+            font-weight: bold;
+            color: #335fa1;
+        }
+
+        #inner div.footer {
+            margin-top: 80px;
+        }
+
+        #inner div.footer>p {
+            color: #a4a4a4;
+            font-size: 13px;
+        }
+
+        #inner div.footer a {
+            text-decoration: none;
+        }
+    </style>
+    <script>
+        function myFunction() {
+            //alert("Hello!");
+            var searchURL = window.location.search;
+            var targetPage = searchURL.substring(1);
+            if (targetPage.match(/((http|ftp|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?)/)) {
+                window.location.replace(targetPage);
+            }
+        }
+    </script>
 </head>
+
 <body onload="myFunction()">
-<h1>Hello World!</h1>
+    <div id="outer">
+        <div id="inner">
+            <p>超级书签西大VPN跳转：</p>
+            <p>拖动下方链接到书签栏，当需要使用西大VPN打开某个网页时，可直接在该网页点击书签进行跳转。</p>
+            <br />
+            <p><a title="拖动我到书签栏"
+                    href="javascript:(function(){window.open('http://webvpn.swu.edu.cn/https/77726476706e69737468656265737421f8e2409220346146300b86a1/jumpto?'+location.href)})()">👥
+                    用西大VPN打开</a>
+            </p>
+        </div>
+    </div>
+
 </body>
