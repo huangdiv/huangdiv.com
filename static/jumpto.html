@@ -1,95 +1,31 @@
 <!DOCTYPE html>
-
-<!DOCTYPE html>
 <html>
 
 <head>
     <meta charset="utf-8">
     <title>jumpto</title>
     <style>
-        html,
-        body {
-            width: 100%;
-            height: 100%;
-            margin: 0px;
-            padding: 0px;
-            font-family: Helvetica, Arial;
-        }
-
         body {
             background: #ececec;
         }
 
         #outer {
-            position: absolute;
-            top: 50%;
-            left: 0px;
-            width: 100%;
-            height: 1px;
-            overflow: visible;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         #inner {
             display: block;
-
             width: 500px;
-            height: 480px;
-
-            position: absolute;
-            margin-left: -250px;
-            /* =>  width / 2  */
-            top: -240px;
-            /* =>  height / 2  */
-            left: 50%;
         }
 
-        #inner p {
-            font-size: 29px;
+        p,
+        dt {
+            font-size: 20px;
             color: #535559;
-            text-align: center;
+            text-align: justify;
             text-shadow: 0px 2px 1px #fff;
-        }
-
-        #inner a.me,
-        #inner a.me:active,
-        #inner a.me:visited,
-        #inner a.me:hover {
-            display: inline-block;
-            width: 60px;
-            height: 28px;
-
-            font-size: 0;
-            text-shadow: none;
-            color: #294995;
-
-            background: url("me.png") no-repeat;
-            background-size: 60px 28px;
-
-            vertical-align: middle;
-            text-decoration: none;
-        }
-
-        span.target-name {
-            font-weight: bold;
-        }
-
-        #inner b,
-        #inner a {
-            font-weight: bold;
-            color: #335fa1;
-        }
-
-        #inner div.footer {
-            margin-top: 80px;
-        }
-
-        #inner div.footer>p {
-            color: #a4a4a4;
-            font-size: 13px;
-        }
-
-        #inner div.footer a {
-            text-decoration: none;
         }
     </style>
     <script>
@@ -107,13 +43,63 @@
 <body onload="myFunction()">
     <div id="outer">
         <div id="inner">
-            <p>超级书签西大VPN跳转：</p>
-            <p>拖动下方链接到书签栏，当需要使用西大VPN打开某个网页时，可直接在该网页点击书签进行跳转。</p>
-            <br />
-            <p><a title="拖动我到书签栏"
-                    href="javascript:(function(){window.open('http://webvpn.swu.edu.cn/https/77726476706e69737468656265737421f8e2409220346146300b86a1/jumpto?'+location.href)})()">👥
-                    用西大VPN打开</a>
-            </p>
+            <p>超级书签：</p>
+            <p>拖动下方链接到书签栏，在网页点击该书签即可针对网页实现各种功能。</p>
+
+            <dl>
+
+                <dt><a
+                        href="javascript:(function(){window.open('http://webvpn.swu.edu.cn/https/77726476706e69737468656265737421f8e2409220346146300b86a1/jumpto?%27+location.href)})()">👥用西大VPN打开</a>
+                </dt>
+                <dt><a
+                        href="javascript:&quot;use strict&quot;;!function(){var t=function(t){t.stopPropagation(),t.stopImmediatePropagation&amp;&amp;t.stopImmediatePropagation()};[&quot;copy&quot;,&quot;cut&quot;,&quot;contextmenu&quot;,&quot;selectstart&quot;,&quot;mousedown&quot;,&quot;mouseup&quot;,&quot;keydown&quot;,&quot;keypress&quot;,&quot;keyup&quot;].forEach(function(e){document.documentElement.addEventListener(e,t,{capture:!0})}),alert(&quot;%E8%A7%A3%E9%99%A4%E9%99%90%E5%88%B6%E6%88%90%E5%8A%9F%E5%95%A6%EF%BC%81&quot;)}();">🔓️解除复制限制</a>
+                </dt>
+                <dt><a
+                        href="javascript:&quot;use strict&quot;;!function(){var t=function(t){t.stopPropagation(),t.stopImmediatePropagation&amp;&amp;t.stopImmediatePropagation()};[&quot;copy&quot;,&quot;cut&quot;,&quot;contextmenu&quot;,&quot;selectstart&quot;,&quot;mousedown&quot;,&quot;mouseup&quot;,&quot;keydown&quot;,&quot;keypress&quot;,&quot;keyup&quot;].forEach(function(e){document.documentElement.addEventListener(e,t,{capture:!0})}),alert(&quot;%E8%A7%A3%E9%99%A4%E9%99%90%E5%88%B6%E6%88%90%E5%8A%9F%E5%95%A6%EF%BC%81&quot;)}();">🔓️解除复制限制1</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(){eval(function(p,a,c,k,e,r){e=function(c){return(c<a?%27%27:e(parseInt(c/a)))+((c=c%a)%3E35?String.fromCharCode(c+29):c.toString(36))};if(!%27%27.replace(/^/,String)){while(c--)r[e(c)]=k[c]||e(c);k=[function(e){return%20r[e]}];e=function(){return%27\\w+%27};c=1};while(c--)if(k[c])p=p.replace(new%20RegExp(%27\\b%27+e(c)+%27\\b%27,%27g%27),k[c]);return%20p}(%275%202=8;5%203=2.K;3.7=3.k=3.e=3.9=3.6=3.y=3.7=3.z=2.7=2.k=2.e=2.9=2.6=4;2.7=2.6=2.c=2.9=p(){r%20t};g(8.n||8){d=4;c=4;6=4}5%20a=8.15(\%27*\%27);o(5%20i=a.q-1;i%3E=0;i--){5%20b=a[i];g(b.n||b){d=4;c=4}}s(h(\%27%u%v%w%x%j%17%A%B%C%j%D\%27)+\%27\\E\%27+h(\%27%F%G%H%I%J%l%L%l%M%N%O%P%Q%R%S%T%U%V%W%X%Y\%27)+\%27\\Z.10.11\%27);3.m.13=\%2714!f\%27;3.m.16=\%2712!f\%27;%27,62,70,%27||doc|bd|null|var|oncontextmenu|onselectstart|document|onkeydown|arAllElements|elmOne|onmousedown|onmouseup|onpaste|important|with|unescape||u5236|oncopy|u7528|style|wrappedJSObject|for|function|length|return|alert|true|u5DF2|u89E3|u9664|u590D|onmousemove|ondragstart|u53F3|u952E|u9650|uFF01|u000d|u66F4|u591A|u7CBE|u5F69|u5B9E|body|u5E94|uFF0C|u8BF7|u5173|u6CE8|u300E|u5F02|u6B21|u5143|u8F6F|u4EF6|u4E16|u754C|u300F|u000dwww|iPlaySoft|com|text|webkitUserSelect|auto|getElementsByTagName|MozUserSelect|u4E0E%27.split(%27|%27),0,{}))})()">🔓️解除复制限制2</a>
+                </dt>
+                <dt><a
+                        href="javascript:&quot;use strict&quot;;!function(){var t=function(t){t.stopPropagation(),t.stopImmediatePropagation&amp;&amp;t.stopImmediatePropagation()};[&quot;copy&quot;,&quot;cut&quot;,&quot;contextmenu&quot;,&quot;selectstart&quot;,&quot;mousedown&quot;,&quot;mouseup&quot;,&quot;keydown&quot;,&quot;keypress&quot;,&quot;keyup&quot;].forEach(function(e){document.documentElement.addEventListener(e,t,{capture:!0})}),alert(&quot;%E8%A7%A3%E9%99%A4%E9%99%90%E5%88%B6%E6%88%90%E5%8A%9F%E5%95%A6%EF%BC%81&quot;)}();">🔓解除复制限制3</a>
+                </dt>
+                <dt><a
+                        href="javascript:&quot;use strict&quot;;!function(){&quot;true&quot;===document.body.getAttribute(&quot;contenteditable&quot;)?(document.body.setAttribute(%22contenteditable%22,!1),alert(%22%E7%BD%91%E9%A1%B5%E4%B8%8D%E8%83%BD%E7%BC%96%E8%BE%91%E5%95%A6%EF%BC%81%22)):(document.body.setAttribute(%22contenteditable%22,!0),alert(%22%E7%BD%91%E9%A1%B5%E5%8F%AF%E4%BB%A5%E7%BC%96%E8%BE%91%E5%95%A6%EF%BC%81%22))}();">📑网页自由编辑</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(){window.open(&quot;http://www.hisprice.cn/his.php?hisurl=%22+location.href)})()">🛒历史价格查询</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(){var night=function(w){(function(d){var css='html{opacity:0.7!important;background:black!important;}body{background:white!important;}';var s=d.getElementsByTagName('style');for(var i=0,si;si=s[i];i++){if(si.innerHTML==css){si.parentNode.removeChild(si);return}};var heads=d.getElementsByTagName('head');if(heads.length){var node=d.createElement('style');node.type='text/css';node.appendChild(d.createTextNode(css));heads[0].appendChild(node)}})(w.document); for(var i=0,f;f=w.frames[i];i++){try{arguments.callee(f)}catch(e){}}};night(window)})();">🌗夜间模式</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(w,d){var href=location.href;var website=w.prompt('%E8%AF%B7%E8%BE%93%E5%85%A5%E7%BD%91%E5%9D%80','http://')||href;d.write('<HTML><HEAD></HEAD><FRAMESET COLS=\'50%,*\'><FRAME SRC='+location.href+'><FRAME SRC='+website+'></FRAMESET></HTML>');})(window,document)">⏸网页分屏</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(){if(!document.getElementById('fountscript')){var founts=document.createElement('script');founts.src='https://fount.artequalswork.com/fount.js';founts.id='fountscript';document.body.appendChild(founts);}})();">✒️字体查询</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(){window.open(&quot;https://z1.m1907.cn/?jx=%22+location.href)})()">📽️VIP视频解析1</a>
+                </dt>
+                <dt><a
+                        href="javascript:(function(){window.open(&quot;http://jx.quanmingjiexi.com/?url=%22+location.href)})()">📽️VIP视频解析2</a>
+                </dt>
+                <dt><a
+                        href="javascript:&quot;use strict&quot;;!function(){for(var t=document.getElementsByTagName(&quot;input&quot;),e=0;e<t.length;e++)&quot;password&quot;===t[e].getAttribute(&quot;type&quot;)&amp;&amp;t[e].setAttribute(&quot;type&quot;,&quot;text&quot;)}();">🔑显示星号密码</a>
+                </dt>
+                <dt><a
+                        href="javascript:&quot;use strict&quot;;!function(){var o=window.location.href,e=/^https?:\/\/chrome.google.com\/webstore\/.+?\/([a-z]{32})(?=[\/#?]|$)/,t=/^https?:\/\/microsoftedge.microsoft.com\/addons\/.+?\/([a-z]{32})(?=[\/#?]|$)/,n=/^https?:\/\/addons.opera.com\/.*?extensions\/(?:details|download)\/([^\/?#]+)/i,s=/^https?:\/\/(reviewers\.)?(addons\.mozilla\.org|addons(?:-dev)?\.allizom\.org)\/.*?(?:addon|review)\/([^\/%3C%3E%22'?#]+)/,d=%22https://www.crxsoso.com/?auto=1&amp;link=%22;if(e.test(o)||t.test(o)||n.test(o)||s.test(o))window.location.href=d+encodeURIComponent(o);else{var%20r=window.prompt(%22%E8%AF%B7%E8%BE%93%E5%85%A5%E6%89%A9%E5%B1%95%E7%9A%84%E8%AF%A6%E6%83%85%E9%A1%B5%E9%93%BE%E6%8E%A5%E6%88%96%E5%90%8D%E7%A7%B0%EF%BC%81\n\n1.%20%E5%8F%AF%E4%BB%A5%E8%BE%93%E5%85%A5%E6%89%A9%E5%B1%95%E5%90%8D%E7%A7%B0%EF%BC%8C%E4%BE%8B%E5%A6%82%EF%BC%9A%E6%B2%B9%E7%8C%B4\n2.%20%E5%8F%AF%E4%BB%A5%E8%BE%93%E5%85%A5%E6%89%A9%E5%B1%95%E9%93%BE%E6%8E%A5%EF%BC%8C%E4%BE%8B%E5%A6%82%EF%BC%9Ahttps://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo%22);if(%22%22==r||null==r)return;e.test(r)||t.test(r)||n.test(r)||s.test(r)?window.location.href=d+encodeURIComponent(r):window.location.href=%22https://www.crxsoso.com/search?keyword=%22+encodeURIComponent(r)}}();">🔍Crx搜搜</a>
+                </dt>
+                <dt><a
+                        href="javascript:void((function()%7Bvar e=document.createElement('script');e.setAttribute('type','text/javascript');e.setAttribute('charset','UTF-8');e.setAttribute('src','http://s.libdd.com/js/app/bookmarklet/version.js?r=%27+Math.random()*99999999);document.body.appendChild(e)%7D)());">⏺分享到点点</a>
+                </dt>
+                <dt><a
+                        href="javascript:void(function(d,a,c,b){a[c]&amp;&amp;typeof a[c].showValidImages=='function'?a[c].showValidImages():(b=a.createElement(%27script%27),b.id=%27huaban_script%27,b.setAttribute(%27charset%27,%27utf-8%27),b.src=%27http://huaban.com/js/pinmarklet.js?%27+Math.floor(+new%20Date/1E7),a.body.appendChild(b))}(window,document,%27__huaban%27));">🌸采集到花瓣</a>
+                </dt>
+                <dt><a href="data:text/html, <html contenteditable>">📝临时编辑器</a>
+                </dt>
+
+            </dl>
         </div>
     </div>
 
