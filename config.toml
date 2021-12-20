@@ -31,10 +31,10 @@ enableEmoji = false
 footnoteReturnLinkContents = "↩"
 
 # 是否启用 Git 版本信息
-enableGitInfo = true
+enableGitInfo = false
 
 # 是否生成 robots.txt 文件
-enableRobotsTXT = false
+enableRobotsTXT = true
 
 # 每一分页的文章数（仅对「文章摘要」首页布局有效）
 paginate = 5
@@ -81,13 +81,17 @@ uglyURLs = false
     [markup.highlight]
         codeFences = true
         guessSyntax = false
-        lineNos = false
+        lineNos = true
         lineNumbersInTable = true
         noClasses = false
     [markup.tableOfContents]
         startLevel = 2
         endLevel = 6
         ordered = true
+
+# 压缩 HTML
+[minify.tdewolff.html]
+    keepWhitespace = false
 
 # 作者信息
 [author]
@@ -109,9 +113,9 @@ uglyURLs = false
     threshold = 80
     includeNewer = true
     toLower = true
-    # [[related.indices]]
-    #     name = "categories"
-    #     weight = 100
+    [[related.indices]]
+        name = "categories"
+        weight = 100
     [[related.indices]]
         name = "tags"
         weight = 95
@@ -173,7 +177,7 @@ uglyURLs = false
 # 4. links      链接栏（关于页面的极简页脚）
 
 # 菜单内的配置说明如下：
-# url           链接地址
+# pageref/url   内链地址/外链地址
 # name          文本（留空（""）则无）
 # weight        位置
 # pre           内链（internal）或外链（external）
@@ -186,37 +190,37 @@ uglyURLs = false
 [menu]
     ## 菜单栏
     # [[menu.main]]
-    #     url = "/"
+    #     pageref = "/"
     #     name = "首页"
     #     weight = 1
     #     pre = "internal"
     #     post = "home"
     [[menu.main]]
-        url = "/edu/"
+        pageref = "/edu/"
         name = "教育"
         weight = 2
         pre = "internal"
         post = "edu"
     [[menu.main]]
-        url = "/tech/"
+        pageref = "/tech/"
         name = "技术"
         weight = 3
         pre = "internal"
         post = "tech"
     [[menu.main]]
-        url = "/life/"
+        pageref = "/life/"
         name = "生活"
         weight = 4
         pre = "internal"
         post = "life"
     [[menu.main]]
-        url = "/tags/"
+        pageref = "/tags/"
         name = "标签"
         weight = 5
         pre = "internal"
         post = "tags"
     [[menu.main]]
-        url = "/about/"
+        pageref = "/about/"
         name = "关于"
         weight = 6
         pre = "internal"
@@ -296,7 +300,7 @@ uglyURLs = false
     # 说明：对弹性布局的顶栏无效
 
     # 是否按文章分区高亮当前菜单项
-    activeInSection = true
+    activeInSection = false
     # 说明：如果开启，那么当某一文章的分区名是某
     #      一菜单项中的 `url` 时，该文章页面中
     #      的该菜单项也会被高亮
@@ -311,7 +315,7 @@ uglyURLs = false
     # 3. posts     文章摘要
     # 4. page      普通页面
 
-    homeLayout = "poetry"
+    homeLayout = "posts"
 
     ## 「诗意人生」
     # 诗句，支持 Markdown
@@ -422,7 +426,7 @@ uglyURLs = false
     displayListTitle = true
 
     # 日期的格式
-    listDateFormat = "2006/01/02"
+    listDateFormat = "1 月 2 日"
     # 注意：请遵循格式 https://gohugo.io/functions/format/
 
     # 日期的位置
@@ -601,8 +605,11 @@ uglyURLs = false
     # 说明：文章的 Front Matter 中的 `comments`
     #      的优先级高于此处
 
+    # 直接加载评论，不需要手动点击按钮加载
+    autoLoadComments = false
+
     # Valine Special
-    enableValineSpecial = true
+    enableValineSpecial = false
     valineSpecialSrcCDN = "https://cdn.jsdelivr.net/gh/track23/blog-static/Valine.min.js"
     valineSpecialLang = "zh-cn"
     valineSpecialAdminEmailHash = "c18ed822903aed06b25ae54c9d81a39a"
@@ -620,10 +627,10 @@ uglyURLs = false
     disqusShortname = ""
 
     ## Valine
-    enableValine = false
+    enableValine = true
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
-    valinePlaceholder = "说点什么吧..."
+    valinePlaceholder = "Just go go"
     valinePath = ""
     valineAvatar = "mm"
     valineMeta = ["nick", "mail", "link"]
@@ -665,7 +672,6 @@ uglyURLs = false
     gitalkProxy = "https://cors-anywhere.azm.workers.dev/https://github.com/login/oauth/access_token"
     gitalkEnableHotKey = true
     # 说明：https://github.com/gitalk/gitalk
-
 
 
     ######################################
@@ -757,7 +763,7 @@ uglyURLs = false
     #      首页布局有效
 
     # 日期格式
-    postMetaDateFormat = "2006/1/2"
+    postMetaDateFormat = "2006.1.2"
     # 注意：请遵循格式 https://gohugo.io/functions/format/
 
     # 是否显示发布时间
@@ -793,7 +799,7 @@ uglyURLs = false
     readingTimeIcon = "clock"
 
     # 是否显示不蒜子页面浏览量
-    displayBusuanziPagePV = true
+    displayBusuanziPagePV = false
     # 不蒜子页面浏览量的图标
     busuanziPagePVIcon = "eye"
     # 说明：仅在生产环境（production）下渲染
@@ -847,7 +853,7 @@ uglyURLs = false
     #      默认值：§
 
     # 锚点图标
-    anchorIcon = ""
+    anchorIcon = "link"
     # 说明：留空（""）则回退到锚点符号
 
     # 是否开启锚点链接
@@ -911,7 +917,7 @@ uglyURLs = false
     squareBrackets = true
 
     # 替换脚注的返回链接中的文本为图标
-    footnoteReturnLinkIcon = ""
+    footnoteReturnLinkIcon = "angle-up"
     # 说明：如果不为空（""），则会用图标替换
     #      `footnoteReturnLinkContents`
 
@@ -922,6 +928,11 @@ uglyURLs = false
     #      如果你喜欢在 Markdown 中手动插入
     #      `---` 以将文章的正文内容与脚注内容
     #      分隔开来，那么这项设置将会非常有用。
+
+
+    ######################################
+    # 滚动条
+    customizeScrollbar = true
 
 
     ######################################
@@ -967,7 +978,7 @@ uglyURLs = false
     ######################################
     ## 字号（单位：px）
 
-    fontSize = 17
+    fontSize = 16
 
     ######################################
     ## 制表符的宽度
@@ -1055,7 +1066,7 @@ uglyURLs = false
     enablePostCopyright = true
 
     # 是否显示（全局设置）
-    displayPostCopyright = false
+    displayPostCopyright = true
     # 说明：文章的 Front Matter 中的 `displayCopyright`
     #      的优先级高于此处
 
@@ -1067,7 +1078,7 @@ uglyURLs = false
     enablePostUpdatedBadge = true
 
     # 是否显示（全局设置）
-    displayUpdatedBadge = false
+    displayUpdatedBadge = true
     # 说明：文章的 Front Matter 中的 `badge`
     #      的优先级高于此处
 
@@ -1081,7 +1092,7 @@ uglyURLs = false
     # 文章的 Git 版本信息
 
     # 是否开启
-    enablePostGitInfo = true
+    enablePostGitInfo = false
 
     # 是否显示（全局设置）
     displayPostGitInfo = false
@@ -1129,7 +1140,7 @@ uglyURLs = false
     # 说明：文章的 Front Matter 中的 `share`
     #      的优先级高于此处
 
-    displayShareOnText = true
+    displayShareOnText = false
 
     shareOnTwitter = true
     shareOnFacebook = true
@@ -1147,10 +1158,10 @@ uglyURLs = false
     # 相关文章
 
     # 是否开启
-    enableRelatedPosts = false
+    enableRelatedPosts = true
 
     # 是否显示（全局设置）
-    displayRelatedPosts = false
+    displayRelatedPosts = true
     # 说明：文章的 Front Matter 中的 `related`
     #      的优先级高于此处
 
@@ -1165,7 +1176,7 @@ uglyURLs = false
     # 文章的标签
 
     # 是否开启
-    enablePostTags = false
+    enablePostTags = true
 
     # 标签的图标
     postTagsIcon = "tag"
@@ -1182,7 +1193,7 @@ uglyURLs = false
     #      的是一篇更旧的文章。
 
     # 是否开启
-    enablePostNav = false
+    enablePostNav = true
 
     # 是否仅限于相同的文章分区
     postNavInSection = true
@@ -1192,8 +1203,8 @@ uglyURLs = false
     # 极简页脚
 
     # 是否开启
-    enableMinimalFooter = true
-    enableVerticalBarStructure = true
+    enableMinimalFooter = false
+    enableVerticalBarStructure = false
     # 说明：如果开启此项，显示在右边的部类或分区
     #      将会包含全部的第一级部类或分区，并且
     #      以竖线（|）分隔开来。
@@ -1233,6 +1244,7 @@ uglyURLs = false
     # 是否在首页显示
     displayFooterInHome = true
 
+    displayCopyleftSymbol = false
     # 是否显示版权符号（©）
     displayCopyrightSymbol = true
 
@@ -1255,10 +1267,10 @@ uglyURLs = false
     # 自定义页脚（支持 Markdown）
     customFooter = ""
 
-    displayBusuanziSiteUVAndPV = true
-    busuanziSiteUVText = ""
+    displayBusuanziSiteUVAndPV = false
+    busuanziSiteUVText = "本站访客数"
     busuanziSiteUVIcon = "user"
-    busuanziSitePVText = ""
+    busuanziSitePVText = "本站访问量"
     busuanziSitePVIcon = "eye"
     # 说明：仅在生产环境（production）下渲染
     #      文本或图标，留空（""）则无
@@ -1337,20 +1349,20 @@ uglyURLs = false
     # 平滑滚动
 
     # 是否开启
-    enableSmoothScroll = false
+    enableSmoothScroll = true
 
 
     ######################################
     # 图片缩放
 
-    enableMediumZoom = false
+    enableMediumZoom = true
     # 说明：https://github.com/francoischalifour/medium-zoom
 
 
     ######################################
     # Instant Page
 
-    enableInstantPage = false
+    enableInstantPage = true
     # 说明：https://github.com/instantpage/instant.page
 
 
