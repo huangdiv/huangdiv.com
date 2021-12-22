@@ -31,10 +31,10 @@ enableEmoji = false
 footnoteReturnLinkContents = "↩"
 
 # 是否启用 Git 版本信息
-enableGitInfo = false
+enableGitInfo = true
 
 # 是否生成 robots.txt 文件
-enableRobotsTXT = true
+enableRobotsTXT = false
 
 # 每一分页的文章数（仅对「文章摘要」首页布局有效）
 paginate = 5
@@ -46,12 +46,12 @@ uglyURLs = false
 
 # URL 结构
 [permalinks]
-    categories = "/categories/:slug/"
+    # categories = "/categories/:slug/"
     tags = "/tags/:slug/"
 
 # 类别
 [taxonomies]
-    # category = "section"
+    # category = "categories"
     tag = "tags"
 
 # 修改时间
@@ -81,7 +81,7 @@ uglyURLs = false
     [markup.highlight]
         codeFences = true
         guessSyntax = false
-        lineNos = true
+        lineNos = false
         lineNumbersInTable = true
         noClasses = false
     [markup.tableOfContents]
@@ -113,9 +113,9 @@ uglyURLs = false
     threshold = 80
     includeNewer = true
     toLower = true
-    [[related.indices]]
-        name = "categories"
-        weight = 100
+    # [[related.indices]]
+    #     name = "categories"
+    #     weight = 100
     [[related.indices]]
         name = "tags"
         weight = 95
@@ -161,7 +161,7 @@ uglyURLs = false
 
 # RSS & Atom 文章数限制
 [services.rss]
-    limit = -1
+    limit = 10
 
 
 
@@ -257,7 +257,7 @@ uglyURLs = false
     # 说明：对弹性布局的顶栏无效
 
     # 背景
-    headerBackground = "linear-gradient(90deg, #f795331a 0, #f370551a 15%, #ef4e7b1a 30%, #a166ab1a 44%, #5073b81a 58%, #1098ad1a 72%, #07b39b1a 86%, #6dba821a 100%)"
+    headerBackground = "alpha(var(--color-bg), 0.8) linear-gradient(90deg, #f795331a 0, #f370551a 15%, #ef4e7b1a 30%, #a166ab1a 44%, #5073b81a 58%, #1098ad1a 72%, #07b39b1a 86%, #6dba821a 100%)"
     # 说明：https://developer.mozilla.org/zh-CN/docs/Web/CSS/background
 
     # 顶栏布局
@@ -267,7 +267,7 @@ uglyURLs = false
     # 在窄视图下隐藏菜单栏并显示一个按钮？
     enableNavToggle = true
 
-    navHeight = "10em"
+    navHeight = "9em"
     # 说明：菜单栏展开时的高度
 
 
@@ -292,11 +292,11 @@ uglyURLs = false
     # 菜单栏
 
     # 是否开启
-    enableMenu = true
+    enableMenu = false
     # 说明：对弹性布局的顶栏无效
 
     # 是否在首页显示
-    displayMenuInHome = true
+    displayMenuInHome = false
     # 说明：对弹性布局的顶栏无效
 
     # 是否按文章分区高亮当前菜单项
@@ -426,7 +426,7 @@ uglyURLs = false
     displayListTitle = true
 
     # 日期的格式
-    listDateFormat = "1 月 2 日"
+    listDateFormat = "2006/01/02"
     # 注意：请遵循格式 https://gohugo.io/functions/format/
 
     # 日期的位置
@@ -440,9 +440,9 @@ uglyURLs = false
     chineseZodiac = true
 
     # 是否翻译年份（仅对年份标题有效）
-    i18nYear = true
+    i18nYear = false
     # 是否翻译月份（仅对月份标题有效）
-    i18nMonth = true
+    i18nMonth = false
 
 
     ######################################
@@ -559,7 +559,7 @@ uglyURLs = false
 
     # 说明：仅在生产环境（production）下渲染
 
-    enableServiceWorker = false
+    enableServiceWorker = true
 
 
     ######################################
@@ -630,7 +630,7 @@ uglyURLs = false
     enableValine = true
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
-    valinePlaceholder = "Just go go"
+    valinePlaceholder = "说点什么吧..."
     valinePath = ""
     valineAvatar = "mm"
     valineMeta = ["nick", "mail", "link"]
@@ -753,12 +753,12 @@ uglyURLs = false
     # 文章元信息
 
     # 是否开启（全局设置）
-    enablePostMeta = true
+    enablePostMeta = false
     # 说明：文章的 Front Matter 中的 `meta`
     #      的优先级高于此处
 
     # 是否在首页开启
-    enablePostMetaInHome = true
+    enablePostMetaInHome = false
     # 说明：仅对「文章摘要」和「普通页面」
     #      首页布局有效
 
@@ -853,7 +853,7 @@ uglyURLs = false
     #      默认值：§
 
     # 锚点图标
-    anchorIcon = "link"
+    anchorIcon = ""
     # 说明：留空（""）则回退到锚点符号
 
     # 是否开启锚点链接
@@ -917,7 +917,7 @@ uglyURLs = false
     squareBrackets = true
 
     # 替换脚注的返回链接中的文本为图标
-    footnoteReturnLinkIcon = "angle-up"
+    footnoteReturnLinkIcon = ""
     # 说明：如果不为空（""），则会用图标替换
     #      `footnoteReturnLinkContents`
 
@@ -932,7 +932,7 @@ uglyURLs = false
 
     ######################################
     # 滚动条
-    customizeScrollbar = true
+    customizeScrollbar = false
 
 
     ######################################
@@ -951,9 +951,9 @@ uglyURLs = false
     # 菜单栏
     fontFamilyMenu = ""
     # 文章标题、文章副标题、列表标题、列表的年份和月份标题、相关文章标题、文章上下篇标题、表格的表头、定义列表中的术语
-    fontFamilyTitle = "'Noto Serif SC', 'EB Garamond', serif"
+    fontFamilyTitle = "'Noto Serif SC', 'Amstelvar', serif"
     # 分节标题、目录标题
-    fontFamilyHeadings = "'Noto Serif SC', 'EB Garamond', serif"
+    fontFamilyHeadings = "'Noto Serif SC', 'Amstelvar', serif"
     # 代码、上标、文章元信息、文章更新徽章、文章的 Git 版本信息、极简页脚、不蒜子站点浏览计数
     fontFamilyCode = "'Source Code Pro', 'Noto Serif SC', monospace"
     # 引用
@@ -963,12 +963,12 @@ uglyURLs = false
     # 说明文字
     fontFamilyCaption = ""
     # 页脚
-    fontFamilyFooter = ""
+    fontFamilyFooter = "'Source Code Pro', 'Noto Serif SC', monospace"
     # 主体
-    fontFamilyBody = "'EB Garamond', 'Noto Serif SC', serif"
+    fontFamilyBody = "'Amstelvar', 'Noto Serif SC', serif"
 
     # 网络字体链接
-    fontsLink = "https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400;1,700&family=Noto+Serif+SC:wght@400;500;700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+    fontsLink = "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel+Decorative:wght@700&display=swap"
     # 说明：要想读者一定体验到你设置的字体，最好
     #      采用网络字体。MemE 主题目前仅支持
     #      Google Fonts 的链接，请前往
@@ -1066,7 +1066,7 @@ uglyURLs = false
     enablePostCopyright = true
 
     # 是否显示（全局设置）
-    displayPostCopyright = true
+    displayPostCopyright = false
     # 说明：文章的 Front Matter 中的 `displayCopyright`
     #      的优先级高于此处
 
@@ -1078,7 +1078,7 @@ uglyURLs = false
     enablePostUpdatedBadge = true
 
     # 是否显示（全局设置）
-    displayUpdatedBadge = true
+    displayUpdatedBadge = false
     # 说明：文章的 Front Matter 中的 `badge`
     #      的优先级高于此处
 
@@ -1092,7 +1092,7 @@ uglyURLs = false
     # 文章的 Git 版本信息
 
     # 是否开启
-    enablePostGitInfo = false
+    enablePostGitInfo = true
 
     # 是否显示（全局设置）
     displayPostGitInfo = false
@@ -1133,10 +1133,10 @@ uglyURLs = false
     # 文章分享
 
     # 是否开启
-    enablePostShare = true
+    enablePostShare = false
 
     # 是否显示（全局设置）
-    displayPostShare = true
+    displayPostShare = false
     # 说明：文章的 Front Matter 中的 `share`
     #      的优先级高于此处
 
@@ -1158,10 +1158,10 @@ uglyURLs = false
     # 相关文章
 
     # 是否开启
-    enableRelatedPosts = true
+    enableRelatedPosts = false
 
     # 是否显示（全局设置）
-    displayRelatedPosts = true
+    displayRelatedPosts = false
     # 说明：文章的 Front Matter 中的 `related`
     #      的优先级高于此处
 
@@ -1176,7 +1176,7 @@ uglyURLs = false
     # 文章的标签
 
     # 是否开启
-    enablePostTags = true
+    enablePostTags = false
 
     # 标签的图标
     postTagsIcon = "tag"
@@ -1217,13 +1217,13 @@ uglyURLs = false
     # 返回顶部按钮
 
     # 是否开启
-    enableBackToTop = true
+    enableBackToTop = false
 
     # 是否开启自动隐藏
     enableBackToTopAutoHide = true
 
     # 是否在首页显示
-    displayBackToTopInHome = true
+    displayBackToTopInHome = false
 
     # 是否在移动端显示
     displayBackToTopOnMobile = false
@@ -1239,7 +1239,7 @@ uglyURLs = false
     enableFooter = true
 
     # 是否显示
-    displayFooter = true
+    displayFooter = false
 
     # 是否在首页显示
     displayFooterInHome = true
@@ -1303,7 +1303,7 @@ uglyURLs = false
     enableHighlight = true
 
     # 是否开启竖直滚动
-    enableOverflowY = true
+    enableOverflowY = false
     # 最大高度
     maxHeight = 20
     # 单位：em
@@ -1320,7 +1320,7 @@ uglyURLs = false
     # 说明：仅对 MemE 生成的 CSS 和 JS 有效
 
     # 是否开启文件指纹
-    enableFingerprint = true
+    enableFingerprint = false
 
     # 是否开启子资源完整性验证
     enableSRI = false
@@ -1349,7 +1349,7 @@ uglyURLs = false
     # 平滑滚动
 
     # 是否开启
-    enableSmoothScroll = true
+    enableSmoothScroll = false
 
 
     ######################################
@@ -1362,7 +1362,7 @@ uglyURLs = false
     ######################################
     # Instant Page
 
-    enableInstantPage = true
+    enableInstantPage = false
     # 说明：https://github.com/instantpage/instant.page
 
 
