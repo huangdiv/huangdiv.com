@@ -1,7 +1,10 @@
 <script>
     function loadComments() {
-        document.querySelector('#load-comments').style.display = "none";
+        // document.querySelector('#load-comments').style.display = "none";
         var vscommentsdiv = document.createElement('div');
+        var commentCountSpan = document.createElement('span');
+        commentCountSpan.id = "comment-count";
+        document.querySelector('#load-comments').appendChild(commentCountSpan);
         vscommentsdiv.id = "vscomments";
         vscommentsdiv.style = "margin-top: 2em;";
         document.querySelector('.load-comments').parentNode.appendChild(vscommentsdiv);
@@ -28,6 +31,7 @@
     function newValine() {
         new Valine({
             el: '#vscomments',
+            comment_count_el: {{ .Site.Params.valineSpecialCommentCountEl }},
             lang: {{ .Site.Params.valineSpecialLang }},
             admin_email_hash: {{ .Site.Params.valineSpecialAdminEmailHash }},
             app_id: {{ .Site.Params.valineSpecialAppId }},
