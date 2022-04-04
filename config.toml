@@ -222,17 +222,23 @@ uglyURLs = false
     [[menu.main]]
         pageref = "/about/"
         name = "关于"
-        weight = 6
+        weight = 7
         pre = "internal"
         post = "user-circle"
     [[menu.main]]
-        weight = 7
-        identifier = "theme-switcher"
+        url = "https://pan.huangdiv.com"
+        name = "网盘"
+        weight = 6
+        pre = "external"
+        post = "pan"
     [[menu.main]]
         weight = 8
+        identifier = "theme-switcher"
+    [[menu.main]]
+        weight = 9
         identifier = "lang-switcher"
     # [[menu.main]]
-    #     weight = 9
+    #     weight = 10
     #     identifier = "search"
     #     post = "search"
 
@@ -267,7 +273,7 @@ uglyURLs = false
     # 在窄视图下隐藏菜单栏并显示一个按钮？
     enableNavToggle = true
 
-    navHeight = "9em"
+    navHeight = "10em"
     # 说明：菜单栏展开时的高度
 
 
@@ -292,11 +298,11 @@ uglyURLs = false
     # 菜单栏
 
     # 是否开启
-    enableMenu = false
+    enableMenu = true
     # 说明：对弹性布局的顶栏无效
 
     # 是否在首页显示
-    displayMenuInHome = false
+    displayMenuInHome = true
     # 说明：对弹性布局的顶栏无效
 
     # 是否按文章分区高亮当前菜单项
