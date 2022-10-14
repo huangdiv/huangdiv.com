@@ -615,7 +615,7 @@ uglyURLs = false
     autoLoadComments = false
 
     # Valine Special
-    enableValineSpecial = true
+    enableValineSpecial = false
     valineSpecialCommentCountEl = "#comment-count"
     valineSpecialSrcCDN = "https://cdn.jsdelivr.net/gh/track23/blog-static/Valine.min.js"
     valineSpecialLang = "zh-cn"
@@ -634,7 +634,7 @@ uglyURLs = false
     disqusShortname = ""
 
     ## Valine
-    enableValine = false
+    enableValine = true
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valinePlaceholder = "说点什么吧..."
