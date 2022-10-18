@@ -2,6 +2,9 @@
     {{ if or (in .Site.Params.mainSections .Section) .Params.comments }}
         {{ if .Site.Params.enableValineSpecial }}
             {{ partial "custom/valine-special.html" . }}
-       {{ end }}
+        {{ end }}
+        {{ if .Site.Params.enableWaline }}
+            {{ partial "custom/waline.html" . }}
+        {{ end }}
     {{ end }}
 {{ end }}

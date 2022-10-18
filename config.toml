@@ -614,7 +614,13 @@ uglyURLs = false
     # 直接加载评论，不需要手动点击按钮加载
     autoLoadComments = false
 
-    # Valine Special
+    ## Waline
+    enableWaline = true
+    walineSrcJsCDN = "https://unpkg.com/@waline/client@v2/dist/waline.js"
+    walineSrcCssCDN = "https://unpkg.com/@waline/client@v2/dist/waline.css"
+    walineServerURL = "https://comments.huangdiv.com"
+
+    ## Valine Special
     enableValineSpecial = false
     valineSpecialCommentCountEl = "#comment-count"
     valineSpecialSrcCDN = "https://cdn.jsdelivr.net/gh/track23/blog-static/Valine.min.js"
@@ -634,7 +640,7 @@ uglyURLs = false
     disqusShortname = ""
 
     ## Valine
-    enableValine = true
+    enableValine = false
     valineAppId = "JSVkqF6bGikdWJ7oeG6kF7fq-MdYXbMMI"
     valineAppKey = "uG9CDQ0NOWKC7MuAWCSIo5TY"
     valinePlaceholder = "说点什么吧..."
