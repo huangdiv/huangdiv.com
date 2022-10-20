@@ -6,7 +6,7 @@ tags: ["about"]
 displayCopyright: false
 badge: false
 gitinfo: true
-dropCap: true
+dropcap: true
 comments: true
 ---
 黄笛，中学物理教师，毕业于西南大学。致力于促进教育及社会公平，目标是构建立体化的教学过程，使学生乐学善思。

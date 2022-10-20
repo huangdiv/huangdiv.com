@@ -1,3 +1,5 @@
-+++
-title = "教育"
-+++
+---
+title : "教育"
+dropcap : true
+meta : true
+---
