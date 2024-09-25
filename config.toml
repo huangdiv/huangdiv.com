@@ -616,8 +616,8 @@ uglyURLs = false
 
     ## Waline
     enableWaline = true
-    walineSrcJsCDN = "https://unpkg.com/@waline/client@v2/dist/waline.js"
-    walineSrcCssCDN = "https://unpkg.com/@waline/client@v2/dist/waline.css"
+    walineSrcJsCDN = "https://unpkg.com/@waline/client@v3/dist/waline.js"
+    walineSrcCssCDN = "https://unpkg.com/@waline/client@v3/dist/waline.css"
     walineServerURL = "https://comments.huangdiv.com"
 
     ## Valine Special
