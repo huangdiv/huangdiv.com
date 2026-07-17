@@ -15,8 +15,12 @@ theme = "meme"
 newContentEditor = ""
 
 # i18n
-defaultContentLanguage = "zh"
+defaultContentLanguage = "zh-cn"
 defaultContentLanguageInSubdir = false
+
+# 标题大小写格式
+# https://gohugo.io/getting-started/configuration/#configure-title-case
+titleCaseStyle = "none"
 
 # 是否复数化列表页面的标题
 pluralizeListTitles = false
@@ -34,10 +38,7 @@ footnoteReturnLinkContents = "↩"
 enableGitInfo = true
 
 # 是否生成 robots.txt 文件
-enableRobotsTXT = false
-
-# 每一分页的文章数（仅对「文章摘要」首页布局有效）
-paginate = 5
+enableRobotsTXT = true
 
 # URL 相关
 disablePathToLower = false
@@ -46,17 +47,23 @@ uglyURLs = false
 
 # URL 结构
 [permalinks]
-    # categories = "/categories/:slug/"
+    categories = "/categories/:slug/"
     tags = "/tags/:slug/"
 
 # 类别
 [taxonomies]
-    # category = "categories"
+    category = "categories"
     tag = "tags"
 
 # 修改时间
 [frontmatter]
     lastmod = ["lastmod", ":git", ":fileModTime", ":default"]
+
+[pagination]
+    disableAliases = false
+    # 每一分页的文章数（仅对「文章摘要」首页布局有效）
+    pagerSize = 5
+    path = 'page'
 
 # Markdown 渲染器
 [markup]
@@ -81,7 +88,7 @@ uglyURLs = false
     [markup.highlight]
         codeFences = true
         guessSyntax = false
-        lineNos = false
+        lineNos = true
         lineNumbersInTable = true
         noClasses = false
     [markup.tableOfContents]
@@ -93,29 +100,14 @@ uglyURLs = false
 [minify.tdewolff.html]
     keepWhitespace = false
 
-# 作者信息
-[author]
-    # 名字
-    name = "黄笛"
-    # 邮箱
-    email = "i@huangdiv.com"
-    # 座右铭或简介
-    motto = "认识你自己"
-    # 头像
-    avatar = "/icons/apple-touch-icon.png"
-    # 网站（默认值：baseURL）
-    website = "https://huangdiv.com/"
-    # 推特
-    twitter = "huangdiv"
-
 # 相关文章
 [related]
     threshold = 80
     includeNewer = true
     toLower = true
-    # [[related.indices]]
-    #     name = "categories"
-    #     weight = 100
+    [[related.indices]]
+        name = "categories"
+         weight = 100
     [[related.indices]]
         name = "tags"
         weight = 95
@@ -161,7 +153,7 @@ uglyURLs = false
 
 # RSS & Atom 文章数限制
 [services.rss]
-    limit = 10
+    limit = -1
 
 
 
@@ -341,6 +333,11 @@ uglyURLs = false
     homeKeywords = ""
     homeLinksDelimiter = ""
 
+    ## 「文章摘要」
+    enableHideInHomepage = false
+    # 说明：激活 `hideInHomepage` front matter
+    #      的支持（性能原因默认关闭）
+
 
     ######################################
     # 站点信息
@@ -432,7 +429,7 @@ uglyURLs = false
     displayListTitle = true
 
     # 日期的格式
-    listDateFormat = "2006/01/02"
+    listDateFormat = "1 月 2 日"
     # 注意：请遵循格式 https://gohugo.io/functions/format/
 
     # 日期的位置
@@ -440,15 +437,15 @@ uglyURLs = false
     # 说明：left（左边）或 right（右边）
 
     # 是否按月份分隔列表
-    groupByMonth = false
+    groupByMonth = true
 
     # 是否开启十二生肖
     chineseZodiac = true
 
     # 是否翻译年份（仅对年份标题有效）
-    i18nYear = false
+    i18nYear = true
     # 是否翻译月份（仅对月份标题有效）
-    i18nMonth = false
+    i18nMonth = true
 
 
     ######################################
@@ -493,6 +490,10 @@ uglyURLs = false
     #      有一个比手动指定更高的优先级——
     #      Front Matter 中的 `description`。
 
+    # 自定页脚（支持 Template 与 Markdown 语法）
+    feedFooter = """> 阅读原文：<{{ .Permalink }}>  
+> 博客公告：博客现已开通邮件订阅，欢迎[通过 Substack 订阅](https://username.substack.com)支持我的创作！"""
+
 
     ######################################
     # 深色模式
@@ -523,12 +524,7 @@ uglyURLs = false
     # 网页应用
 
     # 说明：前往 https://realfavicongenerator.net/
-    #      生成相关图标和文件，下载后解压，仅保留
-    #      android-chrome-512x512.png、
-    #      apple-touch-icon.png、
-    #      mstile-150x150.png、
-    #      safari-pinned-tab.svg、favicon.ico、
-    #      site.webmanifest 这些文件，删除其余。
+    #      生成相关图标和文件，下载后解压。
     #      然后将这些文件移动到 ~/blog/static/icons/
     #      目录下，再将 favicon.ico、site.webmanifest
     #      移动到 ~/blog/static/ 目录下，
@@ -536,10 +532,16 @@ uglyURLs = false
     #      manifest.json，并检查和修改相关内容
     #      （图标的路径）。
 
+    # 注意：要检查你的图标
+    #      请前往 https://realfavicongenerator.net/favicon-checker。
+    #      如果检测到任何问题，检查生成的文件和
+    #      ~/blog/themes/meme/static/ 目录下
+    #      相关文件的文件名差异。如果有差异，
+    #      这意味着某些文件可能已经过时。
+    #      如有需要，请提 Issue。
+
     themeColor = "#fff"
     themeColorDark = "#16171d"
-    safariMaskColor = "#2a6df4"
-    msApplicationTileColor = "#fff"
 
 
     ######################################
@@ -676,15 +678,73 @@ uglyURLs = false
     gitalkRepo = "your_repository"
     gitalkOwner = "your_gitalk_owner"
     gitalkAdmin = ["your_gitalk_admin"]
-    gitalkLable = ["Gitalk"]
+
+    # 1. default (`location.href`)
+    # 2. pathname (`location.pathname`)
+    # 3. hash (hash_filepath)
+    # 4. custom:your_gitalk_id ("your_gitalk_id")
+    gitalkID = "pathname"
+
+    gitalkNumber = -1
+    gitalkLables = ["Gitalk"]
+
+    # 1. default (`document.title`)
+    # 2. custom:your_gitalk_title ("your_gitalk_title")
+    gitalkTitle = "default"
+
+    # 1. default (`location.href` + header.meta[description])
+    # 2. href (`location.href`)
+    # 3. custom:your_gitalk_body ("your_gitalk_body")
+    gitalkBody = "default"
+
+    # 1. default (`navigator.language || navigator.userLanguage`)
+    # 2. Support [en, zh-CN, zh-TW, es-ES, fr, ru, de, pl, ko, fa, ja]
+    gitalkLanguage = "zh-CN"
+    
     gitalkDistractionFreeMode = false
     gitalkPerPage = 10
-    gitalkLanguage = "en"
     gitalkPagerDirection = "last"
     gitalkCreateIssueManually = false
     gitalkProxy = "https://cors-anywhere.azm.workers.dev/https://github.com/login/oauth/access_token"
+    gitalkStaggerDelayBy = 150
+    gitalkAppearAnimation = "accordionVertical"
+    gitalkEnterAnimation = "accordionVertical"
+    gitalkLeaveAnimation = "accordionVertical"
     gitalkEnableHotKey = true
     # 说明：https://github.com/gitalk/gitalk
+
+    ## Giscus
+    enableGiscus = false
+    giscusRepo = "[ENTER repo/you/want HERE]"
+    giscusRepoId = "[ENTER REPO ID HERE]"
+    giscusCategory = "[ENTER CATEGORY NAME HERE]"
+    giscusCategoryId = "[ENTER CATEGORY ID HERE]"
+    giscusMapping = "pathname"
+    giscusStrict = false
+    giscusReactionsEnabled = true
+    giscusEmitMetaData = false
+    giscusInputPosition = "top"
+    giscusTheme = "light"
+    giscusThemeDark = "dark"
+    giscusLang = "zh-CN"
+    # 说明：https://giscus.app/zh-CN
+
+    # Remark42
+    enableRemark42 = false
+    remark42Host = ""
+    remark42SiteId = "remark"
+    remark42Url = ""
+    remark42Components = ["embed"]
+    remark42MaxShownComments = 15
+    remark42MaxLastComments = 15
+    remark42Theme = "light"
+    remark42PageTitle = ""
+    remark42Locale = "zh"
+    remark42ShowEmailSubscription = true
+    remark42ShowRssSubscription = true
+    remark42SimpleView = false
+    remark42NoFooter = false
+    # 说明：https://remark42.com/docs/configuration/frontend/
 
 
     ######################################
@@ -720,6 +780,8 @@ uglyURLs = false
     ## 广告单元
     enableGoogleAdUnits = false
     googleAdSlot = ""
+    googleAdSlotInArticle = ""
+    googleAdSlotAutoRelaxed = ""
 
 
     ######################################
@@ -766,12 +828,12 @@ uglyURLs = false
     # 文章元信息
 
     # 是否开启（全局设置）
-    enablePostMeta = false
+    enablePostMeta = true
     # 说明：文章的 Front Matter 中的 `meta`
     #      的优先级高于此处
 
     # 是否在首页开启
-    enablePostMetaInHome = false
+    enablePostMetaInHome = true
     # 说明：仅对「文章摘要」和「普通页面」
     #      首页布局有效
 
@@ -866,7 +928,7 @@ uglyURLs = false
     #      默认值：§
 
     # 锚点图标
-    anchorIcon = ""
+    anchorIcon = "link"
     # 说明：留空（""）则回退到锚点符号
 
     # 是否开启锚点链接
@@ -883,7 +945,7 @@ uglyURLs = false
     enableCaption = true
 
     # 说明文字的前缀
-    captionPrefix = "◎ "
+    captionPrefix = "※ "
 
 
     ######################################
@@ -930,7 +992,7 @@ uglyURLs = false
     squareBrackets = true
 
     # 替换脚注的返回链接中的文本为图标
-    footnoteReturnLinkIcon = ""
+    footnoteReturnLinkIcon = "angle-up"
     # 说明：如果不为空（""），则会用图标替换
     #      `footnoteReturnLinkContents`
 
@@ -945,7 +1007,7 @@ uglyURLs = false
 
     ######################################
     # 滚动条
-    customizeScrollbar = false
+    customizeScrollbar = true
 
 
     ######################################
@@ -964,9 +1026,9 @@ uglyURLs = false
     # 菜单栏
     fontFamilyMenu = ""
     # 文章标题、文章副标题、列表标题、列表的年份和月份标题、相关文章标题、文章上下篇标题、表格的表头、定义列表中的术语
-    fontFamilyTitle = "'Noto Serif SC', 'Amstelvar', serif"
+    fontFamilyTitle = "'Noto Serif SC', serif"
     # 分节标题、目录标题
-    fontFamilyHeadings = "'Noto Serif SC', 'Amstelvar', serif"
+    fontFamilyHeadings = "'Noto Serif SC', serif"
     # 代码、上标、文章元信息、文章更新徽章、文章的 Git 版本信息、极简页脚、不蒜子站点浏览计数
     fontFamilyCode = "'Source Code Pro', 'Noto Serif SC', monospace"
     # 引用
@@ -976,12 +1038,12 @@ uglyURLs = false
     # 说明文字
     fontFamilyCaption = ""
     # 页脚
-    fontFamilyFooter = "'Source Code Pro', 'Noto Serif SC', monospace"
+    fontFamilyFooter = ""
     # 主体
-    fontFamilyBody = "'Amstelvar', 'Noto Serif SC', serif"
+    fontFamilyBody = "'Noto Serif SC', serif"
 
     # 网络字体链接
-    fontsLink = "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel+Decorative:wght@700&display=swap"
+    fontsLink = "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap"
     # 说明：要想读者一定体验到你设置的字体，最好
     #      采用网络字体。MemE 主题目前仅支持
     #      Google Fonts 的链接，请前往
@@ -991,7 +1053,7 @@ uglyURLs = false
     ######################################
     ## 字号（单位：px）
 
-    fontSize = 16
+    fontSize = 18
 
     ######################################
     ## 制表符的宽度
@@ -1059,8 +1121,8 @@ uglyURLs = false
     ######################################
     ## 着重号
 
-    # 说明：MemE 主题自创的新 Markdown 语法
-    #      `..文本..`
+    # 说明：MemE 主题定义的语法 `..文本..`
+    #      https://www.w3.org/International/clreq/#id84
 
     # 是否开启
     enableEmphasisPoint = true
@@ -1116,6 +1178,7 @@ uglyURLs = false
     repoURL = "https://github.com/huangdiv/huangdiv.com"
     # 编辑地址
     repoEditURL = "https://github.com/huangdiv/huangdiv.com/blob/master"
+    repoEditURLSuffix = ""
 
     # Git 的图标
     gitIcon = "code-branch"
@@ -1155,16 +1218,13 @@ uglyURLs = false
 
     displayShareOnText = false
 
-    shareOnTwitter = true
-    shareOnFacebook = true
-    shareOnLinkedIn = true
-    shareOnTelegram = true
-    shareOnWeibo = true
-    shareOnDouban = true
-    shareOnQQ = true
-    shareOnQzone = true
+    postShareItems = ["facebook", "mastodon", "fediverse", "x", "linkedin", "telegram", "weibo", "douban", "qq", "qzone", "pocket", "hackernews", "qrcode", "email"]
 
-    shareViaQRCode = true
+    # 从网络获取 Fediverse 实例列表用于输入建议
+    fetchFediverseInstances = false
+    # 说明：当开启 mastodon 或 fediverse 分享项
+    #      时建议开启。开启后构建时，数据需要从网
+    #      络下载，会带来额外的构建时间。
 
 
     ######################################
@@ -1230,13 +1290,13 @@ uglyURLs = false
     # 返回顶部按钮
 
     # 是否开启
-    enableBackToTop = false
+    enableBackToTop = true
 
     # 是否开启自动隐藏
     enableBackToTopAutoHide = true
 
     # 是否在首页显示
-    displayBackToTopInHome = false
+    displayBackToTopInHome = true
 
     # 是否在移动端显示
     displayBackToTopOnMobile = false
@@ -1252,7 +1312,7 @@ uglyURLs = false
     enableFooter = true
 
     # 是否显示
-    displayFooter = false
+    displayFooter = true
 
     # 是否在首页显示
     displayFooterInHome = true
@@ -1262,7 +1322,7 @@ uglyURLs = false
     displayCopyrightSymbol = true
 
     # 是否显示站点的创建年份
-    displaySiteCreatedYear = false
+    displaySiteCreatedYear = true
 
     # 年份与作者之间的图标，留空（""）则无
     iconBetweenYearAndAuthor = "heart"
@@ -1270,6 +1330,9 @@ uglyURLs = false
     iconColor = "#f06292"
     # 是否开启图标的跳动效果
     iconAnimation = true
+
+    # 是否显示站点的作者名称
+    displaySiteAuthorName = true
 
     # 是否显示 Hugo 和 MemE 的链接
     displayPoweredBy = false
@@ -1316,7 +1379,7 @@ uglyURLs = false
     enableHighlight = true
 
     # 是否开启竖直滚动
-    enableOverflowY = false
+    enableOverflowY = true
     # 最大高度
     maxHeight = 20
     # 单位：em
@@ -1333,7 +1396,7 @@ uglyURLs = false
     # 说明：仅对 MemE 生成的 CSS 和 JS 有效
 
     # 是否开启文件指纹
-    enableFingerprint = false
+    enableFingerprint = true
 
     # 是否开启子资源完整性验证
     enableSRI = false
@@ -1362,7 +1425,7 @@ uglyURLs = false
     # 平滑滚动
 
     # 是否开启
-    enableSmoothScroll = false
+    enableSmoothScroll = true
 
 
     ######################################
@@ -1375,7 +1438,7 @@ uglyURLs = false
     ######################################
     # Instant Page
 
-    enableInstantPage = false
+    enableInstantPage = true
     # 说明：https://github.com/instantpage/instant.page
 
 
@@ -1413,3 +1476,55 @@ uglyURLs = false
     fofVideoWebm = ""
     fofVideoMp4 = ""
     # 说明：视频地址可留空（""）
+
+
+    ######################################
+    # 定制第三方库的地址
+
+    [params.lib]
+        host = "https://cdn.jsdelivr.net"
+        # 说明：设置为根（"/"）且将下方对应 path
+        #      设置，如果你想要直接从「本地」
+        #      加载某个库的话。比如：
+        #      将 path 设置为 "js/lib.min.js"，
+        #      并将文件放到你的 /static/js/lib.min.js
+    [params.lib.path]
+        clipboard = "/npm/clipboard-polyfill@2.8.6/dist/clipboard-polyfill.min.js"
+        instantsearch = "/npm/instantsearch.js@2/dist/instantsearch.min.js"
+        gitalk = "/npm/gitalk@1/dist/gitalk.min.js"
+        gitalk_css = "/npm/gitalk@1/dist/gitalk.css"
+        instantpage = "/npm/instant.page@5.1.0/instantpage.min.js"
+        katex = "/npm/katex@0.13.0/dist/katex.min.js"
+        katex_css = "/npm/katex@0.13.0/dist/katex.min.css"
+        katex_mhchem = "/npm/katex@0.13.0/dist/contrib/mhchem.min.js"
+        katex_auto_render = "/npm/katex@0.13.0/dist/contrib/auto-render.min.js"
+        lunr = "/npm/lunr@2.3.9/lunr.min.js"
+        lunr_tinyseg = "/npm/lunr-languages@1.4.0/tinyseg.js"
+        lunr_stemmer = "/npm/lunr-languages@1.4.0/min/lunr.stemmer.support.min.js"
+        lunr_lang = "/npm/lunr-languages@1.4.0/min/lunr.de.min.js"
+        mathjax = "/npm/mathjax@3.1.2/es5/tex-mml-chtml.js"
+        medium_zoom = "/npm/medium-zoom@latest/dist/medium-zoom.min.js"
+        mermaid = "/npm/mermaid@8.8.3/dist/mermaid.min.js"
+        qrcode = "/npm/qrcode-generator@1.4.4/qrcode.min.js"
+        valine = "/npm/valine@1.4.14/dist/Valine.min.js"
+        busuanzi = "https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"
+        utterances = "https://utteranc.es/client.js"
+
+
+    ######################################
+    # 作者信息
+    [params.author]
+        # 名字
+        name = "黄笛"
+        # 邮箱
+        email = "i@huangdiv.com"
+        # 座右铭或简介
+        motto = "黄笛，中学物理老师，业余程序员，生活探险家"
+        # 头像
+        avatar = "/icons/apple-touch-icon.png"
+        # 网站（默认值：baseURL）
+        website = "https://huangdiv.com"
+        # 推特
+        twitter = "huangdiv"
+        # Fediverse
+        fediverse = "@huangdiv@mastodon.social"
