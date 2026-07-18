@@ -27,10 +27,10 @@
     weight = 3
 
 [[socials]]
-    id = "twitter"
-    url = "https://twitter.com/huangdiv"
-    icon = "twitter"
-    title = "Twitter"
+    id = "x"
+    url = "https://x.com/huangdiv"
+    icon = "x"
+    title = "𝕏"
     weight = 4
 
 [[socials]]

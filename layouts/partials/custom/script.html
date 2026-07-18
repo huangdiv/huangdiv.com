@@ -1,8 +1,5 @@
 {{ if and (.Params.comments | default .Site.Params.enableComments) (eq hugo.Environment "production") }}
     {{ if or (in .Site.Params.mainSections .Section) .Params.comments }}
-        {{ if .Site.Params.enableValineSpecial }}
-            {{ partial "custom/valine-special.html" . }}
-        {{ end }}
         {{ if .Site.Params.enableWaline }}
             {{ partial "custom/waline.html" . }}
         {{ end }}
