@@ -618,9 +618,9 @@ uglyURLs = false
 
     ## Waline
     enableWaline = true
-    walineSrcJsCDN = "https://unpkg.com/@waline/client@v3/dist/waline.js"
-    walineSrcCssCDN = "https://unpkg.com/@waline/client@v3/dist/waline.css"
-    walineServerURL = "https://comments.huangdiv.com"
+    # 说明：参见 https://waline.js.org/guide/get-started/#html-%E5%BC%95%E5%85%A5
+    # 涉及文件： layouts\partials\components 下的 comments.html 
+    #           layouts\partials\custom 下的 script.html 和 waline.html
 
     ## Disqus
     enableDisqus = false

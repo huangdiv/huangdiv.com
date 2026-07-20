@@ -1,52 +1,15 @@
-<script>
+<link rel="stylesheet" href="https://unpkg.com/@waline/client@v3/dist/waline.css" />
+<script type="module">
+    import { init } from 'https://unpkg.com/@waline/client@v3/dist/waline.js';
+
     function loadComments() {
-        // document.querySelector('#load-comments').style.display = "none";
-        var walineCommentsDiv = document.createElement('div');
-        // var commentCountSpan = document.createElement('span');
-        // commentCountSpan.id = "comment-count";
-        // document.querySelector('#load-comments').appendChild(commentCountSpan);
-        walineCommentsDiv.id = "walineComments";
-        //walineCommentsDiv.style = "margin-top: 1em;";
-        document.querySelector('.load-comments').parentNode.appendChild(walineCommentsDiv);
-        if (typeof Waline === 'undefined') {
-            var getScript = (options) => {
-                var script = document.createElement('script');
-                script.defer = true;
-                script.crossOrigin = 'anonymous';
-                Object.keys(options).forEach((key) => {
-                    script[key] = options[key];
-                });
-                document.body.appendChild(script);
-            };
-            var getCss = (options) => {
-                var link = document.createElement('link');
-                link.rel = "stylesheet";
-                Object.keys(options).forEach((key) => {
-                    link[key] = options[key];
-                });
-                document.body.appendChild(link);
-            };
-            getScript({
-                src: {{ .Site.Params.walineSrcJsCDN }},
-                onload: () => {
-                    getCss({
-                        href: {{ .Site.Params.walineSrcCssCDN }},
-                        onload: () => {
-                            newWaline();
-                        }
-                    });
-                }
+        if (document.getElementById('walineComments')) {
+            init({
+                el: '#walineComments',
+                serverURL: "https://comments.huangdiv.com",
+                dark: 'html[data-theme="dark"]'
             });
-        } else {
-            newWaline();
         }
     }
-    function newWaline() {
-        Waline.init({
-            el: "#walineComments",
-            serverURL: {{ .Site.Params.walineServerURL }},
-            dark: 'html[data-theme="dark"]'
-        });
-    }
-    //loadComments();
+    window.loadComments = loadComments;
 </script>
