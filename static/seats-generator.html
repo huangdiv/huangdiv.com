@@ -6,34 +6,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>班级座位表</title>
     <style>
+        :root {
+            --bg: #f0f4f8;
+            --surface: #ffffff;
+            --surface-hover: #f8fafc;
+            --border: #e2e8f0;
+            --border-light: #edf2f7;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-light: #dbeafe;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Microsoft YaHei', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 24px;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
         }
 
         h1 {
             text-align: center;
-            color: #333;
-            margin-bottom: 30px;
+            color: var(--text-primary);
+            margin-bottom: 28px;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            outline: none;
+            cursor: text;
+            position: relative;
+            display: inline-block;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 16px;
+            border-radius: var(--radius-sm);
+            transition: background 0.15s ease;
+        }
+
+        h1:hover {
+            background: var(--surface-hover);
+        }
+
+        h1:focus {
+            background: var(--primary-light);
+            box-shadow: 0 0 0 2px var(--primary);
         }
 
         .container {
             display: flex;
             justify-content: center;
-            gap: 30px;
+            gap: 28px;
             flex-wrap: wrap;
             align-items: flex-start;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
+        /* 教室区域 */
         .classroom {
             display: grid;
             gap: 10px;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background-color: var(--surface);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
             position: relative;
             min-height: 400px;
         }
@@ -50,34 +105,39 @@
             right: -3px;
             bottom: -3px;
             border: 3px solid transparent;
-            border-radius: 12px;
+            border-radius: calc(var(--radius-lg) + 3px);
             pointer-events: none;
+            transition: border-color 0.2s;
         }
 
         .classroom.highlight::after {
-            border-color: #2196f3;
+            border-color: var(--primary);
         }
 
         .seat {
             width: 100px;
             height: 60px;
-            background-color: #e3f2fd;
-            border: 1px solid #90caf9;
-            border-radius: 5px;
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius-sm);
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             cursor: move;
             position: relative;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            font-size: 13px;
         }
 
         .seat.highlight {
-            background-color: #bbdefb;
-            box-shadow: 0 0 0 2px #2196f3;
+            background-color: #dbeafe;
+            box-shadow: 0 0 0 2px var(--primary);
         }
 
         .seat:hover {
-            background-color: #bbdefb;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .seat.dragging {
@@ -85,30 +145,598 @@
         }
 
         .seat.empty {
-            background-color: #f5f5f5;
-            border: 1px dashed #ccc;
-            color: #999;
+            background-color: #f8fafc;
+            border: 1px dashed var(--border);
+            color: var(--text-muted);
         }
 
         .seat.empty.highlight {
-            background-color: #e0e0e0;
-            box-shadow: 0 0 0 2px #2196f3;
+            background-color: #f1f5f9;
+            box-shadow: 0 0 0 2px var(--primary);
         }
 
         .seat.empty:hover {
-            background-color: #e0e0e0;
+            background-color: #f1f5f9;
+            transform: none;
+            box-shadow: none;
         }
 
+        .seat-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .seat-number {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .teacher-desk {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 4px;
+            font-size: 14px;
+        }
+
+        .teacher-desk.teacher-view {
+            margin-bottom: 0;
+            margin-top: 8px;
+            order: 9999;
+        }
+
+        .aisle-placeholder {
+            width: 30px;
+            height: 1px;
+        }
+
+        /* 控制面板 */
         .controls {
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            background-color: var(--surface);
+            padding: 0;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            width: 320px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 20px 20px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-bottom: 0;
+        }
+
+        .panel-header h3 {
+            margin: 0 0 4px 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .panel-subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* 统计卡片 */
+        .stats-card {
+            margin: 16px 16px 0;
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-light);
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 12px;
+        }
+
+        .stat-block {
+            text-align: center;
+        }
+
+        .stat-num {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .checkin-mini-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .checkin-mini-rate {
+            font-weight: 700;
+            color: var(--success);
+            font-size: 13px;
+        }
+
+        .checkin-mini-bar {
+            height: 6px;
+            background: var(--border-light);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .checkin-mini-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #34d399, var(--success));
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        /* 快捷操作 */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px 0;
+        }
+
+        .action-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-light);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .action-btn.action-btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .action-btn.action-btn-primary:hover {
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            color: white;
+        }
+
+        .action-btn.action-btn-primary.active {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+
+        .action-btn.action-btn-primary.active:hover {
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .action-icon {
+            font-size: 18px;
+        }
+
+        /* 辅助操作行 */
+        .sub-actions {
+            display: flex;
+            gap: 6px;
+            padding: 10px 16px 0;
+            flex-wrap: wrap;
+        }
+
+        .sub-btn {
+            flex: 1;
+            min-width: 0;
+            padding: 7px 4px;
+            background: var(--surface-hover);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sub-btn:hover:not(:disabled) {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .sub-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* 折叠面板 */
+        .collapse-panel {
+            border-top: 1px solid var(--border-light);
+        }
+
+        .collapse-header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            transition: background 0.15s ease;
+        }
+
+        .collapse-header:hover {
+            background: var(--surface-hover);
+        }
+
+        .collapse-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .collapse-arrow {
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .collapse-panel.collapsed .collapse-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .collapse-body {
+            display: none;
+            padding: 0 16px 16px;
+            animation: slideDown 0.25s ease;
+        }
+
+        .collapse-panel:not(.collapsed) .collapse-body {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 表单行 */
+        .form-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: flex-end;
+        }
+
+        .form-item {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .form-item label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .form-item input {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            transition: border-color 0.15s ease;
+            background: white;
+        }
+
+        .form-item input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-btn {
+            padding: 7px 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease;
+            min-width: auto;
+            flex: none;
+        }
+
+        .form-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .empty-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 8px 0;
+        }
+
+        .danger-btn {
+            width: 100%;
+            padding: 9px;
+            background: var(--danger-light);
+            color: var(--danger);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-top: 10px;
+        }
+
+        .danger-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .danger-btn.full-width {
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        /* 子区块 */
+        .sub-section {
+            margin-bottom: 16px;
+        }
+
+        .sub-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .mini-btn {
+            padding: 4px 10px;
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+            min-width: auto;
+            flex: none;
+            white-space: nowrap;
+        }
+
+        .mini-btn:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .mini-btn.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .mini-btn.primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+            color: white;
+        }
+
+        .mini-btn.danger {
+            color: var(--danger);
+        }
+
+        .mini-btn.danger:hover {
+            background: var(--danger-light);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* 分组创建行 */
+        .group-create-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .group-name-input {
+            flex: 1;
+            min-width: 0;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .group-name-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .group-color-input {
+            width: 30px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            flex: none;
+        }
+
+        /* 签到模式横幅 */
+        .checkin-banner {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            animation: slideDown 0.3s ease;
+        }
+
+        .checkin-banner.visible {
+            display: flex;
+        }
+
+        .checkin-banner-icon {
+            background: rgba(255, 255, 255, 0.25);
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .checkin-banner-close {
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            padding: 0;
+            flex: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            font-weight: bold;
+        }
+
+        .checkin-banner-close:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 已签到座位样式 */
+        .seat.checked-in {
+            animation: checkinPop 0.3s ease;
+        }
+
+        .seat.checked-in::before {
+            content: '✓';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+            line-height: 1;
+        }
+
+        @keyframes checkinPop {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.08);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .classroom.checkin-mode .seat:not(.empty) {
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .classroom.checkin-mode .seat:not(.empty):hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .student-list-container {
+            margin-top: 15px;
             position: relative;
         }
 
-        .controls::after {
+        .student-list-container::after {
             content: '';
             position: absolute;
             top: -3px;
@@ -116,77 +744,13 @@
             right: -3px;
             bottom: -3px;
             border: 3px solid transparent;
-            border-radius: 12px;
+            border-radius: 8px;
             pointer-events: none;
+            transition: border-color 0.2s;
         }
 
         .student-list-container.highlight::after {
             border-color: #2196f3;
-        }
-
-        .button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-bottom: 10px;
-        }
-
-        button {
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            padding: 8px 1px;
-            border-radius: 5px;
-            cursor: pointer;
-            flex: 1;
-            min-width: 70px;
-            font-size: 14px;
-        }
-
-        button.primary {
-            background-color: #2196f3;
-        }
-
-        button.primary:hover {
-            background-color: #0b7dda;
-        }
-
-        button.danger {
-            background-color: #f44336;
-        }
-
-        button.danger:hover {
-            background-color: #d32f2f;
-        }
-
-        button:hover {
-            background-color: #388e3c;
-        }
-
-        .stats-container {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #e8f5e9;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .stat-item {
-            text-align: center;
-            flex: 1;
-        }
-
-        .stat-value {
-            font-weight: bold;
-            font-size: 16px;
-            color: #2e7d32;
-        }
-
-        .student-list-container {
-            margin-top: 15px;
-            position: relative;
         }
 
         .student-list {
@@ -239,6 +803,16 @@
             left: 2px;
             font-size: 10px;
             color: #666;
+            z-index: 1;
+        }
+
+        .seat-name {
+            font-size: 14px;
+            color: #333;
+            text-align: center;
+            padding: 0 4px;
+            word-break: break-all;
+            line-height: 1.2;
         }
 
         .file-input {
@@ -730,145 +1304,1004 @@
             width: auto;
             margin: 0;
         }
+
+        /* ==================== 移动端触摸交互样式 ==================== */
+        .seat.selected-for-move {
+            box-shadow: 0 0 0 3px #ff9800, 0 2px 8px rgba(255,152,0,0.5);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .student-item.selected-for-move {
+            box-shadow: 0 0 0 3px #ff9800;
+            background-color: #fff3e0 !important;
+        }
+
+        .mobile-mode-banner {
+            display: none;
+            background: #fff3e0;
+            border: 1px solid #ffb74d;
+            border-radius: 5px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #e65100;
+            line-height: 1.4;
+        }
+
+        .mobile-mode-banner.visible {
+            display: block;
+        }
+
+        /* ==================== 批量操作样式 ==================== */
+        .batch-toolbar {
+            display: none;
+            background: #e3f2fd;
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .batch-toolbar.visible {
+            display: flex;
+        }
+
+        .batch-toolbar select {
+            flex: 1;
+            min-width: 80px;
+            padding: 4px;
+            font-size: 13px;
+        }
+
+        .batch-toolbar button {
+            min-width: 50px;
+            padding: 4px 8px;
+            font-size: 13px;
+        }
+
+        .batch-count {
+            font-size: 12px;
+            color: #666;
+            margin-right: 5px;
+            white-space: nowrap;
+        }
+
+        .student-item .batch-checkbox {
+            display: none;
+            margin-right: 6px;
+            width: auto;
+            vertical-align: middle;
+        }
+
+        .student-item.batch-mode .batch-checkbox {
+            display: inline-block;
+        }
+
+        .student-item.batch-mode {
+            cursor: pointer;
+        }
+
+        .student-item.batch-selected {
+            background-color: #bbdefb !important;
+        }
+
+        /* 分配学生区域的批量样式 */
+        .student-group-item .batch-checkbox {
+            margin-right: 4px;
+            width: auto;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .student-group-item.batch-selected {
+            background-color: #bbdefb !important;
+            border-color: #2196f3 !important;
+        }
+
+        /* ==================== 撤销/重做按钮样式 ==================== */
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ==================== 响应式布局 ==================== */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
+
+            .container {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .classroom {
+                padding: 10px;
+                overflow-x: auto;
+            }
+
+            .controls {
+                width: 100%;
+                padding: 10px;
+            }
+
+            .seat {
+                width: 70px;
+                height: 50px;
+            }
+
+            .seat-name {
+                font-size: 11px;
+            }
+
+            .seat-number {
+                font-size: 8px;
+            }
+
+            .stats-container {
+                font-size: 12px;
+            }
+
+            .stat-value {
+                font-size: 14px;
+            }
+
+            button {
+                padding: 6px 1px;
+                font-size: 12px;
+                min-width: 60px;
+            }
+        }
+
+        /* ==================== 补充 & 覆盖样式 ==================== */
+
+        /* 学生列表 - 新版风格 */
+        .student-list {
+            max-height: 180px;
+            overflow-y: auto;
+            min-height: 48px;
+            border: 1px solid var(--border-light);
+            padding: 6px;
+            border-radius: var(--radius-sm);
+            background-color: var(--surface-hover);
+        }
+
+        .student-item {
+            padding: 6px 10px;
+            margin: 2px 0;
+            background-color: var(--surface);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            cursor: move;
+            transition: all 0.15s ease;
+            font-size: 13px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .student-item:hover {
+            background-color: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .student-item .student-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .student-item .student-delete {
+            opacity: 0;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            min-width: auto;
+            flex: none;
+            transition: opacity 0.15s;
+        }
+
+        .student-item:hover .student-delete {
+            opacity: 1;
+        }
+
+        .student-item .student-delete:hover {
+            color: var(--danger);
+        }
+
+        /* 走道列表 - 新版风格 */
+        .aisle-list {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        .aisle-item {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .aisle-remove-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            min-width: auto;
+            font-size: 12px;
+            line-height: 1;
+            padding: 0;
+            opacity: 0.7;
+            flex: none;
+        }
+
+        .aisle-remove-btn:hover {
+            opacity: 1;
+        }
+
+        /* 分组列表 - 新版风格 */
+        .group-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .group-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: var(--surface);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            transition: all 0.15s ease;
+        }
+
+        .group-item:hover {
+            border-color: var(--primary);
+        }
+
+        .group-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .group-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex: none;
+        }
+
+        .group-name-text {
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 2px;
+            flex: none;
+        }
+
+        .group-actions button {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            padding: 2px 4px;
+            min-width: auto;
+            flex: none;
+            transition: color 0.15s;
+            line-height: 1;
+        }
+
+        .group-actions button:hover {
+            color: var(--danger);
+        }
+
+        /* 批量操作工具栏 - 新版风格 */
+        .batch-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px;
+            background: var(--primary-light);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .batch-count {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .batch-select {
+            padding: 4px 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 11px;
+            background: white;
+        }
+
+        /* 学生分组选择器 */
+        .student-group-selector {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            background: var(--surface-hover);
+        }
+
+        .student-group-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 8px;
+            margin: 2px 0;
+            background: var(--surface);
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .student-group-item:hover {
+            background: var(--primary-light);
+        }
+
+        .student-group-item.selected {
+            background: var(--primary-light);
+            border-left: 3px solid var(--primary);
+        }
+
+        .student-group-item input[type="checkbox"] {
+            flex: none;
+        }
+
+        /* 教室包装器 */
+        .classroom-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 删除区 - 浮动垃圾桶样式 */
+        .delete-zone {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.8);
+            opacity: 0;
+            pointer-events: none;
+            padding: 12px 24px;
+            border: 2px dashed var(--danger);
+            border-radius: 50px;
+            background: var(--danger-light);
+            color: var(--danger);
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+
+        .delete-zone.visible {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+            pointer-events: auto;
+        }
+
+        .delete-zone.highlight {
+            background: var(--danger);
+            color: white;
+            transform: translateX(-50%) scale(1.08);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .delete-icon {
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .delete-text {
+            white-space: nowrap;
+        }
+
+        /* 导入导出区 - 新版风格 */
+        .io-section {
+            margin-bottom: 12px;
+        }
+
+        .io-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .io-btn {
+            display: block;
+            width: auto;
+            padding: 8px 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.15s ease;
+            flex: none;
+            min-width: auto;
+        }
+
+        .io-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .io-btn.primary {
+            background: var(--primary);
+        }
+
+        .io-btn.ghost {
+            background: var(--surface);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .io-btn.ghost:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .io-btn-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .io-btn-row .io-btn {
+            flex: 1;
+        }
+
+        .io-divider {
+            height: 1px;
+            background: var(--border-light);
+            margin: 12px 0;
+        }
+
+        .file-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 6px 0;
+        }
+
+        .full-select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            background: white;
+            margin-bottom: 8px;
+        }
+
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .table-preview {
+            max-height: 150px;
+            overflow: auto;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            border: 1px solid var(--border-light);
+            padding: 4px 6px;
+            text-align: left;
+        }
+
+        .preview-table th {
+            background: var(--surface-hover);
+            position: sticky;
+            top: 0;
+        }
+
+        .group-preview-section {
+            margin: 8px 0;
+        }
+
+        .group-preview-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: white;
+        }
+
+        /* 拖拽提示 */
+        .drag-hint {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 23, 42, 0.85);
+            color: white;
+            padding: 14px 24px;
+            border-radius: var(--radius-md);
+            font-size: 15px;
+            z-index: 1000;
+            display: none;
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* 移动端横幅 */
+        .mobile-mode-banner {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 13px;
+            margin-bottom: 16px;
+            border-radius: var(--radius-md);
+            display: none;
+            font-weight: 500;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* 文件输入隐藏 */
+        .file-input {
+            display: none;
+        }
+
+        /* 选中移动样式 */
+        .selected-for-move {
+            outline: 2px solid var(--primary);
+            outline-offset: 1px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .controls {
+                width: 100%;
+                max-width: 420px;
+            }
+
+            .classroom {
+                padding: 12px;
+                overflow-x: auto;
+            }
+
+            .delete-zone {
+                bottom: -50px;
+                padding: 10px 20px;
+                font-size: 12px;
+            }
+
+            .delete-icon {
+                font-size: 18px;
+            }
+        }
+
+        /* ==================== 打印样式 ==================== */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 5mm;
+            }
+
+            html, body {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background: #fff;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                overflow: hidden;
+            }
+
+            body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+
+            h1 {
+                margin: 0 0 2mm 0;
+                font-size: 12pt;
+                text-align: center;
+                position: static !important;
+                transform: none !important;
+                display: block !important;
+                left: auto !important;
+                background: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+
+            .drag-hint,
+            .controls,
+            .delete-zone,
+            .classroom-wrapper > .delete-zone,
+            .mobile-mode-banner,
+            .batch-toolbar,
+            .checkin-banner,
+            .no-print {
+                display: none !important;
+            }
+
+            .container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+                gap: 0;
+                overflow: hidden;
+            }
+
+            .classroom-wrapper {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                position: static;
+            }
+
+            .classroom {
+                display: grid !important;
+                box-shadow: none;
+                border: 1px solid #ccc;
+                padding: 5px;
+                border-radius: 6px;
+                background-color: #fff;
+                margin: 0 auto;
+                min-height: 0 !important;
+                gap: 3px !important;
+            }
+
+            .classroom::after {
+                display: none !important;
+            }
+
+            .seat {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .teacher-desk {
+                margin-bottom: 3px !important;
+                padding: 5px !important;
+                font-size: 11px !important;
+            }
+
+            .teacher-desk.teacher-view {
+                margin-top: 3px !important;
+                margin-bottom: 0 !important;
+            }
+
+            .seat-name, .seat-number {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .seat.checked-in::before {
+                content: '✓';
+                position: absolute;
+                top: -3px;
+                right: -3px;
+                width: 18px;
+                height: 18px;
+                background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+                color: white;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                line-height: 1;
+            }
+
+            .student-list-container {
+                display: none;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="drag-hint" id="dragHint">拖放到座位或名单区域</div>
+    <div class="mobile-mode-banner" id="mobileBanner">
+        移动端模式：点击学生或座位选中，再点击目标位置完成移动。点击已选中的元素可取消选择。
+    </div>
 
-    <h1>班级座位表</h1>
+    <h1 id="pageTitle" contenteditable="true" spellcheck="false">班级座位表</h1>
 
     <div class="container">
-        <div class="classroom" id="classroom">
-            <div class="teacher-desk">讲台</div>
-            <!-- 座位将通过JavaScript动态生成 -->
+        <div class="classroom-wrapper">
+            <div class="classroom" id="classroom">
+                <div class="teacher-desk">讲台</div>
+                <!-- 座位将通过JavaScript动态生成 -->
+            </div>
+            <div class="delete-zone" id="deleteZone">
+                <span class="delete-icon">🗑️</span>
+                <span class="delete-text">拖到此处删除</span>
+            </div>
         </div>
 
         <div class="controls" id="controls">
-            <h3 style="margin-top: 0; margin-bottom: 15px;">操作面板</h3>
+            <div class="panel-header">
+                <h3>班级座位表</h3>
+                <span class="panel-subtitle">拖拽学生到座位即可排座</span>
+            </div>
 
-            <!-- 学生统计信息 -->
-            <div class="stats-container" id="statsContainer">
-                <div class="stat-item">
-                    <div>学生总数</div>
-                    <div class="stat-value" id="totalStudents">0</div>
+            <!-- 统计卡片 -->
+            <div class="stats-card">
+                <div class="stats-row">
+                    <div class="stat-block">
+                        <div class="stat-num" id="totalStudents">0</div>
+                        <div class="stat-label">学生总数</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-num" id="assignedStudents">0</div>
+                        <div class="stat-label">已入座</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-num" id="unassignedStudents">0</div>
+                        <div class="stat-label">未入座</div>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <div>已安排座位</div>
-                    <div class="stat-value" id="assignedStudents">0</div>
-                </div>
-                <div class="stat-item">
-                    <div>未安排座位</div>
-                    <div class="stat-value" id="unassignedStudents">0</div>
+                <div class="checkin-mini">
+                    <div class="checkin-mini-label">
+                        <span>签到</span>
+                        <span class="checkin-mini-rate" id="checkinRate">0%</span>
+                    </div>
+                    <div class="checkin-mini-bar">
+                        <div class="checkin-mini-fill" id="checkinProgressBar"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 座位表配置 -->
-            <div class="config-section">
-                <div class="config-group">
-                    <label for="rowsInput">行:</label>
-                    <input type="number" id="rowsInput" min="1" max="20" value="7">
-                    <label for="colsInput">列:</label>
-                    <input type="number" id="colsInput" min="1" max="20" value="7">
-                    <button id="applyConfigBtn" class="primary">应用</button>
-                </div>
-                <div class="config-group">
-                    <label for="aisleAfterCol">列:</label>
-                    <input type="number" id="aisleAfterCol" min="1" max="20" value="1">
-                    <label for="aisleWidth">宽:</label>
-                    <input type="number" id="aisleWidth" min="10" max="100" value="30">
-                    <button id="addAisleBtn" class="primary">添加走道</button>
-                </div>
-                <div id="aisleList" class="aisle-list">
-                    <span style="color: #999;">暂无走道</span>
+            <!-- 快捷操作 -->
+            <div class="quick-actions">
+                <button id="checkinModeBtn" class="action-btn action-btn-primary">
+                    <span class="action-icon">✓</span>
+                    <span>签到模式</span>
+                </button>
+                <button id="randomBtn" class="action-btn">
+                    <span class="action-icon">⇄</span>
+                    <span>随机排座</span>
+                </button>
+                <button id="printBtn" class="action-btn">
+                    <span class="action-icon">⎙</span>
+                    <span>打印/PDF</span>
+                </button>
+            </div>
+
+            <!-- 辅助操作行 -->
+            <div class="sub-actions">
+                <button id="undoBtn" class="sub-btn" disabled title="撤销">↶ 撤销</button>
+                <button id="redoBtn" class="sub-btn" disabled title="重做">↷ 重做</button>
+                <button id="toggleViewBtn" class="sub-btn">⇅ 教师视角</button>
+                <button id="exportBtn" class="sub-btn">⬇ 导出图片</button>
+            </div>
+
+            <!-- 折叠面板：座位设置 -->
+            <div class="collapse-panel collapsed">
+                <button class="collapse-header" data-target="seatSettings">
+                    <span class="collapse-title">⚙ 座位设置</span>
+                    <span class="collapse-arrow">▾</span>
+                </button>
+                <div class="collapse-body" id="seatSettings">
+                    <div class="form-row">
+                        <div class="form-item">
+                            <label>行数</label>
+                            <input type="number" id="rowsInput" min="1" max="20" value="7">
+                        </div>
+                        <div class="form-item">
+                            <label>列数</label>
+                            <input type="number" id="colsInput" min="1" max="20" value="7">
+                        </div>
+                        <button id="applyConfigBtn" class="form-btn">应用</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-item">
+                            <label>走道列后</label>
+                            <input type="number" id="aisleAfterCol" min="1" max="20" value="1">
+                        </div>
+                        <div class="form-item">
+                            <label>宽度(px)</label>
+                            <input type="number" id="aisleWidth" min="10" max="100" value="30">
+                        </div>
+                        <button id="addAisleBtn" class="form-btn">添加走道</button>
+                    </div>
+                    <div id="aisleList" class="aisle-list">
+                        <span class="empty-hint">暂无走道</span>
+                    </div>
+                    <button id="resetBtn" class="danger-btn">重置座位</button>
                 </div>
             </div>
 
-            <!-- 分组管理界面 -->
-            <div class="group-section">
-                <div class="group-header">
-                    <h4>学生分组管理</h4>
-                    <button class="group-toggle-btn" id="groupToggleBtn">▼</button>
-                </div>
-                <div class="group-content" id="groupContent">
-                    <div class="group-actions">
-                        <input type="text" id="groupNameInput" placeholder="分组名称">
-                        <input type="color" id="groupColorInput" value="#4CAF50">
-                        <button id="addGroupBtn" class="primary">添加分组</button>
+            <!-- 折叠面板：学生管理 -->
+            <div class="collapse-panel">
+                <button class="collapse-header" data-target="studentManagement">
+                    <span class="collapse-title">👥 学生管理</span>
+                    <span class="collapse-arrow">▾</span>
+                </button>
+                <div class="collapse-body" id="studentManagement">
+                    <!-- 学生列表 -->
+                    <div class="sub-section">
+                        <div class="section-head">
+                            <span>未安排座位的学生</span>
+                            <button id="quickRandomBtn" class="mini-btn">随机入座</button>
+                        </div>
+                        <div id="studentList" class="student-list drop-target">
+                        </div>
                     </div>
-                    <div class="group-list" id="groupList">
-                        <span style="color: #999; font-size: 12px;">暂无分组</span>
-                    </div>
-                    <div class="student-assignment" id="studentAssignment" style="display: none;">
-                        <h5>分配学生到分组</h5>
-                        <div class="student-group-selector" id="studentGroupSelector">
+
+                    <!-- 分组管理 -->
+                    <div class="sub-section">
+                        <div class="section-head">
+                            <span>学生分组</span>
+                        </div>
+                        <div class="group-create-row">
+                            <input type="text" id="groupNameInput" placeholder="分组名称" class="group-name-input">
+                            <input type="color" id="groupColorInput" value="#4CAF50" class="group-color-input">
+                            <button id="addGroupBtn" class="mini-btn primary">添加</button>
+                        </div>
+                        <div class="group-list" id="groupList">
+                            <span class="empty-hint">暂无分组</span>
+                        </div>
+
+                        <div class="student-assignment" id="studentAssignment" style="display: none;">
+                            <div class="section-head">
+                                <span>分配学生到分组</span>
+                                <button id="batchModeBtn" class="mini-btn no-print">批量操作</button>
+                            </div>
+                            <div class="batch-toolbar" id="batchToolbar">
+                                <span class="batch-count" id="batchCount">已选 0</span>
+                                <select id="batchGroupSelect" class="batch-select"></select>
+                                <button id="batchAssignBtn" class="mini-btn">分配</button>
+                                <button id="batchDeleteBtn" class="mini-btn danger">删除</button>
+                                <button id="batchSelectAllBtn" class="mini-btn">全选</button>
+                                <button id="batchCancelBtn" class="mini-btn">取消</button>
+                            </div>
+                            <div class="student-group-selector" id="studentGroupSelector">
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="button-group">
-                <button id="saveBtn">保存</button>
-                <button id="exportBtn" class="primary">导出图片</button>
-                <button id="randomBtn">随机排座</button>
-                <button id="resetBtn">重置座位</button>
-            </div>
 
-            <div class="button-group">
-                <button id="toggleViewBtn" class="primary">教师视角</button>
-                <button id="clearStorageBtn" class="danger">清除数据</button>
-                <button id="exportConfigBtn">导出配置</button>
-                <button id="importConfigBtn">导入配置</button>
-                <input type="file" id="configFileInput" class="config-file-input" accept=".json">
-            </div>
-
-            <div class="import-section">
-                <h4 style="margin-bottom: 10px;">导入学生名单</h4>
-                <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls">
-                <label for="fileInput" class="file-label">选择Excel文件</label>
-                <div id="fileInfo" style="font-size: 13px;"></div>
-                <div id="previewArea" style="display:none;">
-                    <h4 style="margin-bottom: 5px; font-size: 14px;">选择姓名列</h4>
-                    <div class="column-selector">
-                        <select id="columnSelect"></select>
-                    </div>
-                    
-                    <!-- 分组导入功能 -->
-                    <div class="group-import-section" id="groupImportSection" style="display:none;">
-                        <h4>学生分组导入</h4>
-                        <label class="group-import-checkbox">
-                            <input type="checkbox" id="enableGroupImport">
-                            启用分组导入功能
-                        </label>
-                        <div id="groupImportControls" style="display:none;">
-                            <div class="group-column-selector">
-                                <label for="groupColumnSelect">选择分组依据列:</label>
-                                <select id="groupColumnSelect"></select>
+            <!-- 折叠面板：导入导出 -->
+            <div class="collapse-panel collapsed">
+                <button class="collapse-header" data-target="ioPanel">
+                    <span class="collapse-title">📁 导入 / 导出</span>
+                    <span class="collapse-arrow">▾</span>
+                </button>
+                <div class="collapse-body" id="ioPanel">
+                    <div class="io-section">
+                        <div class="io-title">导入学生名单 (Excel)</div>
+                        <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls">
+                        <label for="fileInput" class="io-btn">选择 Excel 文件</label>
+                        <div id="fileInfo" class="file-info"></div>
+                        <div id="previewArea" style="display:none;">
+                            <div class="section-head">
+                                <span>选择姓名列</span>
                             </div>
-                            <!-- 分组预览 -->
-                            <div class="group-preview-section" id="groupPreviewSection" style="display:none;">
-                                <h5 style="margin:0 0 8px 0; font-size:13px;">分组结果预览</h5>
-                                <div id="groupPreviewList"></div>
+                            <select id="columnSelect" class="full-select"></select>
+                            
+                            <div class="group-import-section" id="groupImportSection" style="display:none;">
+                                <label class="check-row">
+                                    <input type="checkbox" id="enableGroupImport">
+                                    <span>同时导入分组</span>
+                                </label>
+                                <div id="groupImportControls" style="display:none;">
+                                    <div class="section-head">
+                                        <span>分组依据列</span>
+                                    </div>
+                                    <select id="groupColumnSelect" class="full-select"></select>
+                                    <div class="group-preview-section" id="groupPreviewSection" style="display:none;">
+                                        <div class="section-head">
+                                            <span>分组预览</span>
+                                        </div>
+                                        <div id="groupPreviewList"></div>
+                                    </div>
+                                </div>
                             </div>
+                            
+                            <button id="confirmImportBtn" class="io-btn primary" style="width:100%;">确认导入</button>
+                            <div class="section-head">
+                                <span>数据预览</span>
+                            </div>
+                            <div id="tablePreview" class="table-preview"></div>
                         </div>
                     </div>
-                    
-                    <div class="group-confirm-buttons">
-                        <button id="confirmImportBtn" class="primary" style="width:100%; padding: 8px;">确认导入</button>
+
+                    <div class="io-divider"></div>
+
+                    <div class="io-section">
+                        <div class="io-title">配置数据</div>
+                        <div class="io-btn-row">
+                            <button id="exportConfigBtn" class="io-btn ghost">导出配置</button>
+                            <button id="importConfigBtn" class="io-btn ghost">导入配置</button>
+                            <input type="file" id="configFileInput" class="file-input" accept=".json">
+                        </div>
+                        <button id="clearStorageBtn" class="danger-btn full-width">清除所有数据</button>
                     </div>
-                    <h4 style="margin-bottom: 5px; font-size: 14px;">数据预览</h4>
-                    <div id="tablePreview"></div>
                 </div>
-            </div>
-
-            <div class="student-list-container" id="studentListContainer">
-                <h4 style="margin-bottom: 8px;">未安排座位的学生</h4>
-                <div id="studentList" class="student-list drop-target">
-                    <!-- 学生名单将通过JavaScript动态生成 -->
-                </div>
-            </div>
-
-            <div class="delete-zone" id="deleteZone">
-                拖动学生到此处删除
             </div>
         </div>
     </div>
@@ -879,15 +2312,21 @@
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
     <script>
-        // 示例学生名单（现在使用对象数组，包含姓名和分组信息）
-        
-        let students = []; // 格式: [{ name: '张三', groupId: null }]
-        let groups = []; // 格式: [{ id: 'g1', name: '第一组', color: '#4CAF50' }]
+    (function () {
+        'use strict';
 
-        // 初始化座位表
+        // ==================== 数据模型 ====================
+        // students: [{ id: 's1', name: '张三', groupId: null }]
+        // groups:  [{ id: 'g1', name: '第一组', color: '#4CAF50' }]
+        // currentSeats: [null, 's1', null, 's2', ...]  — 存储学生 ID
+
+        let students = [];
+        let groups = [];
+
+        // DOM 引用
         const classroom = document.getElementById('classroom');
+        const pageTitle = document.getElementById('pageTitle');
         const studentList = document.getElementById('studentList');
-        const studentListContainer = document.getElementById('studentListContainer');
         const fileInput = document.getElementById('fileInput');
         const fileInfo = document.getElementById('fileInfo');
         const previewArea = document.getElementById('previewArea');
@@ -902,8 +2341,6 @@
         const rowsInput = document.getElementById('rowsInput');
         const colsInput = document.getElementById('colsInput');
         const applyConfigBtn = document.getElementById('applyConfigBtn');
-        const groupToggleBtn = document.getElementById('groupToggleBtn');
-        const groupContent = document.getElementById('groupContent');
         const groupNameInput = document.getElementById('groupNameInput');
         const groupColorInput = document.getElementById('groupColorInput');
         const addGroupBtn = document.getElementById('addGroupBtn');
@@ -916,18 +2353,32 @@
         const groupColumnSelect = document.getElementById('groupColumnSelect');
         const groupPreviewSection = document.getElementById('groupPreviewSection');
         const groupPreviewList = document.getElementById('groupPreviewList');
+        const aisleListEl = document.getElementById('aisleList');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        const printBtn = document.getElementById('printBtn');
+        const batchModeBtn = document.getElementById('batchModeBtn');
+        const batchToolbar = document.getElementById('batchToolbar');
+        const batchGroupSelect = document.getElementById('batchGroupSelect');
+        const batchAssignBtn = document.getElementById('batchAssignBtn');
+        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+        const batchSelectAllBtn = document.getElementById('batchSelectAllBtn');
+        const batchCancelBtn = document.getElementById('batchCancelBtn');
+        const batchCountEl = document.getElementById('batchCount');
+        const quickRandomBtn = document.getElementById('quickRandomBtn');
+        const mobileBanner = document.getElementById('mobileBanner');
 
         // 分组导入相关变量
-        let tempImportGroups = []; // 临时存储导入的分组
-        let selectedGroupColumnIndex = -1; // 选择的分组列索引
-        let isGroupImportEnabled = false; // 是否启用分组导入
+        let tempImportGroups = [];
+        let selectedGroupColumnIndex = -1;
+        let isGroupImportEnabled = false;
 
-        let draggedStudent = null;
+        let draggedStudentId = null;
         let draggedFromIndex = null;
-        let excelData = null; // 存储解析后的Excel数据
-        let selectedColumnIndex = 0; // 默认选择第一列
+        let excelData = null;
+        let selectedColumnIndex = 0;
         let dragStartTime = 0;
-        let isTeacherView = false; // 当前是否为教师视角
+        let isTeacherView = false;
 
         // 座位表配置
         let rows = 7;
@@ -935,7 +2386,228 @@
         let currentSeats = Array(rows * cols).fill(null);
 
         // 走道配置
-        let aisles = []; // 存储走道配置 [{afterCol: 2, width: 30}, {afterCol: 5, width: 40}]
+        let aisles = [];
+
+        let isInitialized = false;
+        let autoSaveTimer = null;
+
+        // 撤销/重做栈
+        const undoStack = [];
+        const redoStack = [];
+        const MAX_UNDO = 30;
+        let isUndoing = false;
+
+        // 移动端触摸交互状态
+        let isTouchDevice = false;
+        let tapSelectedStudentId = null;   // 选中的学生 ID（来自学生列表）
+        let tapSelectedSeatIndex = null;    // 选中的座位索引（来自座位表）
+
+        // 批量操作状态
+        let isBatchMode = false;
+        const batchSelectedIds = new Set();
+
+        // 签到模式状态
+        let isCheckinMode = false;
+
+        // ==================== 工具函数 ====================
+
+        function generateId(prefix) {
+            prefix = prefix || 'g';
+            return prefix + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str == null ? '' : str;
+            return div.innerHTML;
+        }
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function adjustColor(color, amount) {
+            const hex = color.replace('#', '');
+            const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
+            const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
+            const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
+            return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
+        }
+
+        function isLightColor(hex) {
+            const r = parseInt(hex.substr(1, 2), 16);
+            const g = parseInt(hex.substr(3, 2), 16);
+            const b = parseInt(hex.substr(5, 2), 16);
+            return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+        }
+
+        // ==================== 学生/分组查找 ====================
+
+        function getStudentById(id) {
+            return students.find(s => s.id === id);
+        }
+
+        function getStudentByName(name) {
+            return students.find(s => s.name === name);
+        }
+
+        function getGroupById(groupId) {
+            return groups.find(g => g.id === groupId);
+        }
+
+        function getStudentGroupColor(studentId) {
+            const student = getStudentById(studentId);
+            if (!student || !student.groupId) return null;
+            const group = getGroupById(student.groupId);
+            return group ? group.color : null;
+        }
+
+        // ==================== 自动保存 ====================
+
+        function getCurrentConfig() {
+            return {
+                title: pageTitle.textContent.trim(),
+                rows: rows,
+                cols: cols,
+                seats: currentSeats,
+                students: students,
+                groups: groups,
+                viewMode: isTeacherView ? 'teacher' : 'student',
+                aisles: aisles,
+                version: '2.0'
+            };
+        }
+
+        function autoSave() {
+            if (!isInitialized) return;
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(function () {
+                try {
+                    localStorage.setItem('classroomConfig', JSON.stringify(getCurrentConfig()));
+                } catch (e) {
+                    console.error('自动保存失败:', e);
+                }
+            }, 500);
+        }
+
+        // ==================== 撤销/重做 ====================
+
+        function pushSnapshot() {
+            if (isUndoing) return;
+            undoStack.push({
+                seats: [...currentSeats],
+                students: JSON.parse(JSON.stringify(students)),
+                groups: JSON.parse(JSON.stringify(groups)),
+                aisles: JSON.parse(JSON.stringify(aisles)),
+                rows: rows,
+                cols: cols
+            });
+            if (undoStack.length > MAX_UNDO) undoStack.shift();
+            redoStack.length = 0;
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            isUndoing = true;
+            redoStack.push({
+                seats: [...currentSeats],
+                students: JSON.parse(JSON.stringify(students)),
+                groups: JSON.parse(JSON.stringify(groups)),
+                aisles: JSON.parse(JSON.stringify(aisles)),
+                rows: rows,
+                cols: cols
+            });
+            const snap = undoStack.pop();
+            currentSeats = [...snap.seats];
+            students = JSON.parse(JSON.stringify(snap.students));
+            groups = JSON.parse(JSON.stringify(snap.groups));
+            aisles = JSON.parse(JSON.stringify(snap.aisles));
+            rows = snap.rows;
+            cols = snap.cols;
+            rowsInput.value = rows;
+            colsInput.value = cols;
+            updateAisleDisplay();
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
+            generateSeats();
+            isUndoing = false;
+            updateUndoRedoButtons();
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            isUndoing = true;
+            undoStack.push({
+                seats: [...currentSeats],
+                students: JSON.parse(JSON.stringify(students)),
+                groups: JSON.parse(JSON.stringify(groups)),
+                aisles: JSON.parse(JSON.stringify(aisles)),
+                rows: rows,
+                cols: cols
+            });
+            const snap = redoStack.pop();
+            currentSeats = [...snap.seats];
+            students = JSON.parse(JSON.stringify(snap.students));
+            groups = JSON.parse(JSON.stringify(snap.groups));
+            aisles = JSON.parse(JSON.stringify(snap.aisles));
+            rows = snap.rows;
+            cols = snap.cols;
+            rowsInput.value = rows;
+            colsInput.value = cols;
+            updateAisleDisplay();
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
+            generateSeats();
+            isUndoing = false;
+            updateUndoRedoButtons();
+        }
+
+        function updateUndoRedoButtons() {
+            undoBtn.disabled = undoStack.length === 0;
+            redoBtn.disabled = redoStack.length === 0;
+        }
+
+        // ==================== 配置迁移（向后兼容） ====================
+
+        function migrateConfig(config) {
+            if (!config) return config;
+            // 处理极旧格式：students 是字符串数组
+            if (config.students && config.students.length > 0 && typeof config.students[0] === 'string') {
+                config.students = config.students.map(function (name) {
+                    return { id: generateId('s'), name: name, groupId: null };
+                });
+            }
+            // 处理旧格式：students 对象没有 id 字段
+            if (config.students && config.students.length > 0 && !config.students[0].id) {
+                config.students.forEach(function (s) {
+                    if (!s.id) s.id = generateId('s');
+                });
+            }
+            // 如果 seats 中存的是姓名而非 ID，转换为 ID
+            if (config.seats && config.students && config.students.length > 0) {
+                const idSet = new Set(config.students.map(function (s) { return s.id; }));
+                const nameToId = new Map(config.students.map(function (s) { return [s.name, s.id]; }));
+                config.seats = config.seats.map(function (seatVal) {
+                    if (seatVal == null) return null;
+                    if (idSet.has(seatVal)) return seatVal; // 已经是 ID
+                    return nameToId.get(seatVal) || null;   // 旧格式姓名 → ID
+                });
+            }
+            // 为旧数据补充 checkedIn 字段
+            if (config.students && config.students.length > 0) {
+                config.students.forEach(function (s) {
+                    if (s.checkedIn == null) s.checkedIn = false;
+                });
+            }
+            config.version = '2.0';
+            return config;
+        }
 
         // 添加走道按钮事件
         document.getElementById('addAisleBtn').addEventListener('click', function () {
@@ -943,7 +2615,7 @@
             const width = parseInt(document.getElementById('aisleWidth').value);
 
             if (afterCol < 1 || afterCol >= cols) {
-                alert(`列数必须在1到${cols - 1}之间！`);
+                alert('列数必须在1到' + (cols - 1) + '之间！');
                 return;
             }
 
@@ -952,7 +2624,7 @@
                 return;
             }
 
-            aisles.push({ afterCol, width });
+            aisles.push({ afterCol: afterCol, width: width });
             aisles.sort((a, b) => a.afterCol - b.afterCol);
             updateAisleDisplay();
             generateSeats();
@@ -960,57 +2632,34 @@
 
         // 更新走道显示
         function updateAisleDisplay() {
-            const aisleList = document.getElementById('aisleList');
             if (aisles.length === 0) {
-                aisleList.innerHTML = '<span style="color: #999;">暂无走道</span>';
+                aisleListEl.innerHTML = '<span style="color: #999;">暂无走道</span>';
                 return;
             }
-
-            aisleList.innerHTML = aisles.map(aisle =>
-                `<span class="aisle-item">
-                    第${aisle.afterCol}列后(${aisle.width}px)
-                    <button onclick="removeAisle(${aisle.afterCol})">×</button>
-                </span>`
+            aisleListEl.innerHTML = aisles.map(aisle =>
+                '<span class="aisle-item" data-after-col="' + aisle.afterCol + '">' +
+                    '第' + aisle.afterCol + '列后(' + aisle.width + 'px) ' +
+                    '<button class="aisle-remove-btn" data-after-col="' + aisle.afterCol + '">×</button>' +
+                '</span>'
             ).join('');
         }
 
-        // 移除走道
-        function removeAisle(afterCol) {
+        // 走道列表事件委托（点击删除按钮）
+        aisleListEl.addEventListener('click', function (e) {
+            const btn = e.target.closest('.aisle-remove-btn');
+            if (!btn) return;
+            const afterCol = parseInt(btn.getAttribute('data-after-col'));
             aisles = aisles.filter(a => a.afterCol !== afterCol);
             updateAisleDisplay();
             generateSeats();
-        }
+        });
 
-        // ==================== 分组管理函数 ====================
+        // ==================== 分组管理 ====================
 
-        // 生成唯一ID
-        function generateId() {
-            return 'g' + Date.now() + Math.random().toString(36).substr(2, 9);
-        }
-
-        // 根据学生姓名获取学生对象
-        function getStudentByName(name) {
-            return students.find(s => s.name === name);
-        }
-
-        // 根据分组ID获取分组
-        function getGroupById(groupId) {
-            return groups.find(g => g.id === groupId);
-        }
-
-        // 根据学生姓名获取分组颜色
-        function getStudentGroupColor(studentName) {
-            const student = getStudentByName(studentName);
-            if (!student || !student.groupId) return null;
-            const group = getGroupById(student.groupId);
-            return group ? group.color : null;
-        }
-
-        // 添加分组
         function addGroup() {
             const name = groupNameInput.value.trim();
             const color = groupColorInput.value;
-            
+
             if (!name) {
                 alert('请输入分组名称');
                 return;
@@ -1022,7 +2671,7 @@
             }
 
             groups.push({
-                id: generateId(),
+                id: generateId('g'),
                 name: name,
                 color: color
             });
@@ -1030,9 +2679,9 @@
             groupNameInput.value = '';
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
+            autoSave();
         }
 
-        // 编辑分组
         function editGroup(groupId, newName, newColor) {
             const group = getGroupById(groupId);
             if (group) {
@@ -1041,212 +2690,221 @@
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
                 generateSeats();
-                generateStudentList();
             }
         }
 
-        // 删除分组
         function deleteGroup(groupId) {
             if (confirm('确定要删除这个分组吗？该分组的学生将变为未分组状态。')) {
-                // 将该分组的学生设置为未分组
+                pushSnapshot();
                 students.forEach(s => {
-                    if (s.groupId === groupId) {
-                        s.groupId = null;
-                    }
+                    if (s.groupId === groupId) s.groupId = null;
                 });
-                
                 groups = groups.filter(g => g.id !== groupId);
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
                 generateSeats();
-                generateStudentList();
             }
         }
 
-        // 更新分组显示
+        // 分组列表渲染（纯渲染，事件由委托处理）
         function updateGroupDisplay() {
             if (groups.length === 0) {
-                groupList.innerHTML = '<span style="color: #999; font-size: 12px;">暂无分组</span>';
+                groupList.innerHTML = '<span class="empty-hint">暂无分组</span>';
             } else {
-                groupList.innerHTML = groups.map(group => `
-                    <div class="group-item">
-                        <div class="group-color-preview" style="background-color: ${group.color};"></div>
-                        <input type="text" class="group-name" value="${group.name}" 
-                               onchange="editGroup('${group.id}', this.value, '${group.color}')">
-                        <input type="color" value="${group.color}" 
-                               onchange="editGroup('${group.id}', '${group.name}', this.value)">
-                        <button class="delete-btn" onclick="deleteGroup('${group.id}')">×</button>
-                    </div>
-                `).join('');
+                groupList.innerHTML = groups.map(group =>
+                    '<div class="group-item" data-group-id="' + escapeHtml(group.id) + '">' +
+                        '<div class="group-info">' +
+                            '<div class="group-color-dot" style="background-color: ' + escapeHtml(group.color) + ';"></div>' +
+                            '<input type="text" class="group-name-input" value="' + escapeHtml(group.name) + '" data-group-id="' + escapeHtml(group.id) + '" style="flex:1;min-width:0;padding:2px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--surface-hover);">' +
+                        '</div>' +
+                        '<div class="group-actions">' +
+                            '<input type="color" class="group-color-input" value="' + escapeHtml(group.color) + '" data-group-id="' + escapeHtml(group.id) + '" style="width:20px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;cursor:pointer;">' +
+                            '<button class="group-delete-btn" data-group-id="' + escapeHtml(group.id) + '" title="删除分组">✕</button>' +
+                        '</div>' +
+                    '</div>'
+                ).join('');
             }
-
-            studentAssignment.style.display = 'block';
+            if (groups.length > 0) {
+                studentAssignment.style.display = 'block';
+            }
         }
 
-        // 更新学生分配显示
+        // 分组列表事件委托
+        groupList.addEventListener('change', function (e) {
+            const target = e.target;
+            const groupId = target.getAttribute('data-group-id');
+            if (!groupId) return;
+            const group = getGroupById(groupId);
+            if (!group) return;
+            if (target.classList.contains('group-name-input')) {
+                editGroup(groupId, target.value, group.color);
+            } else if (target.classList.contains('group-color-input')) {
+                editGroup(groupId, group.name, target.value);
+            }
+        });
+
+        groupList.addEventListener('click', function (e) {
+            const btn = e.target.closest('.group-delete-btn');
+            if (!btn) return;
+            deleteGroup(btn.getAttribute('data-group-id'));
+        });
+
+        // 更新学生分配显示（纯渲染，事件由委托处理）
         function updateStudentAssignmentDisplay() {
-            if (students.length === 0) {
-                studentGroupSelector.innerHTML = `
-                    <div class="student-group-item" style="background: #e8f5e9;">
-                        <input type="text" placeholder="新增学生姓名" onchange="updateStudentName('NEW', this.value)">
-                        <select onchange="assignStudentToGroup('NEW', this.value)">
-                            <option value="">未分组</option>
-                            ${groups.map(g => `
-                                <option value="${g.id}">${g.name}</option>
-                            `).join('')}
-                        </select>
-                        <button class="add-btn" onclick="addNewStudent()">+</button>
-                    </div>
-                `;
-                return;
-            }
+            const groupOptions = groups.map(g =>
+                '<option value="' + escapeHtml(g.id) + '">' + escapeHtml(g.name) + '</option>'
+            ).join('');
 
-            studentGroupSelector.innerHTML = students.map(student => `
-                <div class="student-group-item">
-                    <input type="text" value="${student.name}" onchange="updateStudentName('${student.name}', this.value)">
-                    <select onchange="assignStudentToGroup('${student.name}', this.value)">
-                        <option value="">未分组</option>
-                        ${groups.map(g => `
-                            <option value="${g.id}" ${student.groupId === g.id ? 'selected' : ''}>${g.name}</option>
-                        `).join('')}
-                    </select>
-                    <button class="delete-btn" onclick="removeStudent('${student.name}')">×</button>
-                </div>
-            `).join('') + `
-                <div class="student-group-item" style="background: #e8f5e9;">
-                    <input type="text" placeholder="新增学生姓名" onchange="updateStudentName('NEW', this.value)">
-                    <select onchange="assignStudentToGroup('NEW', this.value)">
-                        <option value="">未分组</option>
-                        ${groups.map(g => `
-                            <option value="${g.id}">${g.name}</option>
-                        `).join('')}
-                    </select>
-                    <button class="add-btn" onclick="addNewStudent()">+</button>
-                </div>
-            `;
+            const newRow =
+                '<div class="student-group-item" style="background: #e8f5e9;">' +
+                    '<input type="text" class="new-student-name" placeholder="新增学生姓名">' +
+                    '<select class="new-student-group"><option value="">未分组</option>' + groupOptions + '</select>' +
+                    '<button class="add-btn new-student-add-btn">+</button>' +
+                '</div>';
+
+            if (students.length === 0) {
+                studentGroupSelector.innerHTML = newRow;
+            } else {
+                const studentsHtml = students.map(student => {
+                    let classes = 'student-group-item';
+                    if (isBatchMode && batchSelectedIds.has(student.id)) {
+                        classes += ' batch-selected';
+                    }
+                    const checkbox = isBatchMode
+                        ? '<input type="checkbox" class="batch-checkbox" ' + (batchSelectedIds.has(student.id) ? 'checked' : '') + '>'
+                        : '';
+                    return (
+                        '<div class="' + classes + '" data-student-id="' + escapeHtml(student.id) + '">' +
+                            checkbox +
+                            '<input type="text" class="student-name-input" value="' + escapeHtml(student.name) + '">' +
+                            '<select class="student-group-select">' +
+                                '<option value="">未分组</option>' +
+                                groups.map(g =>
+                                    '<option value="' + escapeHtml(g.id) + '"' + (student.groupId === g.id ? ' selected' : '') + '>' + escapeHtml(g.name) + '</option>'
+                                ).join('') +
+                            '</select>' +
+                            '<button class="delete-btn student-delete-btn">×</button>' +
+                        '</div>'
+                    );
+                }).join('');
+                studentGroupSelector.innerHTML = studentsHtml + newRow;
+            }
         }
 
-        // 分配学生到分组
-        function assignStudentToGroup(studentName, groupId) {
-            // 如果是新增学生，直接添加
-            if (studentName === 'NEW') {
-                // 获取新增学生输入框的值
-                const inputEl = studentGroupSelector.querySelector('input[placeholder="新增学生姓名"]');
-                if (inputEl && inputEl.value.trim()) {
-                    const name = inputEl.value.trim();
-                    if (students.some(s => s.name === name)) {
-                        alert('该学生已存在');
-                        return;
-                    }
-                    students.push({
-                        name: name,
-                        groupId: groupId || null
-                    });
-                    inputEl.value = '';
-                    updateStudentAssignmentDisplay();
-                    generateStudentList();
-                    updateStatistics();
-                }
+        // 学生分配区域事件委托
+        studentGroupSelector.addEventListener('change', function (e) {
+            const target = e.target;
+            const item = target.closest('.student-group-item');
+            if (!item) return;
+
+            // 已有学生姓名变更
+            if (target.classList.contains('student-name-input')) {
+                const studentId = item.getAttribute('data-student-id');
+                updateStudentName(studentId, target.value);
                 return;
             }
-            
-            const student = getStudentByName(studentName);
+
+            // 已有学生分组变更
+            if (target.classList.contains('student-group-select')) {
+                const studentId = item.getAttribute('data-student-id');
+                assignStudentToGroup(studentId, target.value);
+                return;
+            }
+        });
+
+        studentGroupSelector.addEventListener('click', function (e) {
+            // 删除学生
+            const delBtn = e.target.closest('.student-delete-btn');
+            if (delBtn) {
+                const item = delBtn.closest('.student-group-item');
+                const studentId = item.getAttribute('data-student-id');
+                removeStudent(studentId);
+                return;
+            }
+
+            // 新增学生
+            const addBtn = e.target.closest('.new-student-add-btn');
+            if (addBtn) {
+                const item = addBtn.closest('.student-group-item');
+                const nameInput = item.querySelector('.new-student-name');
+                const groupSelect = item.querySelector('.new-student-group');
+                const name = nameInput.value.trim();
+                const groupId = groupSelect.value || null;
+
+                if (!name) {
+                    alert('请输入学生姓名');
+                    return;
+                }
+                if (students.some(s => s.name === name)) {
+                    alert('该学生已存在');
+                    return;
+                }
+
+                students.push({ id: generateId('s'), name: name, groupId: groupId, checkedIn: false });
+                nameInput.value = '';
+                groupSelect.value = '';
+                updateStudentAssignmentDisplay();
+                generateStudentList();
+                updateStatistics();
+                autoSave();
+            }
+        });
+
+        // 新增学生输入框回车
+        studentGroupSelector.addEventListener('keypress', function (e) {
+            if (e.key !== 'Enter') return;
+            const target = e.target;
+            if (!target.classList.contains('new-student-name')) return;
+            const item = target.closest('.student-group-item');
+            const addBtn = item.querySelector('.new-student-add-btn');
+            addBtn.click();
+        });
+
+        function assignStudentToGroup(studentId, groupId) {
+            const student = getStudentById(studentId);
             if (student) {
                 student.groupId = groupId || null;
                 generateSeats();
                 generateStudentList();
+                autoSave();
             }
         }
 
-        // 更新学生姓名
-        function updateStudentName(oldName, newName) {
-            // 如果是新增学生，暂不处理（等待用户点击+或选择分组）
-            if (oldName === 'NEW') return;
-            
+        function updateStudentName(studentId, newName) {
             newName = newName.trim();
-            
+
             if (!newName) {
                 alert('请输入学生姓名');
                 updateStudentAssignmentDisplay();
                 return;
             }
-            
-            // 检查新姓名是否已存在
-            if (students.some(s => s.name === newName && s.name !== oldName)) {
+
+            const student = getStudentById(studentId);
+            if (!student) return;
+
+            if (students.some(s => s.name === newName && s.id !== studentId)) {
                 alert('该姓名已存在');
                 updateStudentAssignmentDisplay();
                 return;
             }
-            
-            const student = getStudentByName(oldName);
-            if (student) {
-                // 更新座位表中的姓名
-                currentSeats = currentSeats.map(name => name === oldName ? newName : name);
-                student.name = newName;
-                generateSeats();
-                generateStudentList();
-            }
-        }
 
-        // 删除学生
-        function removeStudent(studentName) {
-            // 如果是新增学生输入框，不处理删除
-            if (studentName === 'NEW') return;
-            
-            if (confirm(`确定要删除学生 ${studentName} 吗？`)) {
-                // 从座位表中移除
-                currentSeats = currentSeats.map(name => name === studentName ? null : name);
-                // 从学生列表中移除
-                students = students.filter(s => s.name !== studentName);
-                updateStudentAssignmentDisplay();
-                generateSeats();
-            }
-        }
-
-        // 添加新学生
-        function addNewStudent() {
-            const inputEl = studentGroupSelector.querySelector('input[placeholder="新增学生姓名"]');
-            const selectEl = studentGroupSelector.querySelector('.student-group-item:last-child select');
-            
-            if (!inputEl || !inputEl.value.trim()) {
-                alert('请输入学生姓名');
-                return;
-            }
-            
-            const name = inputEl.value.trim();
-            
-            // 检查是否已存在
-            if (students.some(s => s.name === name)) {
-                alert('该学生已存在');
-                return;
-            }
-            
-            const groupId = selectEl.value || null;
-            
-            students.push({
-                name: name,
-                groupId: groupId
-            });
-            
-            // 清空输入框
-            inputEl.value = '';
-            selectEl.value = '';
-            
-            // 更新UI
-            updateStudentAssignmentDisplay();
+            // ID 化后无需更新 currentSeats（座位存的是 ID，不是姓名）
+            student.name = newName;
+            generateSeats();
             generateStudentList();
-            updateStatistics();
+            autoSave();
         }
 
-        // 切换分组面板展开/收起
-        function toggleGroupPanel() {
-            groupContent.classList.toggle('expanded');
-            groupToggleBtn.textContent = groupContent.classList.contains('expanded') ? '▲' : '▼';
-            
-            // 当展开分组面板时，显示学生分配区域并更新内容
-            if (groupContent.classList.contains('expanded')) {
-                studentAssignment.style.display = 'block';
+        function removeStudent(studentId) {
+            const student = getStudentById(studentId);
+            if (!student) return;
+            if (confirm('确定要删除学生 ' + student.name + ' 吗？')) {
+                pushSnapshot();
+                currentSeats = currentSeats.map(id => id === studentId ? null : id);
+                students = students.filter(s => s.id !== studentId);
                 updateStudentAssignmentDisplay();
+                generateSeats();
+                autoSave();
             }
         }
 
@@ -1254,11 +2912,11 @@
 
         // ==================== 分组导入相关函数 ====================
 
-        // 预定义一组对比度良好的颜色
+        // 预定义一组对比度良好的颜色（已去重）
         const distinctColors = [
-            '#4ECDC4', '#FF6B6B', '#45B7D1', '#96CEB4', '#FFEAA7', 
-            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', 
-            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
+            '#4ECDC4', '#FF6B6B', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#D2B4DE', '#D7BDE2',
             '#AED6F1', '#F9E79F', '#ABEBC6', '#F5B7B1', '#D4EFDF',
             '#FCF3CF', '#E8DAEF', '#D6EAF8', '#FAD7A0', '#A9DFBF'
         ];
@@ -1325,7 +2983,7 @@
                 const groupName = String(groupValue).trim();
                 if (!groupMap.has(groupName)) {
                     groupMap.set(groupName, {
-                        id: generateId(),
+                        id: generateId('g'),
                         name: groupName,
                         color: getNextDistinctColor(),
                         students: []
@@ -1336,17 +2994,16 @@
             tempImportGroups = Array.from(groupMap.values());
         }
 
-        // 渲染分组预览
+        // 渲染分组预览（纯渲染，事件由委托处理）
         function renderGroupPreview() {
             if (tempImportGroups.length === 0) {
                 groupPreviewSection.style.display = 'none';
                 return;
             }
-            
+
             groupPreviewSection.style.display = 'block';
-            
+
             groupPreviewList.innerHTML = tempImportGroups.map((group, index) => {
-                // 计算该分组的学生数量（需要姓名列和分组列都有数据）
                 const nameColIndex = parseInt(columnSelect.value);
                 let studentCount = 0;
                 if (nameColIndex >= 0 && selectedGroupColumnIndex >= 0) {
@@ -1358,40 +3015,38 @@
                         }
                     }
                 }
-                
-                return `
-                    <div class="group-preview-item">
-                        <div class="group-preview-color" style="background-color: ${group.color};"></div>
-                        <div class="group-preview-info">
-                            <div class="group-preview-name">
-                                <input type="text" value="${group.name}" 
-                                    onchange="updateTempGroupName(${index}, this.value)" 
-                                    class="group-name-input">
-                            </div>
-                            <div class="group-preview-count">学生数量: ${studentCount}</div>
-                        </div>
-                        <div class="group-preview-edit">
-                            <input type="color" value="${group.color}" 
-                                onchange="updateTempGroupColor(${index}, this.value)">
-                        </div>
-                    </div>
-                `;
+                return (
+                    '<div class="group-preview-item" data-index="' + index + '">' +
+                        '<div class="group-preview-color" style="background-color: ' + escapeHtml(group.color) + ';"></div>' +
+                        '<div class="group-preview-info">' +
+                            '<div class="group-preview-name">' +
+                                '<input type="text" value="' + escapeHtml(group.name) + '" class="preview-group-name-input">' +
+                            '</div>' +
+                            '<div class="group-preview-count">学生数量: ' + studentCount + '</div>' +
+                        '</div>' +
+                        '<div class="group-preview-edit">' +
+                            '<input type="color" value="' + escapeHtml(group.color) + '" class="preview-group-color-input">' +
+                        '</div>' +
+                    '</div>'
+                );
             }).join('');
         }
 
-        // 更新临时分组名称
-        function updateTempGroupName(index, newName) {
-            if (tempImportGroups[index]) {
-                tempImportGroups[index].name = newName;
+        // 分组预览事件委托
+        groupPreviewList.addEventListener('change', function (e) {
+            const target = e.target;
+            const item = target.closest('.group-preview-item');
+            if (!item) return;
+            const index = parseInt(item.getAttribute('data-index'));
+            if (!tempImportGroups[index]) return;
+            if (target.classList.contains('preview-group-name-input')) {
+                tempImportGroups[index].name = target.value;
+                renderGroupPreview();
+            } else if (target.classList.contains('preview-group-color-input')) {
+                tempImportGroups[index].color = target.value;
+                renderGroupPreview();
             }
-        }
-
-        // 更新临时分组颜色
-        function updateTempGroupColor(index, newColor) {
-            if (tempImportGroups[index]) {
-                tempImportGroups[index].color = newColor;
-            }
-        }
+        });
 
         // 处理分组导入启用状态变化
         function handleGroupImportToggle() {
@@ -1428,7 +3083,7 @@
         // 导入学生并应用分组
         function importStudentsWithGroups(nameColumnIndex) {
             const newStudents = [];
-            
+
             // 首先确定分组映射
             const groupNameToId = new Map();
             if (isGroupImportEnabled && tempImportGroups.length > 0) {
@@ -1436,27 +3091,25 @@
                     groupNameToId.set(group.name, group.id);
                 });
             }
-            
+
             // 处理学生数据
             for (let i = 1; i < excelData.length; i++) {
                 const nameCell = excelData[i][nameColumnIndex];
                 if (!nameCell || typeof nameCell !== 'string') continue;
-                
+
                 const name = nameCell.trim();
                 if (!name) continue;
-                
+
                 let groupId = null;
                 if (isGroupImportEnabled && selectedGroupColumnIndex >= 0) {
                     const groupVal = excelData[i][selectedGroupColumnIndex];
                     if (groupVal) {
                         const groupName = String(groupVal).trim();
-                        // 查找匹配的分组（支持精确匹配）
                         if (groupNameToId.has(groupName)) {
                             groupId = groupNameToId.get(groupName);
                         } else {
-                            // 尝试模糊匹配
                             for (const [gName, gId] of groupNameToId.entries()) {
-                                if (gName.toLowerCase().includes(groupName.toLowerCase()) || 
+                                if (gName.toLowerCase().includes(groupName.toLowerCase()) ||
                                     groupName.toLowerCase().includes(gName.toLowerCase())) {
                                     groupId = gId;
                                     break;
@@ -1465,27 +3118,25 @@
                         }
                     }
                 }
-                
-                newStudents.push({ name: name, groupId: groupId });
+
+                newStudents.push({ id: generateId('s'), name: name, groupId: groupId, checkedIn: false });
             }
-            
+
             if (newStudents.length === 0) {
                 fileInfo.innerHTML = '<span style="color:red">未找到学生名单，请选择正确的列</span>';
                 return;
             }
-            
+
             // 更新学生数据
             students = newStudents;
-            
+
             // 如果启用了分组导入，添加分组到系统
             if (isGroupImportEnabled && tempImportGroups.length > 0) {
-                // 合并现有分组和新分组（避免ID冲突）
                 const existingGroupNames = new Set(groups.map(g => g.name));
                 tempImportGroups.forEach(newGroup => {
                     if (!existingGroupNames.has(newGroup.name)) {
                         groups.push(newGroup);
                     } else {
-                        // 如果分组名已存在，更新颜色
                         const existingGroup = groups.find(g => g.name === newGroup.name);
                         if (existingGroup) {
                             existingGroup.color = newGroup.color;
@@ -1493,101 +3144,124 @@
                     }
                 });
             }
-            
+
             // 更新UI
-            fileInfo.innerHTML = `<span style="color:green">成功导入 ${students.length} 名学生${isGroupImportEnabled && tempImportGroups.length > 0 ? `，${tempImportGroups.length}个分组` : ''}</span>`;
+            fileInfo.innerHTML = '<span style="color:green">成功导入 ' + students.length + ' 名学生' +
+                (isGroupImportEnabled && tempImportGroups.length > 0 ? '，' + tempImportGroups.length + '个分组' : '') + '</span>';
             generateStudentList();
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
             previewArea.style.display = 'none';
-            
-            // 尝试匹配现有座位
+
+            // 尝试按姓名匹配旧座位配置（兼容旧数据）
             const savedConfig = localStorage.getItem('classroomConfig');
             if (savedConfig) {
-                const config = JSON.parse(savedConfig);
-                const studentNames = newStudents.map(s => s.name);
-                currentSeats = config.seats.map(name => {
-                    return studentNames.includes(name) ? name : null;
-                });
+                try {
+                    const config = JSON.parse(savedConfig);
+                    migrateConfig(config);
+                    if (config.seats && config.students) {
+                        const oldNameToNewId = new Map(newStudents.map(s => [s.name, s.id]));
+                        const oldIdToName = new Map(config.students.map(s => [s.id, s.name]));
+                        currentSeats = config.seats.map(seatVal => {
+                            if (!seatVal) return null;
+                            const oldName = oldIdToName.get(seatVal) || seatVal;
+                            return oldNameToNewId.get(oldName) || null;
+                        });
+                        // 调整座位数组长度
+                        const targetLen = rows * cols;
+                        if (currentSeats.length < targetLen) {
+                            currentSeats = currentSeats.concat(Array(targetLen - currentSeats.length).fill(null));
+                        } else if (currentSeats.length > targetLen) {
+                            currentSeats = currentSeats.slice(0, targetLen);
+                        }
+                    }
+                    generateSeats();
+                } catch (e) {
+                    console.error('匹配旧座位配置失败:', e);
+                    generateSeats();
+                }
+            } else {
                 generateSeats();
             }
+            autoSave();
         }
 
         // ==================== 分组导入相关函数结束 ====================
 
-        // 修改generateSeats函数，支持走道显示和分组颜色
         function generateSeats() {
-            // 设置网格布局
             classroom.style.gridTemplateColumns = generateGridTemplateColumns();
-            
-            // 清空并重建
-            classroom.innerHTML = isTeacherView ? '' : '<div class="teacher-desk">讲台</div>';
+            classroom.innerHTML = '';
 
-            // 按行列顺序生成座位，并在走道位置插入占位元素
+            if (isCheckinMode) {
+                const banner = document.createElement('div');
+                banner.className = 'checkin-banner visible';
+                banner.innerHTML =
+                    '<span class="checkin-banner-icon">✓</span>' +
+                    '<span>签到模式已开启 — 点击座位签到/取消签到</span>' +
+                    '<button class="checkin-banner-close">×</button>';
+                classroom.appendChild(banner);
+                banner.querySelector('.checkin-banner-close').addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (isCheckinMode) toggleCheckinMode();
+                });
+            }
+
+            if (!isTeacherView) {
+                const desk = document.createElement('div');
+                desk.className = 'teacher-desk';
+                desk.textContent = '讲台';
+                classroom.appendChild(desk);
+            }
+
             for (let row = 0; row < rows; row++) {
                 for (let col = 0; col < cols; col++) {
-                    // 计算座位索引（根据视角决定）
                     let seatIndex;
-                    // 计算列索引（考虑左右镜像）
                     let actualCol;
-                    
+
                     if (isTeacherView) {
-                        // 教师视角：从后往前排列（最后一排显示在最上面）
-                        // 同时左右镜像（从右往左看）
                         const actualRow = rows - 1 - row;
-                        actualCol = cols - 1 - col; // 左右镜像
+                        actualCol = cols - 1 - col;
                         seatIndex = actualRow * cols + actualCol;
                     } else {
-                        // 学生视角：从前往后排列，正常从左到右
                         actualCol = col;
                         seatIndex = row * cols + col;
                     }
 
                     const seat = document.createElement('div');
-                    seat.className = currentSeats[seatIndex] ? 'seat' : 'seat empty';
+                    const studentId = currentSeats[seatIndex];
+                    const student = studentId ? getStudentById(studentId) : null;
+                    const isCheckedIn = student && student.checkedIn;
+                    let seatClass = studentId ? 'seat' : 'seat empty';
+                    if (isCheckedIn) seatClass += ' checked-in';
+                    seat.className = seatClass;
                     seat.setAttribute('data-index', seatIndex);
+                    seat.setAttribute('data-student', studentId || '');
 
-                    // 计算实际的行列号（用于显示）
                     const displayRow = Math.floor(seatIndex / cols) + 1;
                     const displayCol = (seatIndex % cols) + 1;
-                    seat.innerHTML = `<span class="seat-number">${displayRow}排${displayCol}列</span>`;
 
-                    if (currentSeats[seatIndex]) {
-                        seat.textContent = currentSeats[seatIndex];
-                        // 根据分组设置颜色
-                        const groupColor = getStudentGroupColor(currentSeats[seatIndex]);
+                    if (studentId) {
+                        const displayName = student ? student.name : '';
+                        const groupColor = getStudentGroupColor(studentId);
                         if (groupColor) {
                             seat.style.backgroundColor = groupColor;
-                            // 调整边框颜色以匹配分组色
                             seat.style.borderColor = adjustColor(groupColor, -30);
+                            seat.style.color = isLightColor(groupColor) ? '#000' : '#fff';
                         }
+                        seat.innerHTML =
+                            '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
+                            '<span class="seat-name">' + escapeHtml(displayName) + '</span>';
+                        seat.draggable = !isTouchDevice && !isCheckinMode;
                     } else {
-                        seat.textContent = '空座位';
+                        seat.innerHTML =
+                            '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
+                            '<span class="seat-name" style="color: #999;">空座位</span>';
+                        seat.draggable = false;
                     }
-
-                    seat.draggable = true;
-
-                    seat.addEventListener('dragstart', handleDragStart);
-                    seat.addEventListener('dragover', handleDragOver);
-                    seat.addEventListener('dragenter', handleDragEnter);
-                    seat.addEventListener('dragleave', handleDragLeave);
-                    seat.addEventListener('drop', handleDrop);
-                    seat.addEventListener('dragend', handleDragEnd);
 
                     classroom.appendChild(seat);
 
-                    // 检查是否需要在此列后添加走道占位元素
-                    let checkCol;
-                    if (isTeacherView) {
-                        // 教师视角下，走道位置需要镜像转换
-                        // actualCol 是当前座位在真实教室中的列索引(0-based)
-                        // 走道 afterCol=X 在真实教室中在第X列后，教师视角应在第(X+1)列后
-                        // 即：actualCol 代表第(actualCol+1)列，若 afterCol==actualCol 则此处应有走道
-                        checkCol = actualCol;
-                    } else {
-                        checkCol = col + 1;
-                    }
-           
+                    let checkCol = isTeacherView ? actualCol : (col + 1);
                     const aisle = aisles.find(a => a.afterCol === checkCol);
                     if (aisle) {
                         const aislePlaceholder = document.createElement('div');
@@ -1604,17 +3278,16 @@
                 classroom.appendChild(desk);
             }
 
+            if (isCheckinMode) {
+                classroom.classList.add('checkin-mode');
+            } else {
+                classroom.classList.remove('checkin-mode');
+            }
+
             generateStudentList();
             updateStatistics();
-        }
-
-        // 辅助函数：调整颜色亮度（用于生成边框色）
-        function adjustColor(color, amount) {
-            const hex = color.replace('#', '');
-            const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
-            const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
-            const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
-            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            updateCheckinStats();
+            autoSave();
         }
 
         // 生成网格列模板（包含走道）
@@ -1662,110 +3335,126 @@
             document.getElementById('unassignedStudents').textContent = unassigned;
         }
 
-        // 获取未安排座位的学生名单（现在处理学生对象）
+        // 更新签到统计
+        function updateCheckinStats() {
+            const total = students.length;
+            const checkedIn = students.filter(s => s.checkedIn).length;
+            const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+            const rateEl = document.getElementById('checkinRate');
+            const progressBar = document.getElementById('checkinProgressBar');
+
+            if (rateEl) rateEl.textContent = rate + '%';
+            if (progressBar) progressBar.style.width = rate + '%';
+        }
+
+        function toggleCheckinMode() {
+            isCheckinMode = !isCheckinMode;
+            updateCheckinModeButton();
+            if (isCheckinMode) {
+                classroom.classList.add('checkin-mode');
+            } else {
+                classroom.classList.remove('checkin-mode');
+            }
+            generateSeats();
+        }
+
+        // 切换学生签到状态
+        function toggleStudentCheckin(studentId) {
+            const student = getStudentById(studentId);
+            if (!student) return;
+
+            pushSnapshot();
+            student.checkedIn = !student.checkedIn;
+            generateSeats();
+        }
+
         function getUnassignedStudents() {
-            const assignedNames = new Set(currentSeats.filter(s => s !== null));
-            return students.filter(s => !assignedNames.has(s.name)).map(s => s.name);
+            const assignedIds = new Set(currentSeats.filter(s => s !== null));
+            return students.filter(s => !assignedIds.has(s.id));
         }
 
         // 生成学生名单（只显示未安排座位的学生）
         function generateStudentList() {
             studentList.innerHTML = '';
+            const unassigned = getUnassignedStudents();
 
-            const unassignedNames = getUnassignedStudents();
-
-            if (unassignedNames.length === 0) {
-                studentList.innerHTML = '<p style="margin:0;font-size:13px;">所有学生已安排座位</p>';
+            if (unassigned.length === 0) {
+                studentList.innerHTML = '<p style="margin:0;font-size:13px;color:var(--text-muted);text-align:center;padding:20px 0;">所有学生已安排座位</p>';
                 updateStatistics();
+                updateCheckinStats();
                 return;
             }
 
-            unassignedNames.forEach(studentName => {
+            unassigned.forEach(student => {
                 const studentItem = document.createElement('div');
                 studentItem.className = 'student-item';
-                studentItem.textContent = studentName;
-                studentItem.draggable = true;
-                
-                // 根据分组设置颜色
-                const groupColor = getStudentGroupColor(studentName);
+                studentItem.setAttribute('data-student', student.id);
+                studentItem.draggable = !isTouchDevice;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'student-name';
+                nameSpan.textContent = student.name;
+                studentItem.appendChild(nameSpan);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'student-delete';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.title = '删除学生';
+                deleteBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    removeStudent(student.id);
+                });
+                studentItem.appendChild(deleteBtn);
+
+                const groupColor = getStudentGroupColor(student.id);
                 if (groupColor) {
                     studentItem.style.backgroundColor = groupColor;
-                    // 确保文字可读
                     studentItem.style.color = isLightColor(groupColor) ? '#000' : '#fff';
                 }
 
-                studentItem.addEventListener('dragstart', (e) => {
+                studentItem.addEventListener('dragstart', function (e) {
                     dragStartTime = Date.now();
-                    draggedStudent = studentName;
+                    draggedStudentId = student.id;
                     draggedFromIndex = null;
-                    e.dataTransfer.setData('text/plain', studentName);
-                    e.target.classList.add('dragging');
-
-                    // 显示拖拽提示
+                    e.dataTransfer.setData('text/plain', student.id);
+                    studentItem.classList.add('dragging');
                     dragHint.style.display = 'block';
-
-                    // 高亮拖放区域
                     classroom.classList.add('highlight');
-                    studentListContainer.classList.add('highlight');
                     studentList.classList.add('highlight');
-                    deleteZone.classList.add('highlight');
+                    deleteZone.classList.add('visible');
                 });
 
-                studentItem.addEventListener('dragend', (e) => {
-                    e.target.classList.remove('dragging');
-                    dragHint.style.display = 'none';
-
-                    // 移除高亮
-                    classroom.classList.remove('highlight');
-                    studentListContainer.classList.remove('highlight');
-                    studentList.classList.remove('highlight');
-                    deleteZone.classList.remove('highlight');
-                    document.querySelectorAll('.seat.highlight').forEach(seat => {
-                        seat.classList.remove('highlight');
-                    });
-
-                    // 如果拖拽时间很短（小于300ms），可能是误操作，不处理
-                    if (Date.now() - dragStartTime < 300) {
-                        return;
-                    }
+                studentItem.addEventListener('dragend', function (e) {
+                    clearDragHighlights();
                 });
 
                 studentList.appendChild(studentItem);
             });
 
-            // 更新统计信息
             updateStatistics();
+            updateCheckinStats();
         }
 
-        // 辅助函数：判断颜色是否为浅色
-        function isLightColor(hex) {
-            const r = parseInt(hex.substr(1, 2), 16);
-            const g = parseInt(hex.substr(3, 2), 16);
-            const b = parseInt(hex.substr(5, 2), 16);
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            return brightness > 128;
-        }
-
-        // 拖拽事件处理
         function handleDragStart(e) {
-            dragStartTime = Date.now();
-            if (e.target.textContent !== '空座位') {
-                draggedStudent = e.target.textContent;
-                draggedFromIndex = parseInt(e.target.getAttribute('data-index'));
-                e.dataTransfer.setData('text/plain', e.target.textContent);
-                e.target.classList.add('dragging');
+            const seat = e.target.closest('.seat');
+            if (!seat) return;
 
-                // 显示拖拽提示
-                dragHint.style.display = 'block';
-
-                // 高亮拖放区域
-                classroom.classList.add('highlight');
-                studentListContainer.classList.add('highlight');
-                studentList.classList.add('highlight');
-                deleteZone.classList.add('highlight');
-            } else {
+            const studentId = seat.getAttribute('data-student');
+            if (!studentId) {
                 e.preventDefault();
+                return;
             }
+
+            dragStartTime = Date.now();
+            draggedStudentId = studentId;
+            draggedFromIndex = parseInt(seat.getAttribute('data-index'));
+            e.dataTransfer.setData('text/plain', studentId);
+            seat.classList.add('dragging');
+            dragHint.style.display = 'block';
+            classroom.classList.add('highlight');
+            studentList.classList.add('highlight');
+            deleteZone.classList.add('visible');
         }
 
         function handleDragOver(e) {
@@ -1774,95 +3463,101 @@
 
         function handleDragEnter(e) {
             e.preventDefault();
-            if (e.target.classList.contains('seat') || e.target.classList.contains('empty')) {
-                e.target.classList.add('highlight');
-            }
+            const seat = e.target.closest('.seat');
+            if (seat) seat.classList.add('highlight');
         }
 
         function handleDragLeave(e) {
-            if (e.target.classList.contains('seat') || e.target.classList.contains('empty')) {
-                e.target.classList.remove('highlight');
+            const seat = e.target.closest('.seat');
+            if (seat && !seat.contains(e.relatedTarget)) {
+                seat.classList.remove('highlight');
             }
+        }
+
+        function clearDragHighlights() {
+            draggedStudentId = null;
+            draggedFromIndex = null;
+            dragHint.style.display = 'none';
+            classroom.classList.remove('highlight');
+            studentList.classList.remove('highlight');
+            deleteZone.classList.remove('highlight', 'visible');
+            document.querySelectorAll('.seat.highlight, .seat.dragging, .student-item.dragging').forEach(el => {
+                el.classList.remove('highlight', 'dragging');
+            });
         }
 
         function handleDrop(e) {
             e.preventDefault();
 
-            // 移除所有高亮
-            document.querySelectorAll('.highlight').forEach(el => {
-                if (el.classList.contains('seat') || el.classList.contains('empty')) {
-                    el.classList.remove('highlight');
-                }
-            });
+            // 仅在有有效拖拽目标时才保存快照
+            const hasValidTarget = e.target.closest('#deleteZone') ||
+                                   e.target.closest('.student-list') ||
+                                   e.target.closest('.seat');
+            if (hasValidTarget && draggedStudentId) {
+                pushSnapshot();
+            }
 
-            // 如果拖放到删除区域
+            // 删除区域
             if (e.target.closest('#deleteZone')) {
-                if (confirm(`确定要删除学生 ${draggedStudent} 吗？`)) {
-                    // 从学生名单中删除
-                    students = students.filter(s => s.name !== draggedStudent);
-
-                    // 如果是从座位拖动过来的，清空该座位
+                const student = getStudentById(draggedStudentId);
+                const displayName = student ? student.name : '';
+                if (confirm('确定要删除学生 ' + displayName + ' 吗？')) {
+                    students = students.filter(s => s.id !== draggedStudentId);
                     if (draggedFromIndex !== null) {
                         currentSeats[draggedFromIndex] = null;
                     }
-
+                    updateStudentAssignmentDisplay();
                     generateSeats();
                 }
+                clearDragHighlights();
                 return;
             }
 
-            // 如果拖放到学生名单区域
+            // 拖回学生名单区域
             if (e.target.closest('.student-list')) {
-                if (draggedFromIndex !== null) { // 从座位拖动到名单
-                    // 清空原座位
+                if (draggedFromIndex !== null) {
                     currentSeats[draggedFromIndex] = null;
                     generateSeats();
                 }
+                clearDragHighlights();
                 return;
             }
 
-            // 否则是拖放到座位区域
-            const seatIndex = parseInt(e.target.getAttribute('data-index'));
+            // 拖到座位
+            const seat = e.target.closest('.seat');
+            if (!seat) {
+                clearDragHighlights();
+                return;
+            }
+            const seatIndex = parseInt(seat.getAttribute('data-index'));
+            if (Number.isNaN(seatIndex)) {
+                clearDragHighlights();
+                return;
+            }
 
-            // 如果是从学生名单拖过来的
-            if (draggedStudent && draggedFromIndex === null) {
-                // 确保该学生没有被安排在其他座位
-                if (currentSeats.includes(draggedStudent)) {
-                    alert(`学生 ${draggedStudent} 已经被安排座位了！`);
+            // 从名单拖到座位
+            if (draggedStudentId && draggedFromIndex === null) {
+                if (currentSeats.includes(draggedStudentId)) {
+                    const student = getStudentById(draggedStudentId);
+                    alert('学生 ' + (student ? student.name : '') + ' 已经被安排座位了！');
+                    clearDragHighlights();
                     return;
                 }
-
-                currentSeats[seatIndex] = draggedStudent;
+                currentSeats[seatIndex] = draggedStudentId;
             }
-            // 如果是座位间的交换
+            // 座位间交换
             else if (draggedFromIndex !== null) {
-                // 保存目标座位的学生
-                const targetStudent = currentSeats[seatIndex];
-                // 将目标座位设置为拖动的学生
-                currentSeats[seatIndex] = draggedStudent;
-                // 将原座位设置为目标座位的学生
-                currentSeats[draggedFromIndex] = targetStudent;
+                const targetStudentId = currentSeats[seatIndex];
+                currentSeats[seatIndex] = draggedStudentId;
+                currentSeats[draggedFromIndex] = targetStudentId;
             }
 
             generateSeats();
+            clearDragHighlights();
         }
 
         function handleDragEnd(e) {
-            if (e.target.classList.contains('seat') || e.target.classList.contains('student-item')) {
-                e.target.classList.remove('dragging');
-            }
-            draggedStudent = null;
-            draggedFromIndex = null;
-            dragHint.style.display = 'none';
-
-            // 移除所有高亮
-            classroom.classList.remove('highlight');
-            studentListContainer.classList.remove('highlight');
-            studentList.classList.remove('highlight');
-            deleteZone.classList.remove('highlight');
-            document.querySelectorAll('.seat.highlight').forEach(seat => {
-                seat.classList.remove('highlight');
-            });
+            clearDragHighlights();
         }
 
         // 为学生名单区域添加拖放支持
@@ -1906,28 +3601,21 @@
             handleDrop(e); // 复用handleDrop函数
         });
 
-        // 为座位表区域添加拖放支持
-        classroom.addEventListener('dragover', function (e) {
-            e.preventDefault();
-        });
+        // 为座位表区域添加拖放支持（事件委托）
+        classroom.addEventListener('dragstart', handleDragStart);
+        classroom.addEventListener('dragover', handleDragOver);
+        classroom.addEventListener('dragenter', handleDragEnter);
+        classroom.addEventListener('dragleave', handleDragLeave);
+        classroom.addEventListener('drop', handleDrop);
+        classroom.addEventListener('dragend', handleDragEnd);
 
-        classroom.addEventListener('dragenter', function (e) {
-            e.preventDefault();
-        });
-
-        // 保存座位表
-        document.getElementById('saveBtn').addEventListener('click', () => {
-            const config = {
-                rows: rows,
-                cols: cols,
-                seats: currentSeats,
-                students: students,
-                groups: groups,
-                viewMode: isTeacherView ? 'teacher' : 'student',
-                aisles: aisles  // 新增走道配置
-            };
-            localStorage.setItem('classroomConfig', JSON.stringify(config));
-            alert('座位表已保存！');
+        // 标题编辑后自动保存
+        pageTitle.addEventListener('input', autoSave);
+        pageTitle.addEventListener('blur', function () {
+            if (pageTitle.textContent.trim() === '') {
+                pageTitle.textContent = '班级座位表';
+                autoSave();
+            }
         });
 
         // 导出座位表为图片
@@ -1937,20 +3625,38 @@
             buttons.forEach(btn => btn.style.visibility = 'hidden');
             dragHint.style.display = 'none';
 
-            // 使用html2canvas捕获座位表区域
-            html2canvas(classroom, {
+            // 创建临时容器，包含标题和座位表，用于导出
+            const exportWrapper = document.createElement('div');
+            exportWrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;background:#fff;padding:20px;border-radius:8px;';
+            const titleClone = pageTitle.cloneNode(true);
+            titleClone.style.cssText = 'margin:0 0 16px 0;font-size:24px;font-weight:700;text-align:center;cursor:default;background:none;box-shadow:none;position:static;transform:none;display:block;left:auto;';
+            exportWrapper.appendChild(titleClone);
+            exportWrapper.appendChild(classroom.cloneNode(true));
+
+            // 临时挂载到页面外
+            exportWrapper.style.position = 'fixed';
+            exportWrapper.style.left = '-9999px';
+            exportWrapper.style.top = '0';
+            document.body.appendChild(exportWrapper);
+
+            // 使用html2canvas捕获包含标题的座位表
+            html2canvas(exportWrapper, {
                 backgroundColor: '#fff',
                 scale: 2 // 提高导出图片质量
             }).then(canvas => {
+                // 清理临时容器
+                document.body.removeChild(exportWrapper);
                 // 恢复按钮显示
                 buttons.forEach(btn => btn.style.visibility = 'visible');
 
-                // 创建下载链接
+                // 创建下载链接，文件名使用当前标题
+                const title = pageTitle.textContent.trim() || '班级座位表';
                 const link = document.createElement('a');
-                link.download = '班级座位表_' + new Date().toLocaleDateString() + '.png';
+                link.download = title + '_' + new Date().toLocaleDateString() + '.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
             }).catch(err => {
+                document.body.removeChild(exportWrapper);
                 console.error('导出图片失败:', err);
                 buttons.forEach(btn => btn.style.visibility = 'visible');
                 alert('导出图片失败，请重试！');
@@ -1958,38 +3664,34 @@
         });
 
         // 随机排座
-        document.getElementById('randomBtn').addEventListener('click', () => {
+        document.getElementById('randomBtn').addEventListener('click', function () {
             if (students.length === 0) {
                 alert('请先导入学生名单！');
                 return;
             }
 
             if (confirm('确定要随机排列座位吗？')) {
-                // 先清空所有座位
+                pushSnapshot();
                 currentSeats = Array(rows * cols).fill(null);
-
-                // 随机打乱学生名单
-                const shuffledStudents = [...students].sort(() => Math.random() - 0.5);
-
-                // 为每个学生分配座位（只提取学生姓名）
+                const shuffledStudents = shuffle(students);
                 for (let i = 0; i < Math.min(shuffledStudents.length, rows * cols); i++) {
-                    currentSeats[i] = shuffledStudents[i].name;
+                    currentSeats[i] = shuffledStudents[i].id;
                 }
-
                 generateSeats();
             }
         });
 
         // 重置座位
-        document.getElementById('resetBtn').addEventListener('click', () => {
+        document.getElementById('resetBtn').addEventListener('click', function () {
             if (confirm('确定要重置所有座位吗？')) {
+                pushSnapshot();
                 currentSeats = Array(rows * cols).fill(null);
                 generateSeats();
             }
         });
 
         // 切换视角
-        toggleViewBtn.addEventListener('click', () => {
+        toggleViewBtn.addEventListener('click', function () {
             isTeacherView = !isTeacherView;
             toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
             generateSeats();
@@ -2005,21 +3707,34 @@
                 return;
             }
 
+            // 检查是否存在因列数缩减而失效的走道
+            const invalidAisles = aisles.filter(a => a.afterCol >= newCols);
+            if (invalidAisles.length > 0) {
+                if (!confirm(`列数缩减将导致 ${invalidAisles.length} 个走道被移除（位于第 ${invalidAisles.map(a => a.afterCol).join('、')} 列后），是否继续？`)) {
+                    return;
+                }
+                aisles = aisles.filter(a => a.afterCol < newCols);
+            }
+
             // 保存当前座位安排
             const oldSeats = [...currentSeats];
-            const oldTotal = rows * cols;
+            const oldRows = rows;
+            const oldCols = cols;
             const newTotal = newRows * newCols;
 
             // 创建新的座位数组
             const newSeats = Array(newTotal).fill(null);
 
-            // 尽可能保留原有的座位安排
-            for (let i = 0; i < Math.min(oldTotal, newTotal); i++) {
-                const row = Math.floor(i / cols);
-                const col = i % cols;
-                const newIndex = row * newCols + col;
-                if (newIndex < newTotal && oldSeats[i]) {
-                    newSeats[newIndex] = oldSeats[i];
+            // 尽可能保留原有的座位安排（按行列映射，只迁移在新范围内有效的座位）
+            for (let r = 0; r < oldRows; r++) {
+                if (r >= newRows) break; // 超出新行数，跳过
+                for (let c = 0; c < oldCols; c++) {
+                    if (c >= newCols) break; // 超出新列数，跳过
+                    const oldIndex = r * oldCols + c;
+                    const newIndex = r * newCols + c;
+                    if (oldIndex < oldSeats.length && oldSeats[oldIndex] && newIndex < newTotal) {
+                        newSeats[newIndex] = oldSeats[oldIndex];
+                    }
                 }
             }
 
@@ -2028,11 +3743,12 @@
             cols = newCols;
             currentSeats = newSeats;
 
+            updateAisleDisplay();
             generateSeats();
         });
 
         // 清除所有数据
-        document.getElementById('clearStorageBtn').addEventListener('click', () => {
+        clearStorageBtn.addEventListener('click', function () {
             if (confirm('确定要清除所有数据吗？此操作不可撤销！')) {
                 localStorage.removeItem('classroomConfig');
                 students = [];
@@ -2043,7 +3759,9 @@
                 colsInput.value = 7;
                 currentSeats = Array(rows * cols).fill(null);
                 isTeacherView = false;
+                aisles = [];
                 toggleViewBtn.textContent = '教师视角';
+                updateAisleDisplay();
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
                 generateSeats();
@@ -2058,7 +3776,8 @@
             // 表头
             for (let i = 0; i < data[0].length; i++) {
                 const isSelected = i === selectedColumn;
-                tableHTML += `<th${isSelected ? ' style="background-color:#c8e6c9"' : ''}>${data[0][i] || '列' + (i + 1)}</th>`;
+                const cellContent = escapeHtml(data[0][i] || '列' + (i + 1));
+                tableHTML += `<th${isSelected ? ' style="background-color:#c8e6c9"' : ''}>${cellContent}</th>`;
             }
             tableHTML += '</tr></thead><tbody>';
 
@@ -2068,7 +3787,8 @@
                 tableHTML += '<tr>';
                 for (let j = 0; j < data[i].length; j++) {
                     const isSelected = j === selectedColumn;
-                    tableHTML += `<td${isSelected ? ' style="background-color:#e8f5e9"' : ''}>${data[i][j] || ''}</td>`;
+                    const cellContent = escapeHtml(data[i][j] || '');
+                    tableHTML += `<td${isSelected ? ' style="background-color:#e8f5e9"' : ''}>${cellContent}</td>`;
                 }
                 tableHTML += '</tr>';
             }
@@ -2146,10 +3866,11 @@
                     // 显示预览
                     tablePreview.innerHTML = createPreviewTable(excelData, nameColumnIndex);
                     previewArea.style.display = 'block';
-                    fileInfo.innerHTML = `<span>请选择包含学生姓名的列 (已自动选择"${excelData[0][nameColumnIndex] || '列' + (nameColumnIndex + 1)}")</span>`;
+                    const autoColName = escapeHtml(excelData[0][nameColumnIndex] || '列' + (nameColumnIndex + 1));
+                    fileInfo.innerHTML = `<span>请选择包含学生姓名的列 (已自动选择"${autoColName}")</span>`;
 
                 } catch (error) {
-                    fileInfo.innerHTML = `<span style="color:red">文件处理错误: ${error.message}</span>`;
+                    fileInfo.innerHTML = `<span style="color:red">文件处理错误: ${escapeHtml(error.message)}</span>`;
                     console.error(error);
                 }
             };
@@ -2179,65 +3900,76 @@
             importStudentsWithGroups(selectedColumnIndex);
         });
 
-        // 初始化 - 尝试从本地存储加载配置
+        // 初始化 — 尝试从本地存储加载配置
         function initialize() {
             const savedConfig = localStorage.getItem('classroomConfig');
 
             if (savedConfig) {
-                const config = JSON.parse(savedConfig);
-                // 处理学生数据的向后兼容
-                if (config.students && config.students.length > 0 && typeof config.students[0] === 'string') {
-                    // 旧格式：简单的字符串数组
-                    students = config.students.map(name => ({ name: name, groupId: null }));
-                } else {
-                    // 新格式：对象数组
-                    students = config.students || [];
-                }
-                groups = config.groups || [];
-                rows = config.rows || 7;
-                cols = config.cols || 7;
-                currentSeats = config.seats || Array(rows * cols).fill(null);
-                isTeacherView = config.viewMode === 'teacher';
-                aisles = config.aisles || [];
+                try {
+                    const config = JSON.parse(savedConfig);
+                    migrateConfig(config);
 
-                // 更新UI
-                rowsInput.value = rows;
-                colsInput.value = cols;
-                toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
-                updateAisleDisplay();
-                updateGroupDisplay();
-                updateStudentAssignmentDisplay();
+                    students = config.students || [];
+                    groups = config.groups || [];
+                    rows = config.rows || 7;
+                    cols = config.cols || 7;
+                    currentSeats = config.seats || Array(rows * cols).fill(null);
+                    isTeacherView = config.viewMode === 'teacher';
+                    aisles = config.aisles || [];
+                    if (config.title) pageTitle.textContent = config.title;
+
+                    // 调整座位数组长度以匹配当前行列
+                    const targetLen = rows * cols;
+                    if (currentSeats.length < targetLen) {
+                        currentSeats = currentSeats.concat(Array(targetLen - currentSeats.length).fill(null));
+                    } else if (currentSeats.length > targetLen) {
+                        currentSeats = currentSeats.slice(0, targetLen);
+                    }
+
+                    rowsInput.value = rows;
+                    colsInput.value = cols;
+                    toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
+                    updateAisleDisplay();
+                    updateGroupDisplay();
+                    updateStudentAssignmentDisplay();
+                } catch (error) {
+                    console.error('加载本地存储配置失败，使用默认配置:', error);
+                    students = [];
+                    groups = [];
+                    rows = 7;
+                    cols = 7;
+                    currentSeats = Array(rows * cols).fill(null);
+                    isTeacherView = false;
+                    aisles = [];
+                    rowsInput.value = rows;
+                    colsInput.value = cols;
+                    toggleViewBtn.textContent = '教师视角';
+                    updateAisleDisplay();
+                    updateGroupDisplay();
+                    updateStudentAssignmentDisplay();
+                    localStorage.removeItem('classroomConfig');
+                    alert('检测到本地存储数据损坏，已重置为默认配置。');
+                }
             }
 
             generateSeats();
+            isInitialized = true;
         }
-        // 导出配置按钮点击事件
-        document.getElementById('exportConfigBtn').addEventListener('click', () => {
-            const config = {
-                rows: rows,
-                cols: cols,
-                seats: currentSeats,
-                students: students,
-                groups: groups,
-                viewMode: isTeacherView ? 'teacher' : 'student',
-                aisles: aisles,
-                version: '1.1'
-            };
 
-            const configStr = JSON.stringify(config, null, 2);
+        // 导出配置按钮
+        document.getElementById('exportConfigBtn').addEventListener('click', function () {
+            const configStr = JSON.stringify(getCurrentConfig(), null, 2);
             const blob = new Blob([configStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-
             const link = document.createElement('a');
-            link.download = `班级座位表配置_${new Date().toLocaleDateString()}.json`;
+            link.download = (pageTitle.textContent.trim() || '班级座位表') + '_配置_' + new Date().toLocaleDateString() + '.json';
             link.href = url;
             link.click();
-
             URL.revokeObjectURL(url);
         });
 
-        // 导入配置按钮点击事件
-        document.getElementById('importConfigBtn').addEventListener('click', () => {
+        // 导入配置按钮
+        document.getElementById('importConfigBtn').addEventListener('click', function () {
             document.getElementById('configFileInput').click();
         });
 
@@ -2250,35 +3982,34 @@
             reader.onload = function (e) {
                 try {
                     const config = JSON.parse(e.target.result);
-
-                    // 验证配置格式
                     if (!config.rows || !config.cols || !Array.isArray(config.seats) || !Array.isArray(config.students)) {
                         throw new Error('无效的配置文件格式');
                     }
 
-                    // 处理学生数据的向后兼容
-                    if (config.students.length > 0 && typeof config.students[0] === 'string') {
-                        students = config.students.map(name => ({ name: name, groupId: null }));
-                    } else {
-                        students = config.students;
-                    }
+                    migrateConfig(config);
 
-                    // 应用配置
+                    students = config.students;
+                    groups = config.groups || [];
                     rows = config.rows;
                     cols = config.cols;
                     currentSeats = config.seats;
-                    groups = config.groups || [];
                     isTeacherView = config.viewMode === 'teacher';
                     aisles = config.aisles || [];
+                    if (config.title) pageTitle.textContent = config.title;
+
+                    const targetLen = rows * cols;
+                    if (currentSeats.length < targetLen) {
+                        currentSeats = currentSeats.concat(Array(targetLen - currentSeats.length).fill(null));
+                    } else if (currentSeats.length > targetLen) {
+                        currentSeats = currentSeats.slice(0, targetLen);
+                    }
+
                     updateAisleDisplay();
                     updateGroupDisplay();
                     updateStudentAssignmentDisplay();
-
-                    // 更新UI
                     rowsInput.value = rows;
                     colsInput.value = cols;
                     toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
-
                     generateSeats();
                     alert('配置导入成功！');
                 } catch (error) {
@@ -2287,22 +4018,422 @@
                 }
             };
             reader.readAsText(file);
-
-            // 重置文件输入，允许重复选择同一文件
             e.target.value = '';
         });
 
-        // 分组管理面板的事件绑定
-        groupToggleBtn.addEventListener('click', toggleGroupPanel);
+        // 分组管理面板事件绑定
         addGroupBtn.addEventListener('click', addGroup);
         groupNameInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                addGroup();
+            if (e.key === 'Enter') addGroup();
+        });
+
+        // ==================== 撤销/重做按钮 + 键盘快捷键 ====================
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+
+        document.addEventListener('keydown', function (e) {
+            // 在输入框中不触发快捷键
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                redo();
             }
         });
 
+        // ==================== 打印/PDF ====================
+        let printScaleValue = 1;
+
+        function applyPrintScale() {
+            printScaleValue = calculatePrintScale();
+            // 使用 zoom 而非 transform: scale()，zoom 会同时改变视觉和布局尺寸，不会产生空白页
+            classroom.style.zoom = printScaleValue;
+        }
+
+        function resetPrintScale() {
+            classroom.style.zoom = '';
+        }
+
+        function calculatePrintScale() {
+            const pageWidthMm = 297 - 10;
+            const pageHeightMm = 210 - 10;
+            const mmToPx = 96 / 25.4;
+
+            const pageWidthPx = pageWidthMm * mmToPx;
+            const pageHeightPx = pageHeightMm * mmToPx;
+
+            const classroomWidth = classroom.offsetWidth;
+            const classroomHeight = classroom.offsetHeight;
+
+            if (classroomWidth === 0 || classroomHeight === 0) return 1;
+
+            const scaleX = pageWidthPx / classroomWidth;
+            const scaleY = pageHeightPx / classroomHeight;
+
+            return Math.min(scaleX, scaleY);
+        }
+
+        printBtn.addEventListener('click', function () {
+            applyPrintScale();
+            setTimeout(function () {
+                window.print();
+            }, 150);
+        });
+
+        if (window.matchMedia) {
+            const mediaQueryList = window.matchMedia('print');
+            const handleMediaChange = function (mql) {
+                if (mql.matches) {
+                    applyPrintScale();
+                } else {
+                    setTimeout(resetPrintScale, 300);
+                }
+            };
+            if (mediaQueryList.addEventListener) {
+                mediaQueryList.addEventListener('change', handleMediaChange);
+            } else if (mediaQueryList.addListener) {
+                mediaQueryList.addListener(handleMediaChange);
+            }
+        }
+
+        // ==================== 移动端触摸交互 ====================
+
+        function detectTouchDevice() {
+            return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        }
+
+        function initMobileSupport() {
+            isTouchDevice = detectTouchDevice();
+            if (isTouchDevice) {
+                mobileBanner.classList.add('visible');
+            }
+        }
+
+        function clearTapSelection() {
+            tapSelectedStudentId = null;
+            tapSelectedSeatIndex = null;
+            document.querySelectorAll('.selected-for-move').forEach(el => {
+                el.classList.remove('selected-for-move');
+            });
+        }
+
+        // 点击学生名单项
+        studentList.addEventListener('click', function (e) {
+            if (!isTouchDevice) return;
+            const item = e.target.closest('.student-item');
+            if (!item) return;
+
+            const studentId = item.getAttribute('data-student');
+            if (!studentId) return;
+
+            // 如果已有选中的座位，将学生放入该座位
+            if (tapSelectedSeatIndex !== null) {
+                pushSnapshot();
+                // 先把学生从原座位移出（如果有）
+                const existingIdx = currentSeats.indexOf(studentId);
+                if (existingIdx >= 0) currentSeats[existingIdx] = null;
+                // 交换：目标座位原学生（如有）放回原座位
+                const targetId = currentSeats[tapSelectedSeatIndex];
+                if (existingIdx >= 0 && targetId) {
+                    currentSeats[existingIdx] = targetId;
+                }
+                currentSeats[tapSelectedSeatIndex] = studentId;
+                clearTapSelection();
+                generateSeats();
+                return;
+            }
+
+            // 切换选中状态
+            if (tapSelectedStudentId === studentId) {
+                clearTapSelection();
+            } else {
+                clearTapSelection();
+                tapSelectedStudentId = studentId;
+                item.classList.add('selected-for-move');
+            }
+        });
+
+        // 点击座位
+        classroom.addEventListener('click', function (e) {
+            const seat = e.target.closest('.seat');
+
+            // 签到模式：点击座位签到/取消签到（支持桌面端和移动端）
+            if (isCheckinMode && seat) {
+                const studentId = seat.getAttribute('data-student');
+                if (studentId) {
+                    toggleStudentCheckin(studentId);
+                }
+                return;
+            }
+
+            if (!isTouchDevice) return;
+            if (!seat) return;
+
+            const seatIndex = parseInt(seat.getAttribute('data-index'));
+            if (Number.isNaN(seatIndex)) return;
+
+            // 如果有选中的学生，将其放入此座位
+            if (tapSelectedStudentId !== null) {
+                pushSnapshot();
+                const existingIdx = currentSeats.indexOf(tapSelectedStudentId);
+                if (existingIdx >= 0) currentSeats[existingIdx] = null;
+                const targetId = currentSeats[seatIndex];
+                if (existingIdx >= 0 && targetId) {
+                    currentSeats[existingIdx] = targetId;
+                }
+                currentSeats[seatIndex] = tapSelectedStudentId;
+                clearTapSelection();
+                generateSeats();
+                return;
+            }
+
+            // 选中此座位上的学生用于移动
+            const studentId = seat.getAttribute('data-student');
+            if (!studentId) return;
+
+            if (tapSelectedSeatIndex === seatIndex) {
+                clearTapSelection();
+            } else {
+                clearTapSelection();
+                tapSelectedSeatIndex = seatIndex;
+                seat.classList.add('selected-for-move');
+            }
+        });
+
+        // 点击空白区域取消选择
+        document.addEventListener('click', function (e) {
+            if (!isTouchDevice) return;
+            // 点击删除区域：删除选中的学生
+            if (e.target.closest('#deleteZone')) {
+                if (tapSelectedStudentId !== null || tapSelectedSeatIndex !== null) {
+                    const studentId = tapSelectedStudentId || (tapSelectedSeatIndex !== null ? currentSeats[tapSelectedSeatIndex] : null);
+                    if (studentId) {
+                        const student = getStudentById(studentId);
+                        if (student && confirm('确定要删除学生 ' + student.name + ' 吗？')) {
+                            pushSnapshot();
+                            currentSeats = currentSeats.map(id => id === studentId ? null : id);
+                            students = students.filter(s => s.id !== studentId);
+                            updateStudentAssignmentDisplay();
+                            generateSeats();
+                        }
+                    }
+                    clearTapSelection();
+                }
+                return;
+            }
+            if (!e.target.closest('.seat') && !e.target.closest('.student-item')) {
+                clearTapSelection();
+            }
+        });
+
+        initMobileSupport();
+
+        // ==================== 批量操作 ====================
+
+        function updateBatchGroupOptions() {
+            batchGroupSelect.innerHTML = '<option value="">选择分组...</option>' +
+                groups.map(g =>
+                    '<option value="' + escapeHtml(g.id) + '">' + escapeHtml(g.name) + '</option>'
+                ).join('');
+        }
+
+        function updateBatchCount() {
+            batchCountEl.textContent = '已选 ' + batchSelectedIds.size;
+        }
+
+        function enterBatchMode() {
+            isBatchMode = true;
+            batchToolbar.classList.add('visible');
+            batchModeBtn.textContent = '退出批量';
+            updateBatchGroupOptions();
+            updateStudentAssignmentDisplay();
+            updateBatchCount();
+        }
+
+        function exitBatchMode() {
+            isBatchMode = false;
+            batchToolbar.classList.remove('visible');
+            batchModeBtn.textContent = '批量操作';
+            batchSelectedIds.clear();
+            updateStudentAssignmentDisplay();
+            updateBatchCount();
+        }
+
+        batchModeBtn.addEventListener('click', function () {
+            if (isBatchMode) exitBatchMode();
+            else enterBatchMode();
+        });
+
+        batchCancelBtn.addEventListener('click', exitBatchMode);
+
+        // 点击学生项（批量模式下的多选，作用于分配学生区域）
+        studentGroupSelector.addEventListener('click', function (e) {
+            if (!isBatchMode) return;
+            const item = e.target.closest('.student-group-item');
+            if (!item) return;
+            const studentId = item.getAttribute('data-student-id');
+            if (!studentId) return;
+            // 如果点的是输入框、下拉框或新增行，不处理
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') return;
+
+            if (batchSelectedIds.has(studentId)) {
+                batchSelectedIds.delete(studentId);
+                item.classList.remove('batch-selected');
+            } else {
+                batchSelectedIds.add(studentId);
+                item.classList.add('batch-selected');
+            }
+            // 同步 checkbox
+            const cb = item.querySelector('.batch-checkbox');
+            if (cb) cb.checked = batchSelectedIds.has(studentId);
+            updateBatchCount();
+        });
+
+        // checkbox 直接点击（作用于分配学生区域）
+        studentGroupSelector.addEventListener('change', function (e) {
+            if (!isBatchMode) return;
+            if (!e.target.classList.contains('batch-checkbox')) return;
+            const item = e.target.closest('.student-group-item');
+            const studentId = item.getAttribute('data-student-id');
+            if (e.target.checked) {
+                batchSelectedIds.add(studentId);
+                item.classList.add('batch-selected');
+            } else {
+                batchSelectedIds.delete(studentId);
+                item.classList.remove('batch-selected');
+            }
+            updateBatchCount();
+        });
+
+        batchSelectAllBtn.addEventListener('click', function () {
+            if (batchSelectedIds.size === students.length) {
+                batchSelectedIds.clear();
+            } else {
+                students.forEach(s => batchSelectedIds.add(s.id));
+            }
+            // 更新 UI
+            studentGroupSelector.querySelectorAll('.student-group-item').forEach(item => {
+                const id = item.getAttribute('data-student-id');
+                if (!id) return;
+                const cb = item.querySelector('.batch-checkbox');
+                if (batchSelectedIds.has(id)) {
+                    item.classList.add('batch-selected');
+                    if (cb) cb.checked = true;
+                } else {
+                    item.classList.remove('batch-selected');
+                    if (cb) cb.checked = false;
+                }
+            });
+            updateBatchCount();
+        });
+
+        batchAssignBtn.addEventListener('click', function () {
+            if (batchSelectedIds.size === 0) {
+                alert('请先选择学生');
+                return;
+            }
+            const groupId = batchGroupSelect.value;
+            if (!groupId) {
+                alert('请选择要分配的分组');
+                return;
+            }
+            pushSnapshot();
+            batchSelectedIds.forEach(id => {
+                const student = getStudentById(id);
+                if (student) student.groupId = groupId;
+            });
+            generateSeats();
+            updateStudentAssignmentDisplay();
+            generateStudentList();
+            autoSave();
+        });
+
+        batchDeleteBtn.addEventListener('click', function () {
+            if (batchSelectedIds.size === 0) {
+                alert('请先选择学生');
+                return;
+            }
+            if (confirm('确定要删除选中的 ' + batchSelectedIds.size + ' 名学生吗？')) {
+                pushSnapshot();
+                const idSet = new Set(batchSelectedIds);
+                currentSeats = currentSeats.map(id => idSet.has(id) ? null : id);
+                students = students.filter(s => !idSet.has(s.id));
+                batchSelectedIds.clear();
+                exitBatchMode();
+                generateSeats();
+                updateStudentAssignmentDisplay();
+                generateStudentList();
+                autoSave();
+            }
+        });
+
+        // 快速随机入座：将所有未安排座位的学生随机分配到空座位
+        quickRandomBtn.addEventListener('click', function () {
+            const unassigned = getUnassignedStudents();
+            if (unassigned.length === 0) {
+                alert('所有学生都已安排座位');
+                return;
+            }
+            const emptyIndices = [];
+            for (let i = 0; i < currentSeats.length; i++) {
+                if (currentSeats[i] === null) emptyIndices.push(i);
+            }
+            if (emptyIndices.length === 0) {
+                alert('没有空座位可分配');
+                return;
+            }
+            if (confirm('确定要将 ' + unassigned.length + ' 名未安排的学生随机入座吗？')) {
+                pushSnapshot();
+                const shuffled = shuffle(unassigned.map(s => s.id));
+                const assigned = Math.min(shuffled.length, emptyIndices.length);
+                for (let i = 0; i < assigned; i++) {
+                    currentSeats[emptyIndices[i]] = shuffled[i];
+                }
+                generateSeats();
+                generateStudentList();
+                autoSave();
+            }
+        });
+
+        // 签到模式按钮
+        const checkinModeBtn = document.getElementById('checkinModeBtn');
+        if (checkinModeBtn) {
+            checkinModeBtn.addEventListener('click', toggleCheckinMode);
+        }
+
+        // 折叠面板交互
+        document.querySelectorAll('.collapse-header').forEach(function (header) {
+            header.addEventListener('click', function () {
+                const panel = header.closest('.collapse-panel');
+                panel.classList.toggle('collapsed');
+            });
+        });
+
+        // 签到模式按钮的 active 状态同步
+        function updateCheckinModeButton() {
+            const btn = document.getElementById('checkinModeBtn');
+            if (!btn) return;
+            const icon = btn.querySelector('.action-icon');
+            const text = btn.querySelector('span:last-child');
+            if (isCheckinMode) {
+                btn.classList.add('active');
+                if (icon) icon.textContent = '✕';
+                if (text) text.textContent = '退出签到';
+            } else {
+                btn.classList.remove('active');
+                if (icon) icon.textContent = '✓';
+                if (text) text.textContent = '签到模式';
+            }
+        }
+
         // 执行初始化
         initialize();
+
+    })();
     </script>
 </body>
 
