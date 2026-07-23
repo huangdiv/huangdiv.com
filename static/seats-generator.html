@@ -523,10 +523,6 @@
             font-size: 11px;
         }
 
-        .group-item button.danger {
-            background-color: #f44336;
-        }
-
         .student-assignment {
             margin-top: 10px;
             padding-top: 10px;
@@ -550,16 +546,20 @@
         .student-group-item {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             padding: 4px 6px;
             background: #fff;
             border-radius: 3px;
             border: 1px solid #eee;
         }
 
-        .student-group-item span {
+        .student-group-item input[type="text"] {
             flex: 1;
             font-size: 12px;
+            padding: 2px 4px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            min-width: 60px;
         }
 
         .student-group-item select {
@@ -567,6 +567,43 @@
             padding: 2px 4px;
             border: 1px solid #ddd;
             border-radius: 3px;
+            min-width: 70px;
+        }
+
+        /* 统一的小按钮样式 */
+        .delete-btn, .add-btn {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            max-width: 20px;
+            flex-shrink: 0;
+            padding: 0;
+            font-size: 12px;
+            line-height: 1;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+        }
+
+        .delete-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .add-btn {
+            background-color: #4caf50;
+        }
+
+        .add-btn:hover {
+            background-color: #388e3c;
         }
 
         /* 分组导入相关样式 */
@@ -1030,46 +1067,89 @@
         function updateGroupDisplay() {
             if (groups.length === 0) {
                 groupList.innerHTML = '<span style="color: #999; font-size: 12px;">暂无分组</span>';
-                studentAssignment.style.display = 'none';
-                return;
+            } else {
+                groupList.innerHTML = groups.map(group => `
+                    <div class="group-item">
+                        <div class="group-color-preview" style="background-color: ${group.color};"></div>
+                        <input type="text" class="group-name" value="${group.name}" 
+                               onchange="editGroup('${group.id}', this.value, '${group.color}')">
+                        <input type="color" value="${group.color}" 
+                               onchange="editGroup('${group.id}', '${group.name}', this.value)">
+                        <button class="delete-btn" onclick="deleteGroup('${group.id}')">×</button>
+                    </div>
+                `).join('');
             }
 
             studentAssignment.style.display = 'block';
-            
-            groupList.innerHTML = groups.map(group => `
-                <div class="group-item">
-                    <div class="group-color-preview" style="background-color: ${group.color};"></div>
-                    <input type="text" class="group-name" value="${group.name}" 
-                           onchange="editGroup('${group.id}', this.value, '${group.color}')">
-                    <input type="color" value="${group.color}" 
-                           onchange="editGroup('${group.id}', '${group.name}', this.value)">
-                    <button class="danger" onclick="deleteGroup('${group.id}')">删除</button>
-                </div>
-            `).join('');
         }
 
         // 更新学生分配显示
         function updateStudentAssignmentDisplay() {
             if (students.length === 0) {
-                studentGroupSelector.innerHTML = '<span style="color: #999; font-size: 12px;">暂无学生</span>';
+                studentGroupSelector.innerHTML = `
+                    <div class="student-group-item" style="background: #e8f5e9;">
+                        <input type="text" placeholder="新增学生姓名" onchange="updateStudentName('NEW', this.value)">
+                        <select onchange="assignStudentToGroup('NEW', this.value)">
+                            <option value="">未分组</option>
+                            ${groups.map(g => `
+                                <option value="${g.id}">${g.name}</option>
+                            `).join('')}
+                        </select>
+                        <button class="add-btn" onclick="addNewStudent()">+</button>
+                    </div>
+                `;
                 return;
             }
 
             studentGroupSelector.innerHTML = students.map(student => `
                 <div class="student-group-item">
-                    <span>${student.name}</span>
+                    <input type="text" value="${student.name}" onchange="updateStudentName('${student.name}', this.value)">
                     <select onchange="assignStudentToGroup('${student.name}', this.value)">
                         <option value="">未分组</option>
                         ${groups.map(g => `
                             <option value="${g.id}" ${student.groupId === g.id ? 'selected' : ''}>${g.name}</option>
                         `).join('')}
                     </select>
+                    <button class="delete-btn" onclick="removeStudent('${student.name}')">×</button>
                 </div>
-            `).join('');
+            `).join('') + `
+                <div class="student-group-item" style="background: #e8f5e9;">
+                    <input type="text" placeholder="新增学生姓名" onchange="updateStudentName('NEW', this.value)">
+                    <select onchange="assignStudentToGroup('NEW', this.value)">
+                        <option value="">未分组</option>
+                        ${groups.map(g => `
+                            <option value="${g.id}">${g.name}</option>
+                        `).join('')}
+                    </select>
+                    <button class="add-btn" onclick="addNewStudent()">+</button>
+                </div>
+            `;
         }
 
         // 分配学生到分组
         function assignStudentToGroup(studentName, groupId) {
+            // 如果是新增学生，直接添加
+            if (studentName === 'NEW') {
+                // 获取新增学生输入框的值
+                const inputEl = studentGroupSelector.querySelector('input[placeholder="新增学生姓名"]');
+                if (inputEl && inputEl.value.trim()) {
+                    const name = inputEl.value.trim();
+                    if (students.some(s => s.name === name)) {
+                        alert('该学生已存在');
+                        return;
+                    }
+                    students.push({
+                        name: name,
+                        groupId: groupId || null
+                    });
+                    inputEl.value = '';
+                    updateStudentAssignmentDisplay();
+                    generateStudentList();
+                    updateStatistics();
+                }
+                return;
+            }
+            
             const student = getStudentByName(studentName);
             if (student) {
                 student.groupId = groupId || null;
@@ -1078,10 +1158,96 @@
             }
         }
 
+        // 更新学生姓名
+        function updateStudentName(oldName, newName) {
+            // 如果是新增学生，暂不处理（等待用户点击+或选择分组）
+            if (oldName === 'NEW') return;
+            
+            newName = newName.trim();
+            
+            if (!newName) {
+                alert('请输入学生姓名');
+                updateStudentAssignmentDisplay();
+                return;
+            }
+            
+            // 检查新姓名是否已存在
+            if (students.some(s => s.name === newName && s.name !== oldName)) {
+                alert('该姓名已存在');
+                updateStudentAssignmentDisplay();
+                return;
+            }
+            
+            const student = getStudentByName(oldName);
+            if (student) {
+                // 更新座位表中的姓名
+                currentSeats = currentSeats.map(name => name === oldName ? newName : name);
+                student.name = newName;
+                generateSeats();
+                generateStudentList();
+            }
+        }
+
+        // 删除学生
+        function removeStudent(studentName) {
+            // 如果是新增学生输入框，不处理删除
+            if (studentName === 'NEW') return;
+            
+            if (confirm(`确定要删除学生 ${studentName} 吗？`)) {
+                // 从座位表中移除
+                currentSeats = currentSeats.map(name => name === studentName ? null : name);
+                // 从学生列表中移除
+                students = students.filter(s => s.name !== studentName);
+                updateStudentAssignmentDisplay();
+                generateSeats();
+            }
+        }
+
+        // 添加新学生
+        function addNewStudent() {
+            const inputEl = studentGroupSelector.querySelector('input[placeholder="新增学生姓名"]');
+            const selectEl = studentGroupSelector.querySelector('.student-group-item:last-child select');
+            
+            if (!inputEl || !inputEl.value.trim()) {
+                alert('请输入学生姓名');
+                return;
+            }
+            
+            const name = inputEl.value.trim();
+            
+            // 检查是否已存在
+            if (students.some(s => s.name === name)) {
+                alert('该学生已存在');
+                return;
+            }
+            
+            const groupId = selectEl.value || null;
+            
+            students.push({
+                name: name,
+                groupId: groupId
+            });
+            
+            // 清空输入框
+            inputEl.value = '';
+            selectEl.value = '';
+            
+            // 更新UI
+            updateStudentAssignmentDisplay();
+            generateStudentList();
+            updateStatistics();
+        }
+
         // 切换分组面板展开/收起
         function toggleGroupPanel() {
             groupContent.classList.toggle('expanded');
             groupToggleBtn.textContent = groupContent.classList.contains('expanded') ? '▲' : '▼';
+            
+            // 当展开分组面板时，显示学生分配区域并更新内容
+            if (groupContent.classList.contains('expanded')) {
+                studentAssignment.style.display = 'block';
+                updateStudentAssignmentDisplay();
+            }
         }
 
         // ==================== 分组管理函数结束 ====================
@@ -1090,7 +1256,7 @@
 
         // 预定义一组对比度良好的颜色
         const distinctColors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
+            '#4ECDC4', '#FF6B6B', '#45B7D1', '#96CEB4', '#FFEAA7', 
             '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', 
             '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
             '#AED6F1', '#F9E79F', '#ABEBC6', '#F5B7B1', '#D4EFDF',
