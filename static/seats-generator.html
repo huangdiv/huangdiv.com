@@ -4261,7 +4261,7 @@
 
             setGithubStatus('正在测试连接…', '');
 
-            githubApiRequest('GET', '/')
+            githubApiRequest('GET', '')
                 .then(res => res.json())
                 .then(data => {
                     if (data.name === s.repo) {
