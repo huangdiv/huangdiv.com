@@ -4195,7 +4195,7 @@
                 'X-GitHub-Api-Version': '2022-11-28'
             };
 
-            const options = { method, headers, mode: 'cors', credentials: 'include' };
+            const options = { method, headers, mode: 'cors' };
             if (body) {
                 headers['Content-Type'] = 'application/json';
                 options.body = JSON.stringify(body);
