@@ -161,11 +161,6 @@
             box-shadow: none;
         }
 
-        .seat-name {
-            font-weight: 600;
-            font-size: 13px;
-        }
-
         .seat-number {
             font-size: 10px;
             color: var(--text-muted);
@@ -863,7 +858,7 @@
         }
 
         .seat-name {
-            font-size: 14px;
+            font-size: 22px;
             color: #333;
             text-align: center;
             padding: 0 4px;
@@ -1015,26 +1010,10 @@
             border: none;
             color: #f44336;
             cursor: pointer;
-            min-width: 0px;
+            min-width: 20px;
             font-size: 11px;
             line-height: 1;
             padding: 0;
-        }
-
-        #exportConfigBtn {
-            background-color: #ff9800;
-        }
-
-        #exportConfigBtn:hover {
-            background-color: #e68a00;
-        }
-
-        #importConfigBtn {
-            background-color: #9c27b0;
-        }
-
-        #importConfigBtn:hover {
-            background-color: #8e24aa;
         }
 
         .config-file-input {
@@ -1100,15 +1079,6 @@
             font-size: 12px;
         }
 
-        .group-actions input[type="color"] {
-            width: 40px;
-            height: 28px;
-            padding: 2px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-
         .group-actions button {
             min-width: auto;
             padding: 4px 10px;
@@ -1169,46 +1139,52 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
-            max-height: 120px;
+            max-height: 150px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .student-group-item {
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 4px 6px;
+            padding: 6px 8px;
             background: #fff;
             border-radius: 3px;
             border: 1px solid #eee;
+            min-width: 0;
         }
 
         .student-group-item input[type="text"] {
             flex: 1;
+            min-width: 0;
             font-size: 12px;
-            padding: 2px 4px;
+            padding: 4px 6px;
             border: 1px solid #ddd;
             border-radius: 3px;
-            min-width: 60px;
+            height: 26px;
+            box-sizing: border-box;
         }
 
         .student-group-item select {
             font-size: 12px;
-            padding: 2px 4px;
+            padding: 3px 4px;
             border: 1px solid #ddd;
             border-radius: 3px;
             min-width: 70px;
+            height: 26px;
+            box-sizing: border-box;
         }
 
         /* 统一的小按钮样式 */
         .delete-btn, .add-btn {
-            width: 20px;
-            height: 20px;
-            min-width: 20px;
-            max-width: 20px;
+            width: 26px;
+            height: 26px;
+            min-width: 26px;
+            max-width: 26px;
             flex-shrink: 0;
             padding: 0;
-            font-size: 12px;
+            font-size: 14px;
             line-height: 1;
             text-align: center;
             display: flex;
@@ -1446,10 +1422,12 @@
 
         /* 分配学生区域的批量样式 */
         .student-group-item .batch-checkbox {
-            margin-right: 4px;
-            width: auto;
+            margin: 0;
+            width: 16px;
+            height: 16px;
             flex-shrink: 0;
             cursor: pointer;
+            vertical-align: middle;
         }
 
         .student-group-item.batch-selected {
@@ -1523,16 +1501,19 @@
         .student-list {
             max-height: 180px;
             overflow-y: auto;
+            overflow-x: hidden;
             min-height: 48px;
             border: 1px solid var(--border-light);
             padding: 6px;
             border-radius: var(--radius-sm);
             background-color: var(--surface-hover);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
         }
 
         .student-item {
             padding: 6px 10px;
-            margin: 2px 0;
             background-color: var(--surface);
             border: 1px solid var(--border-light);
             border-radius: var(--radius-sm);
@@ -1582,11 +1563,11 @@
         .aisle-list {
             font-size: 11px;
             color: var(--text-secondary);
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-start;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 4px;
             margin-bottom: 6px;
+            overflow-x: hidden;
         }
 
         .aisle-item {
@@ -1596,9 +1577,19 @@
             border-radius: 12px;
             display: inline-flex;
             align-items: center;
+            justify-content: space-between;
             gap: 4px;
             font-size: 11px;
             font-weight: 500;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .aisle-item span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
         }
 
         .aisle-remove-btn {
@@ -1606,36 +1597,46 @@
             border: none;
             color: var(--primary);
             cursor: pointer;
-            min-width: auto;
-            font-size: 12px;
+            min-width: 18px;
+            height: 18px;
+            font-size: 14px;
             line-height: 1;
             padding: 0;
             opacity: 0.7;
             flex: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
         }
 
         .aisle-remove-btn:hover {
             opacity: 1;
+            background: rgba(102, 126, 234, 0.1);
         }
 
         /* 分组列表 - 新版风格 */
         .group-list {
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 4px;
             margin-bottom: 8px;
+            overflow-x: hidden;
         }
 
         .group-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 10px;
             background: var(--surface);
             border: 1px solid var(--border-light);
             border-radius: var(--radius-sm);
             font-size: 12px;
             transition: all 0.15s ease;
+            min-width: 0;
+            overflow: hidden;
+            height: 34px;
+            box-sizing: border-box;
         }
 
         .group-item:hover {
@@ -1648,13 +1649,25 @@
             gap: 6px;
             flex: 1;
             min-width: 0;
+            height: 100%;
         }
 
-        .group-color-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            flex: none;
+        .group-item .group-name-input {
+            flex: 1;
+            min-width: 0;
+            height: 22px;
+            padding: 0 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+            background: var(--surface-hover);
+            color: var(--text-primary);
+            box-sizing: border-box;
+        }
+
+        .group-item .group-name-input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         .group-name-text {
@@ -1667,51 +1680,80 @@
 
         .group-actions {
             display: flex;
-            gap: 2px;
+            align-items: center;
+            gap: 6px;
             flex: none;
+            height: 100%;
         }
 
-        .group-actions button {
-            background: none;
-            border: none;
-            color: var(--text-muted);
+        .group-actions .group-color-input {
+            width: 26px;
+            height: 26px;
+            padding: 2px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
             cursor: pointer;
-            font-size: 11px;
-            padding: 2px 4px;
-            min-width: auto;
             flex: none;
-            transition: color 0.15s;
-            line-height: 1;
-        }
-
-        .group-actions button:hover {
-            color: var(--danger);
+            background: var(--surface);
+            box-sizing: border-box;
         }
 
         /* 批量操作工具栏 - 新版风格 */
         .batch-toolbar {
-            display: flex;
+            display: none;
             flex-wrap: wrap;
-            gap: 6px;
-            padding: 8px;
-            background: var(--primary-light);
-            border-radius: var(--radius-sm);
-            margin-bottom: 8px;
+            gap: 8px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, var(--primary-light) 0%, #e8f0fe 100%);
+            border-radius: var(--radius-md);
+            margin-bottom: 10px;
             align-items: center;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .batch-toolbar.visible {
+            display: flex;
         }
 
         .batch-count {
             font-size: 12px;
             font-weight: 600;
             color: var(--primary);
+            white-space: nowrap;
+            padding: 4px 10px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
         .batch-select {
-            padding: 4px 6px;
+            padding: 5px 8px;
             border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 11px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
             background: white;
+            height: 28px;
+            box-sizing: border-box;
+            min-width: 90px;
+        }
+
+        .batch-toolbar .mini-btn {
+            height: 28px;
+            padding: 0 12px;
+            font-size: 12px;
+            line-height: 26px;
+            box-sizing: border-box;
+        }
+
+        .batch-divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(59, 130, 246, 0.2);
+            margin: 0 2px;
+        }
+
+        .batch-spacer {
+            margin-left: auto;
         }
 
         /* 学生分组选择器 */
@@ -1841,9 +1883,10 @@
         }
 
         .io-btn.ghost {
-            background: var(--surface);
+            background: var(--surface-hover);
             color: var(--text-secondary);
             border: 1px solid var(--border);
+            font-weight: 400;
         }
 
         .io-btn.ghost:hover {
@@ -2355,7 +2398,7 @@
             <!-- 折叠面板：座位设置 -->
             <div class="collapse-panel collapsed">
                 <button class="collapse-header" data-target="seatSettings">
-                    <span class="collapse-title">⚙ 座位设置</span>
+                    <span class="collapse-title">⚙️ 座位设置</span>
                     <span class="collapse-arrow">▾</span>
                 </button>
                 <div class="collapse-body" id="seatSettings">
@@ -2410,11 +2453,6 @@
                         <div class="section-head">
                             <span>学生分组</span>
                         </div>
-                        <div class="group-create-row">
-                            <input type="text" id="groupNameInput" placeholder="分组名称" class="group-name-input">
-                            <input type="color" id="groupColorInput" value="#4CAF50" class="group-color-input">
-                            <button id="addGroupBtn" class="mini-btn primary">添加</button>
-                        </div>
                         <div class="group-list" id="groupList">
                             <span class="empty-hint">暂无分组</span>
                         </div>
@@ -2427,10 +2465,12 @@
                             <div class="batch-toolbar" id="batchToolbar">
                                 <span class="batch-count" id="batchCount">已选 0</span>
                                 <select id="batchGroupSelect" class="batch-select"></select>
-                                <button id="batchAssignBtn" class="mini-btn">分配</button>
-                                <button id="batchDeleteBtn" class="mini-btn danger">删除</button>
+                                <button id="batchAssignBtn" class="mini-btn">分配分组</button>
+                                <div class="batch-spacer"></div>
                                 <button id="batchSelectAllBtn" class="mini-btn">全选</button>
                                 <button id="batchCancelBtn" class="mini-btn">取消</button>
+                                <div class="batch-divider"></div>
+                                <button id="batchDeleteBtn" class="mini-btn danger">删除</button>
                             </div>
                             <div class="student-group-selector" id="studentGroupSelector">
                             </div>
@@ -2442,7 +2482,7 @@
             <!-- 折叠面板：导入导出 -->
             <div class="collapse-panel collapsed">
                 <button class="collapse-header" data-target="ioPanel">
-                    <span class="collapse-title">📁 导入 / 导出</span>
+                    <span class="collapse-title">📁 导入导出</span>
                     <span class="collapse-arrow">▾</span>
                 </button>
                 <div class="collapse-body" id="ioPanel">
@@ -2562,9 +2602,6 @@
         const rowsInput = document.getElementById('rowsInput');
         const colsInput = document.getElementById('colsInput');
         const applyConfigBtn = document.getElementById('applyConfigBtn');
-        const groupNameInput = document.getElementById('groupNameInput');
-        const groupColorInput = document.getElementById('groupColorInput');
-        const addGroupBtn = document.getElementById('addGroupBtn');
         const groupList = document.getElementById('groupList');
         const studentAssignment = document.getElementById('studentAssignment');
         const studentGroupSelector = document.getElementById('studentGroupSelector');
@@ -2878,8 +2915,12 @@
         // ==================== 分组管理 ====================
 
         function addGroup() {
-            const name = groupNameInput.value.trim();
-            const color = groupColorInput.value;
+            const newRow = groupList.querySelector('.new-group-row');
+            if (!newRow) return;
+            const nameInput = newRow.querySelector('.new-group-name');
+            const colorInput = newRow.querySelector('.new-group-color');
+            const name = nameInput.value.trim();
+            const color = colorInput.value;
 
             if (!name) {
                 alert('请输入分组名称');
@@ -2897,7 +2938,6 @@
                 color: color
             });
 
-            groupNameInput.value = '';
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
             autoSave();
@@ -2929,21 +2969,32 @@
 
         // 分组列表渲染（纯渲染，事件由委托处理）
         function updateGroupDisplay() {
+            // 新增分组行（始终显示在最后）
+            const newRow =
+                '<div class="group-item new-group-row" style="background: #e8f5e9;">' +
+                    '<div class="group-info">' +
+                        '<input type="text" class="group-name-input new-group-name" placeholder="新增分组" data-group-id="">' +
+                    '</div>' +
+                    '<div class="group-actions">' +
+                        '<input type="color" class="group-color-input new-group-color" value="#4CAF50" data-group-id="">' +
+                        '<button class="add-btn new-group-add-btn" title="添加分组">+</button>' +
+                    '</div>' +
+                '</div>';
+
             if (groups.length === 0) {
-                groupList.innerHTML = '<span class="empty-hint">暂无分组</span>';
+                groupList.innerHTML = newRow;
             } else {
                 groupList.innerHTML = groups.map(group =>
                     '<div class="group-item" data-group-id="' + escapeHtml(group.id) + '">' +
                         '<div class="group-info">' +
-                            '<div class="group-color-dot" style="background-color: ' + escapeHtml(group.color) + ';"></div>' +
-                            '<input type="text" class="group-name-input" value="' + escapeHtml(group.name) + '" data-group-id="' + escapeHtml(group.id) + '" style="flex:1;min-width:0;padding:2px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--surface-hover);">' +
+                            '<input type="text" class="group-name-input" value="' + escapeHtml(group.name) + '" data-group-id="' + escapeHtml(group.id) + '">' +
                         '</div>' +
                         '<div class="group-actions">' +
-                            '<input type="color" class="group-color-input" value="' + escapeHtml(group.color) + '" data-group-id="' + escapeHtml(group.id) + '" style="width:20px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;cursor:pointer;">' +
-                            '<button class="group-delete-btn" data-group-id="' + escapeHtml(group.id) + '" title="删除分组">✕</button>' +
+                            '<input type="color" class="group-color-input" value="' + escapeHtml(group.color) + '" data-group-id="' + escapeHtml(group.id) + '">' +
+                            '<button class="delete-btn group-delete-btn" data-group-id="' + escapeHtml(group.id) + '" title="删除分组">×</button>' +
                         '</div>' +
                     '</div>'
-                ).join('');
+                ).join('') + newRow;
             }
             if (groups.length > 0) {
                 studentAssignment.style.display = 'block';
@@ -2965,9 +3016,25 @@
         });
 
         groupList.addEventListener('click', function (e) {
-            const btn = e.target.closest('.group-delete-btn');
-            if (!btn) return;
-            deleteGroup(btn.getAttribute('data-group-id'));
+            // 删除分组
+            const delBtn = e.target.closest('.group-delete-btn');
+            if (delBtn) {
+                deleteGroup(delBtn.getAttribute('data-group-id'));
+                return;
+            }
+            // 新增分组
+            const addBtn = e.target.closest('.new-group-add-btn');
+            if (addBtn) {
+                addGroup();
+                return;
+            }
+        });
+
+        // 新增分组输入框回车
+        groupList.addEventListener('keypress', function (e) {
+            if (e.key !== 'Enter') return;
+            if (!e.target.classList.contains('new-group-name')) return;
+            addGroup();
         });
 
         // 更新学生分配显示（纯渲染，事件由委托处理）
@@ -3573,11 +3640,12 @@
 
         // 更新签到统计
         function updateCheckinStats() {
-            const total = students.length;
-            const checkedIn = students.filter(s => s.checkedIn).length;
-            const notCheckedIn = total - checkedIn;
-            const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
-            const assigned = currentSeats.filter(seat => seat !== null).length;
+            const assignedIds = new Set(currentSeats.filter(s => s !== null));
+            const assigned = assignedIds.size;
+            const assignedStudents = students.filter(s => assignedIds.has(s.id));
+            const checkedIn = assignedStudents.filter(s => s.checkedIn).length;
+            const notCheckedIn = assigned - checkedIn;
+            const rate = assigned > 0 ? Math.round((checkedIn / assigned) * 100) : 0;
 
             const rateEl = document.getElementById('checkinRate');
             const progressBar = document.getElementById('checkinProgressBar');
@@ -3603,12 +3671,10 @@
                 classroom.classList.add('checkin-mode');
                 document.getElementById('normalStatsRow').style.display = 'none';
                 document.getElementById('checkinStatsRow').style.display = 'flex';
-                document.getElementById('checkinMini').style.display = 'none';
             } else {
                 classroom.classList.remove('checkin-mode');
                 document.getElementById('normalStatsRow').style.display = 'flex';
                 document.getElementById('checkinStatsRow').style.display = 'none';
-                document.getElementById('checkinMini').style.display = 'block';
             }
             generateSeats();
             updateCheckinStats();
@@ -4608,12 +4674,6 @@
             };
             reader.readAsText(file);
             e.target.value = '';
-        });
-
-        // 分组管理面板事件绑定
-        addGroupBtn.addEventListener('click', addGroup);
-        groupNameInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') addGroup();
         });
 
         // ==================== 撤销/重做按钮 + 键盘快捷键 ====================
