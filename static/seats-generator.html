@@ -257,6 +257,14 @@
             margin-top: 2px;
         }
 
+        .checkin-stats #checkedInCount {
+            color: var(--success);
+        }
+
+        .checkin-stats #notCheckedInCount {
+            color: var(--danger);
+        }
+
         .checkin-mini-label {
             display: flex;
             justify-content: space-between;
@@ -673,6 +681,23 @@
             background: rgba(255, 255, 255, 0.35);
         }
 
+        .checkin-banner-btn {
+            margin-left: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+        .checkin-banner-btn:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
         @keyframes slideDown {
             from {
                 opacity: 0;
@@ -699,6 +724,26 @@
             background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
             color: white;
             font-size: 11px;
+            font-weight: bold;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+            line-height: 1;
+        }
+
+        .seat.not-checked-in::before {
+            content: '×';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+            color: white;
+            font-size: 12px;
             font-weight: bold;
             border-radius: 50%;
             display: flex;
@@ -1812,6 +1857,109 @@
             margin: 12px 0;
         }
 
+        /* 配置管理列表 */
+        .config-list {
+            max-height: 180px;
+            overflow-y: auto;
+            margin: 6px 0;
+        }
+
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-light);
+            margin-bottom: 4px;
+            font-size: 12px;
+            transition: background 0.15s;
+        }
+
+        .config-item:hover {
+            background: var(--surface-hover);
+        }
+
+        .config-item.active {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .config-item-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .config-item-name:hover {
+            text-decoration: underline;
+        }
+
+        .config-item-time {
+            font-size: 10px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .config-item-del {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            line-height: 1;
+        }
+
+        .config-item-del:hover {
+            color: var(--danger);
+        }
+
+        .config-empty {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        /* WebDAV 设置 */
+        .webdav-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            margin-bottom: 6px;
+            background: var(--surface);
+            color: var(--text-primary);
+        }
+
+        .webdav-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+        }
+
+        .webdav-status {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            min-height: 16px;
+        }
+
+        .webdav-status.success {
+            color: var(--success);
+        }
+
+        .webdav-status.error {
+            color: var(--danger);
+        }
+
         .file-info {
             font-size: 12px;
             color: var(--text-secondary);
@@ -2074,6 +2222,27 @@
                 line-height: 1;
             }
 
+            .seat.not-checked-in::before {
+                content: '×';
+                position: absolute;
+                top: -3px;
+                right: -3px;
+                width: 18px;
+                height: 18px;
+                background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                line-height: 1;
+            }
+
             .student-list-container {
                 display: none;
             }
@@ -2109,7 +2278,7 @@
 
             <!-- 统计卡片 -->
             <div class="stats-card">
-                <div class="stats-row">
+                <div class="stats-row" id="normalStatsRow">
                     <div class="stat-block">
                         <div class="stat-num" id="totalStudents">0</div>
                         <div class="stat-label">学生总数</div>
@@ -2123,7 +2292,21 @@
                         <div class="stat-label">未入座</div>
                     </div>
                 </div>
-                <div class="checkin-mini">
+                <div class="stats-row checkin-stats" id="checkinStatsRow" style="display:none;">
+                    <div class="stat-block">
+                        <div class="stat-num" id="assignedStudentsCheckin">0</div>
+                        <div class="stat-label">入座学生数</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-num" id="checkedInCount">0</div>
+                        <div class="stat-label">已签到</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-num" id="notCheckedInCount">0</div>
+                        <div class="stat-label">未签到</div>
+                    </div>
+                </div>
+                <div class="checkin-mini" id="checkinMini">
                     <div class="checkin-mini-label">
                         <span>签到</span>
                         <span class="checkin-mini-rate" id="checkinRate">0%</span>
@@ -2154,8 +2337,8 @@
             <div class="sub-actions">
                 <button id="undoBtn" class="sub-btn" disabled title="撤销">↶ 撤销</button>
                 <button id="redoBtn" class="sub-btn" disabled title="重做">↷ 重做</button>
-                <button id="toggleViewBtn" class="sub-btn">⇅ 教师视角</button>
-                <button id="exportBtn" class="sub-btn">⬇ 导出图片</button>
+                <button id="toggleViewBtn" class="sub-btn">教师视角</button>
+                <button id="exportBtn" class="sub-btn">导出图片</button>
             </div>
 
             <!-- 折叠面板：座位设置 -->
@@ -2293,12 +2476,31 @@
                     <div class="io-divider"></div>
 
                     <div class="io-section">
-                        <div class="io-title">配置数据</div>
+                        <div class="io-title">配置管理</div>
                         <div class="io-btn-row">
                             <button id="exportConfigBtn" class="io-btn ghost">导出配置</button>
                             <button id="importConfigBtn" class="io-btn ghost">导入配置</button>
+                            <button id="saveConfigAsBtn" class="io-btn ghost">保存为…</button>
                             <input type="file" id="configFileInput" class="file-input" accept=".json">
                         </div>
+                        <div id="configList" class="config-list"></div>
+
+                        <div class="io-divider" style="margin:10px 0;"></div>
+
+                        <div class="io-title">WebDAV 云同步</div>
+                        <div class="webdav-settings">
+                            <input type="url" id="webdavUrl" class="webdav-input" placeholder="WebDAV 地址 (如 https://dav.example.com/path/)">
+                            <input type="text" id="webdavUser" class="webdav-input" placeholder="用户名">
+                            <input type="password" id="webdavPass" class="webdav-input" placeholder="密码">
+                            <div class="io-btn-row">
+                                <button id="webdavSaveSettingsBtn" class="io-btn ghost">保存设置</button>
+                                <button id="webdavTestBtn" class="io-btn ghost">测试连接</button>
+                                <button id="webdavSyncUpBtn" class="io-btn ghost">上传</button>
+                                <button id="webdavSyncDownBtn" class="io-btn ghost">下载</button>
+                            </div>
+                            <div id="webdavStatus" class="webdav-status"></div>
+                        </div>
+
                         <button id="clearStorageBtn" class="danger-btn full-width">清除所有数据</button>
                     </div>
                 </div>
@@ -2335,6 +2537,10 @@
         const confirmImportBtn = document.getElementById('confirmImportBtn');
         const dragHint = document.getElementById('dragHint');
         const clearStorageBtn = document.getElementById('clearStorageBtn');
+
+        // 多配置管理常量
+        const CONFIGS_KEY = 'classroomConfigsList';
+        const ACTIVE_CONFIG_KEY = 'classroomActiveConfig';
         const deleteZone = document.getElementById('deleteZone');
         const toggleViewBtn = document.getElementById('toggleViewBtn');
         const exportBtn = document.getElementById('exportBtn');
@@ -3197,12 +3403,26 @@
                 banner.className = 'checkin-banner visible';
                 banner.innerHTML =
                     '<span class="checkin-banner-icon">✓</span>' +
-                    '<span>签到模式已开启 — 点击座位签到/取消签到</span>' +
+                    '<span>签到模式 — 点击座位签到/取消签到</span>' +
+                    '<button class="checkin-banner-btn" id="resetCheckinBtn">重新签到</button>' +
+                    '<button class="checkin-banner-btn" id="allCheckinBtn">全部签到</button>' +
                     '<button class="checkin-banner-close">×</button>';
                 classroom.appendChild(banner);
                 banner.querySelector('.checkin-banner-close').addEventListener('click', function (e) {
                     e.stopPropagation();
                     if (isCheckinMode) toggleCheckinMode();
+                });
+                banner.querySelector('#resetCheckinBtn').addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    pushSnapshot();
+                    students.forEach(s => s.checkedIn = false);
+                    generateSeats();
+                });
+                banner.querySelector('#allCheckinBtn').addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    pushSnapshot();
+                    students.forEach(s => s.checkedIn = true);
+                    generateSeats();
                 });
             }
 
@@ -3233,6 +3453,7 @@
                     const isCheckedIn = student && student.checkedIn;
                     let seatClass = studentId ? 'seat' : 'seat empty';
                     if (isCheckedIn) seatClass += ' checked-in';
+                    else if (studentId && isCheckinMode) seatClass += ' not-checked-in';
                     seat.className = seatClass;
                     seat.setAttribute('data-index', seatIndex);
                     seat.setAttribute('data-student', studentId || '');
@@ -3339,13 +3560,25 @@
         function updateCheckinStats() {
             const total = students.length;
             const checkedIn = students.filter(s => s.checkedIn).length;
+            const notCheckedIn = total - checkedIn;
             const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+            const assigned = currentSeats.filter(seat => seat !== null).length;
 
             const rateEl = document.getElementById('checkinRate');
             const progressBar = document.getElementById('checkinProgressBar');
 
             if (rateEl) rateEl.textContent = rate + '%';
             if (progressBar) progressBar.style.width = rate + '%';
+
+            if (isCheckinMode) {
+                const assignedEl = document.getElementById('assignedStudentsCheckin');
+                const checkedInEl = document.getElementById('checkedInCount');
+                const notCheckedInEl = document.getElementById('notCheckedInCount');
+
+                if (assignedEl) assignedEl.textContent = assigned;
+                if (checkedInEl) checkedInEl.textContent = checkedIn;
+                if (notCheckedInEl) notCheckedInEl.textContent = notCheckedIn;
+            }
         }
 
         function toggleCheckinMode() {
@@ -3353,10 +3586,17 @@
             updateCheckinModeButton();
             if (isCheckinMode) {
                 classroom.classList.add('checkin-mode');
+                document.getElementById('normalStatsRow').style.display = 'none';
+                document.getElementById('checkinStatsRow').style.display = 'flex';
+                document.getElementById('checkinMini').style.display = 'none';
             } else {
                 classroom.classList.remove('checkin-mode');
+                document.getElementById('normalStatsRow').style.display = 'flex';
+                document.getElementById('checkinStatsRow').style.display = 'none';
+                document.getElementById('checkinMini').style.display = 'block';
             }
             generateSeats();
+            updateCheckinStats();
         }
 
         // 切换学生签到状态
@@ -3751,6 +3991,8 @@
         clearStorageBtn.addEventListener('click', function () {
             if (confirm('确定要清除所有数据吗？此操作不可撤销！')) {
                 localStorage.removeItem('classroomConfig');
+                localStorage.removeItem(CONFIGS_KEY);
+                localStorage.removeItem(ACTIVE_CONFIG_KEY);
                 students = [];
                 groups = [];
                 rows = 7;
@@ -3765,8 +4007,326 @@
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
                 generateSeats();
+                renderConfigList();
                 alert('所有数据已清除！');
             }
+        });
+
+        // ==================== 多配置管理 ====================
+
+        const configListEl = document.getElementById('configList');
+        const saveConfigAsBtn = document.getElementById('saveConfigAsBtn');
+
+        function getSavedConfigs() {
+            try {
+                return JSON.parse(localStorage.getItem(CONFIGS_KEY)) || {};
+            } catch { return {}; }
+        }
+
+        function setSavedConfigs(configs) {
+            localStorage.setItem(CONFIGS_KEY, JSON.stringify(configs));
+        }
+
+        function getActiveConfigName() {
+            return localStorage.getItem(ACTIVE_CONFIG_KEY) || '';
+        }
+
+        function setActiveConfigName(name) {
+            localStorage.setItem(ACTIVE_CONFIG_KEY, name);
+        }
+
+        function renderConfigList() {
+            const configs = getSavedConfigs();
+            const activeName = getActiveConfigName();
+            const names = Object.keys(configs);
+
+            if (names.length === 0) {
+                configListEl.innerHTML = '<div class="config-empty">暂无保存的配置</div>';
+                return;
+            }
+
+            configListEl.innerHTML = names.map(name => {
+                const isActive = name === activeName;
+                const time = configs[name].savedAt ? new Date(configs[name].savedAt).toLocaleString() : '';
+                return '<div class="config-item' + (isActive ? ' active' : '') + '">' +
+                    '<span class="config-item-name" data-config="' + escapeHtml(name) + '" title="点击切换到此配置">' + escapeHtml(name) + '</span>' +
+                    '<span class="config-item-time">' + time + '</span>' +
+                    '<button class="config-item-del" data-del="' + escapeHtml(name) + '" title="删除此配置">×</button>' +
+                '</div>';
+            }).join('');
+        }
+
+        // 点击配置名切换
+        configListEl.addEventListener('click', function (e) {
+            const nameEl = e.target.closest('.config-item-name');
+            const delEl = e.target.closest('.config-item-del');
+
+            if (nameEl) {
+                const name = nameEl.getAttribute('data-config');
+                const configs = getSavedConfigs();
+                if (!configs[name]) return;
+                applyConfig(configs[name]);
+                setActiveConfigName(name);
+                renderConfigList();
+            }
+
+            if (delEl) {
+                const name = delEl.getAttribute('data-del');
+                if (!confirm('确定删除配置「' + name + '」吗？')) return;
+                const configs = getSavedConfigs();
+                delete configs[name];
+                setSavedConfigs(configs);
+                if (getActiveConfigName() === name) setActiveConfigName('');
+                renderConfigList();
+            }
+        });
+
+        // 双击配置名重命名
+        configListEl.addEventListener('dblclick', function (e) {
+            const nameEl = e.target.closest('.config-item-name');
+            if (!nameEl) return;
+            const oldName = nameEl.getAttribute('data-config');
+            const newName = prompt('请输入新名称：', oldName);
+            if (!newName || newName === oldName) return;
+            const configs = getSavedConfigs();
+            if (configs[newName]) { alert('该名称已存在！'); return; }
+            configs[newName] = configs[oldName];
+            delete configs[oldName];
+            setSavedConfigs(configs);
+            if (getActiveConfigName() === oldName) setActiveConfigName(newName);
+            renderConfigList();
+        });
+
+        // 保存为…
+        saveConfigAsBtn.addEventListener('click', function () {
+            let name = getActiveConfigName();
+            if (!name) name = pageTitle.textContent.trim() || '班级座位表';
+            const input = prompt('请输入配置名称：', name);
+            if (!input) return;
+            const configs = getSavedConfigs();
+            configs[input] = { ...getCurrentConfig(), savedAt: Date.now() };
+            setSavedConfigs(configs);
+            setActiveConfigName(input);
+            renderConfigList();
+        });
+
+        // 应用配置的通用函数
+        function applyConfig(config) {
+            migrateConfig(config);
+            students = config.students || [];
+            groups = config.groups || [];
+            rows = config.rows || 7;
+            cols = config.cols || 7;
+            currentSeats = config.seats || Array(rows * cols).fill(null);
+            isTeacherView = config.viewMode === 'teacher';
+            aisles = config.aisles || [];
+            if (config.title) pageTitle.textContent = config.title;
+
+            const targetLen = rows * cols;
+            if (currentSeats.length < targetLen) {
+                currentSeats = currentSeats.concat(Array(targetLen - currentSeats.length).fill(null));
+            } else if (currentSeats.length > targetLen) {
+                currentSeats = currentSeats.slice(0, targetLen);
+            }
+
+            rowsInput.value = rows;
+            colsInput.value = cols;
+            toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
+            updateAisleDisplay();
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
+            generateSeats();
+        }
+
+        // 初始渲染配置列表
+        renderConfigList();
+
+        // ==================== WebDAV 云同步 ====================
+
+        const WEBDAV_SETTINGS_KEY = 'webdavSettings';
+        const webdavUrl = document.getElementById('webdavUrl');
+        const webdavUser = document.getElementById('webdavUser');
+        const webdavPass = document.getElementById('webdavPass');
+        const webdavStatus = document.getElementById('webdavStatus');
+        const webdavSaveSettingsBtn = document.getElementById('webdavSaveSettingsBtn');
+        const webdavTestBtn = document.getElementById('webdavTestBtn');
+        const webdavSyncUpBtn = document.getElementById('webdavSyncUpBtn');
+        const webdavSyncDownBtn = document.getElementById('webdavSyncDownBtn');
+
+        // 加载已保存的 WebDAV 设置
+        (function loadWebdavSettings() {
+            try {
+                const s = JSON.parse(localStorage.getItem(WEBDAV_SETTINGS_KEY));
+                if (s) {
+                    webdavUrl.value = s.url || '';
+                    webdavUser.value = s.user || '';
+                    webdavPass.value = s.pass || '';
+                }
+            } catch {}
+        })();
+
+        function setWebdavStatus(msg, type) {
+            webdavStatus.textContent = msg;
+            webdavStatus.className = 'webdav-status' + (type ? ' ' + type : '');
+        }
+
+        function getWebdavSettings() {
+            return { url: webdavUrl.value.trim(), user: webdavUser.value.trim(), pass: webdavPass.value };
+        }
+
+        // 保存 WebDAV 设置
+        webdavSaveSettingsBtn.addEventListener('click', function () {
+            const s = getWebdavSettings();
+            if (!s.url) { setWebdavStatus('请填写 WebDAV 地址', 'error'); return; }
+            localStorage.setItem(WEBDAV_SETTINGS_KEY, JSON.stringify(s));
+            setWebdavStatus('设置已保存，正在测试连接…', '');
+            testWebdavConnection();
+        });
+
+        // 测试 WebDAV 连接
+        webdavTestBtn.addEventListener('click', testWebdavConnection);
+
+        function testWebdavConnection() {
+            const s = getWebdavSettings();
+            if (!s.url) { setWebdavStatus('请填写 WebDAV 地址', 'error'); return; }
+            if (!s.user) { setWebdavStatus('请填写用户名', 'error'); return; }
+            
+            setWebdavStatus('正在测试连接…', '');
+            
+            const testUrl = s.url.replace(/\/+$/, '') + '/';
+            const headers = {
+                'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(s.user + ':' + s.pass))),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': '*/*'
+            };
+
+            fetch(testUrl, { method: 'OPTIONS', headers, mode: 'cors', credentials: 'include' })
+                .then(res => {
+                    if (res.status >= 200 && res.status < 300) {
+                        return fetch(testUrl, { method: 'PROPFIND', headers, mode: 'cors', credentials: 'include', body: '<?xml version="1.0" encoding="utf-8"?><D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>' });
+                    }
+                    throw new Error('OPTIONS 请求失败 (HTTP ' + res.status + ')');
+                })
+                .then(res => {
+                    if (res.status === 207 || res.status === 200) {
+                        setWebdavStatus('连接成功！服务器支持 WebDAV', 'success');
+                    } else if (res.status === 401) {
+                        setWebdavStatus('认证失败：用户名或密码错误', 'error');
+                    } else if (res.status === 403) {
+                        setWebdavStatus('权限不足：无法访问该目录', 'error');
+                    } else {
+                        throw new Error('PROPFIND 请求失败 (HTTP ' + res.status + ')');
+                    }
+                })
+                .catch(err => {
+                    if (err.message === 'Failed to fetch') {
+                        setWebdavStatus('连接失败：请检查地址、网络或服务器 CORS 配置', 'error');
+                    } else {
+                        setWebdavStatus('连接失败: ' + err.message, 'error');
+                    }
+                });
+        }
+
+        // WebDAV 请求辅助函数
+        function webdavRequest(method, path, body, options = {}) {
+            const s = getWebdavSettings();
+            if (!s.url || !s.user) {
+                setWebdavStatus('请先设置 WebDAV 地址和用户名', 'error');
+                return Promise.reject(new Error('未设置 WebDAV'));
+            }
+
+            const url = s.url.replace(/\/+$/, '') + '/' + path.replace(/^\/+/, '');
+            const headers = {
+                'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(s.user + ':' + s.pass))),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': '*/*'
+            };
+
+            const fetchOptions = { method, headers, mode: 'cors', credentials: 'include', ...options };
+            if (body) {
+                headers['Content-Type'] = 'application/json';
+                fetchOptions.body = body;
+            }
+
+            return fetch(url, fetchOptions)
+                .then(res => {
+                    if (!res.ok) {
+                        const statusText = res.statusText || '未知错误';
+                        if (res.status === 401) {
+                            throw new Error('认证失败：用户名或密码错误');
+                        } else if (res.status === 403) {
+                            throw new Error('权限不足：无法访问该资源');
+                        } else if (res.status === 404) {
+                            throw new Error('资源不存在：服务器上未找到文件');
+                        } else if (res.status >= 500) {
+                            throw new Error('服务器错误 (HTTP ' + res.status + ')');
+                        } else {
+                            throw new Error('请求失败 (HTTP ' + res.status + ': ' + statusText + ')');
+                        }
+                    }
+                    return res;
+                })
+                .catch(err => {
+                    if (err.message === 'Failed to fetch') {
+                        throw new Error('连接失败：可能的原因包括\n• WebDAV 地址不正确\n• 服务器未启用 CORS 跨域访问\n• 服务器不可达或网络故障\n• HTTPS 证书无效\n\n建议：先点击「测试连接」验证服务器配置');
+                    }
+                    throw err;
+                });
+        }
+
+        // 上传所有配置到 WebDAV
+        webdavSyncUpBtn.addEventListener('click', function () {
+            setWebdavStatus('正在上传…', '');
+            const configs = getSavedConfigs();
+            const activeName = getActiveConfigName();
+            const data = JSON.stringify({ configs, activeName, current: getCurrentConfig(), savedAt: Date.now() });
+
+            webdavRequest('PUT', 'seats-configs.json', data)
+                .then(res => {
+                    if (res.ok || res.status === 201 || res.status === 204) {
+                        setWebdavStatus('上传成功 (' + new Date().toLocaleTimeString() + ')', 'success');
+                    } else {
+                        throw new Error('HTTP ' + res.status);
+                    }
+                })
+                .catch(err => {
+                    setWebdavStatus('上传失败: ' + err.message, 'error');
+                });
+        });
+
+        // 从 WebDAV 下载配置
+        webdavSyncDownBtn.addEventListener('click', function () {
+            setWebdavStatus('正在下载…', '');
+
+            webdavRequest('GET', 'seats-configs.json')
+                .then(res => {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data.configs || typeof data.configs !== 'object') {
+                        throw new Error('数据格式无效');
+                    }
+
+                    // 合并配置：云端配置与本地合并（云端优先）
+                    const localConfigs = getSavedConfigs();
+                    const merged = { ...localConfigs, ...data.configs };
+                    setSavedConfigs(merged);
+
+                    // 如果有活跃配置，应用它
+                    if (data.activeName && data.configs[data.activeName]) {
+                        applyConfig(data.configs[data.activeName]);
+                        setActiveConfigName(data.activeName);
+                    } else if (data.current) {
+                        applyConfig(data.current);
+                    }
+
+                    renderConfigList();
+                    setWebdavStatus('下载成功，已合并 ' + Object.keys(data.configs).length + ' 个配置', 'success');
+                })
+                .catch(err => {
+                    setWebdavStatus('下载失败: ' + err.message, 'error');
+                });
         });
 
         // 创建表格预览
