@@ -2487,18 +2487,19 @@
 
                         <div class="io-divider" style="margin:10px 0;"></div>
 
-                        <div class="io-title">WebDAV 云同步</div>
+                        <div class="io-title">GitHub 同步</div>
                         <div class="webdav-settings">
-                            <input type="url" id="webdavUrl" class="webdav-input" placeholder="WebDAV 地址 (如 https://dav.example.com/path/)">
-                            <input type="text" id="webdavUser" class="webdav-input" placeholder="用户名">
-                            <input type="password" id="webdavPass" class="webdav-input" placeholder="密码">
+                            <input type="text" id="githubOwner" class="webdav-input" placeholder="GitHub 用户名 (如 username)">
+                            <input type="text" id="githubRepo" class="webdav-input" placeholder="仓库名 (如 blog)">
+                            <input type="text" id="githubPath" class="webdav-input" placeholder="文件路径 (如 data/seats-configs.json)" value="data/seats-configs.json">
+                            <input type="password" id="githubToken" class="webdav-input" placeholder="Personal Access Token">
                             <div class="io-btn-row">
-                                <button id="webdavSaveSettingsBtn" class="io-btn ghost">保存设置</button>
-                                <button id="webdavTestBtn" class="io-btn ghost">测试连接</button>
-                                <button id="webdavSyncUpBtn" class="io-btn ghost">上传</button>
-                                <button id="webdavSyncDownBtn" class="io-btn ghost">下载</button>
+                                <button id="githubSaveSettingsBtn" class="io-btn ghost">保存设置</button>
+                                <button id="githubTestBtn" class="io-btn ghost">测试连接</button>
+                                <button id="githubSyncUpBtn" class="io-btn ghost">上传</button>
+                                <button id="githubSyncDownBtn" class="io-btn ghost">下载</button>
                             </div>
-                            <div id="webdavStatus" class="webdav-status"></div>
+                            <div id="githubStatus" class="webdav-status"></div>
                         </div>
 
                         <button id="clearStorageBtn" class="danger-btn full-width">清除所有数据</button>
@@ -4141,179 +4142,185 @@
         // 初始渲染配置列表
         renderConfigList();
 
-        // ==================== WebDAV 云同步 ====================
+        // ==================== GitHub API 同步 ====================
 
-        const WEBDAV_SETTINGS_KEY = 'webdavSettings';
-        const webdavUrl = document.getElementById('webdavUrl');
-        const webdavUser = document.getElementById('webdavUser');
-        const webdavPass = document.getElementById('webdavPass');
-        const webdavStatus = document.getElementById('webdavStatus');
-        const webdavSaveSettingsBtn = document.getElementById('webdavSaveSettingsBtn');
-        const webdavTestBtn = document.getElementById('webdavTestBtn');
-        const webdavSyncUpBtn = document.getElementById('webdavSyncUpBtn');
-        const webdavSyncDownBtn = document.getElementById('webdavSyncDownBtn');
+        const GITHUB_SETTINGS_KEY = 'githubSettings';
+        const githubOwner = document.getElementById('githubOwner');
+        const githubRepo = document.getElementById('githubRepo');
+        const githubPath = document.getElementById('githubPath');
+        const githubToken = document.getElementById('githubToken');
+        const githubStatus = document.getElementById('githubStatus');
+        const githubSaveSettingsBtn = document.getElementById('githubSaveSettingsBtn');
+        const githubTestBtn = document.getElementById('githubTestBtn');
+        const githubSyncUpBtn = document.getElementById('githubSyncUpBtn');
+        const githubSyncDownBtn = document.getElementById('githubSyncDownBtn');
 
-        // 加载已保存的 WebDAV 设置
-        (function loadWebdavSettings() {
+        (function loadGithubSettings() {
             try {
-                const s = JSON.parse(localStorage.getItem(WEBDAV_SETTINGS_KEY));
+                const s = JSON.parse(localStorage.getItem(GITHUB_SETTINGS_KEY));
                 if (s) {
-                    webdavUrl.value = s.url || '';
-                    webdavUser.value = s.user || '';
-                    webdavPass.value = s.pass || '';
+                    githubOwner.value = s.owner || '';
+                    githubRepo.value = s.repo || '';
+                    githubPath.value = s.path || 'data/seats-configs.json';
+                    githubToken.value = s.token || '';
                 }
             } catch {}
         })();
 
-        function setWebdavStatus(msg, type) {
-            webdavStatus.textContent = msg;
-            webdavStatus.className = 'webdav-status' + (type ? ' ' + type : '');
+        function setGithubStatus(msg, type) {
+            githubStatus.textContent = msg;
+            githubStatus.className = 'webdav-status' + (type ? ' ' + type : '');
         }
 
-        function getWebdavSettings() {
-            return { url: webdavUrl.value.trim(), user: webdavUser.value.trim(), pass: webdavPass.value };
-        }
-
-        // 保存 WebDAV 设置
-        webdavSaveSettingsBtn.addEventListener('click', function () {
-            const s = getWebdavSettings();
-            if (!s.url) { setWebdavStatus('请填写 WebDAV 地址', 'error'); return; }
-            localStorage.setItem(WEBDAV_SETTINGS_KEY, JSON.stringify(s));
-            setWebdavStatus('设置已保存，正在测试连接…', '');
-            testWebdavConnection();
-        });
-
-        // 测试 WebDAV 连接
-        webdavTestBtn.addEventListener('click', testWebdavConnection);
-
-        function testWebdavConnection() {
-            const s = getWebdavSettings();
-            if (!s.url) { setWebdavStatus('请填写 WebDAV 地址', 'error'); return; }
-            if (!s.user) { setWebdavStatus('请填写用户名', 'error'); return; }
-            
-            setWebdavStatus('正在测试连接…', '');
-            
-            const testUrl = s.url.replace(/\/+$/, '') + '/';
-            const headers = {
-                'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(s.user + ':' + s.pass))),
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': '*/*'
+        function getGithubSettings() {
+            return {
+                owner: githubOwner.value.trim(),
+                repo: githubRepo.value.trim(),
+                path: githubPath.value.trim() || 'data/seats-configs.json',
+                token: githubToken.value.trim()
             };
-
-            fetch(testUrl, { method: 'OPTIONS', headers, mode: 'cors', credentials: 'include' })
-                .then(res => {
-                    if (res.status >= 200 && res.status < 300) {
-                        return fetch(testUrl, { method: 'PROPFIND', headers, mode: 'cors', credentials: 'include', body: '<?xml version="1.0" encoding="utf-8"?><D:propfind xmlns:D="DAV:"><D:prop><D:displayname/></D:prop></D:propfind>' });
-                    }
-                    throw new Error('OPTIONS 请求失败 (HTTP ' + res.status + ')');
-                })
-                .then(res => {
-                    if (res.status === 207 || res.status === 200) {
-                        setWebdavStatus('连接成功！服务器支持 WebDAV', 'success');
-                    } else if (res.status === 401) {
-                        setWebdavStatus('认证失败：用户名或密码错误', 'error');
-                    } else if (res.status === 403) {
-                        setWebdavStatus('权限不足：无法访问该目录', 'error');
-                    } else {
-                        throw new Error('PROPFIND 请求失败 (HTTP ' + res.status + ')');
-                    }
-                })
-                .catch(err => {
-                    if (err.message === 'Failed to fetch') {
-                        setWebdavStatus('连接失败：请检查地址、网络或服务器 CORS 配置', 'error');
-                    } else {
-                        setWebdavStatus('连接失败: ' + err.message, 'error');
-                    }
-                });
         }
 
-        // WebDAV 请求辅助函数
-        function webdavRequest(method, path, body, options = {}) {
-            const s = getWebdavSettings();
-            if (!s.url || !s.user) {
-                setWebdavStatus('请先设置 WebDAV 地址和用户名', 'error');
-                return Promise.reject(new Error('未设置 WebDAV'));
+        function githubApiRequest(method, endpoint, body) {
+            const s = getGithubSettings();
+            if (!s.owner || !s.repo || !s.token) {
+                setGithubStatus('请先填写 GitHub 设置', 'error');
+                return Promise.reject(new Error('未设置 GitHub'));
             }
 
-            const url = s.url.replace(/\/+$/, '') + '/' + path.replace(/^\/+/, '');
+            const url = `https://api.github.com/repos/${s.owner}/${s.repo}${endpoint}`;
             const headers = {
-                'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(s.user + ':' + s.pass))),
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': '*/*'
+                'Authorization': 'token ' + s.token,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
             };
 
-            const fetchOptions = { method, headers, mode: 'cors', credentials: 'include', ...options };
+            const options = { method, headers, mode: 'cors', credentials: 'include' };
             if (body) {
                 headers['Content-Type'] = 'application/json';
-                fetchOptions.body = body;
+                options.body = JSON.stringify(body);
             }
 
-            return fetch(url, fetchOptions)
-                .then(res => {
-                    if (!res.ok) {
-                        const statusText = res.statusText || '未知错误';
+            return fetch(url, options).then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => {
+                        const msg = err.message || err.error || '请求失败';
                         if (res.status === 401) {
-                            throw new Error('认证失败：用户名或密码错误');
+                            throw new Error('认证失败：Token 无效或已过期');
                         } else if (res.status === 403) {
-                            throw new Error('权限不足：无法访问该资源');
+                            throw new Error('权限不足：Token 缺少 repo 权限');
                         } else if (res.status === 404) {
-                            throw new Error('资源不存在：服务器上未找到文件');
-                        } else if (res.status >= 500) {
-                            throw new Error('服务器错误 (HTTP ' + res.status + ')');
-                        } else {
-                            throw new Error('请求失败 (HTTP ' + res.status + ': ' + statusText + ')');
+                            throw new Error('仓库或文件不存在');
                         }
+                        throw new Error('请求失败: ' + msg);
+                    }).catch(() => {
+                        throw new Error('请求失败 (HTTP ' + res.status + ')');
+                    });
+                }
+                return res;
+            });
+        }
+
+        githubSaveSettingsBtn.addEventListener('click', function () {
+            const s = getGithubSettings();
+            if (!s.owner) { setGithubStatus('请填写 GitHub 用户名', 'error'); return; }
+            if (!s.repo) { setGithubStatus('请填写仓库名', 'error'); return; }
+            if (!s.token) { setGithubStatus('请填写 Personal Access Token', 'error'); return; }
+            
+            localStorage.setItem(GITHUB_SETTINGS_KEY, JSON.stringify(s));
+            setGithubStatus('设置已保存，正在测试连接…', '');
+            testGithubConnection();
+        });
+
+        githubTestBtn.addEventListener('click', testGithubConnection);
+
+        function testGithubConnection() {
+            const s = getGithubSettings();
+            if (!s.owner || !s.repo || !s.token) {
+                setGithubStatus('请先填写完整的 GitHub 设置', 'error');
+                return;
+            }
+
+            setGithubStatus('正在测试连接…', '');
+
+            githubApiRequest('GET', '/')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.name === s.repo) {
+                        setGithubStatus('连接成功！仓库: ' + data.full_name, 'success');
+                    } else {
+                        throw new Error('仓库名称不匹配');
                     }
-                    return res;
                 })
                 .catch(err => {
-                    if (err.message === 'Failed to fetch') {
-                        throw new Error('连接失败：可能的原因包括\n• WebDAV 地址不正确\n• 服务器未启用 CORS 跨域访问\n• 服务器不可达或网络故障\n• HTTPS 证书无效\n\n建议：先点击「测试连接」验证服务器配置');
-                    }
-                    throw err;
+                    setGithubStatus('连接失败: ' + err.message, 'error');
                 });
         }
 
-        // 上传所有配置到 WebDAV
-        webdavSyncUpBtn.addEventListener('click', function () {
-            setWebdavStatus('正在上传…', '');
+        githubSyncUpBtn.addEventListener('click', function () {
+            const s = getGithubSettings();
+            if (!s.owner || !s.repo || !s.token) {
+                setGithubStatus('请先填写完整的 GitHub 设置', 'error');
+                return;
+            }
+
+            setGithubStatus('正在上传…', '');
             const configs = getSavedConfigs();
             const activeName = getActiveConfigName();
-            const data = JSON.stringify({ configs, activeName, current: getCurrentConfig(), savedAt: Date.now() });
+            const content = JSON.stringify({ configs, activeName, current: getCurrentConfig(), savedAt: Date.now() }, null, 2);
+            const encodedContent = btoa(unescape(encodeURIComponent(content)));
 
-            webdavRequest('PUT', 'seats-configs.json', data)
-                .then(res => {
-                    if (res.ok || res.status === 201 || res.status === 204) {
-                        setWebdavStatus('上传成功 (' + new Date().toLocaleTimeString() + ')', 'success');
-                    } else {
-                        throw new Error('HTTP ' + res.status);
-                    }
+            githubApiRequest('GET', `/contents/${s.path}`)
+                .then(res => res.json())
+                .then(existing => {
+                    return githubApiRequest('PUT', `/contents/${s.path}`, {
+                        message: '[Seats Generator] 同步配置',
+                        content: encodedContent,
+                        sha: existing.sha
+                    });
                 })
                 .catch(err => {
-                    setWebdavStatus('上传失败: ' + err.message, 'error');
+                    if (err.message.includes('404')) {
+                        return githubApiRequest('PUT', `/contents/${s.path}`, {
+                            message: '[Seats Generator] 初始化配置',
+                            content: encodedContent
+                        });
+                    }
+                    throw err;
+                })
+                .then(() => {
+                    setGithubStatus('上传成功 (' + new Date().toLocaleTimeString() + ')', 'success');
+                })
+                .catch(err => {
+                    setGithubStatus('上传失败: ' + err.message, 'error');
                 });
         });
 
-        // 从 WebDAV 下载配置
-        webdavSyncDownBtn.addEventListener('click', function () {
-            setWebdavStatus('正在下载…', '');
+        githubSyncDownBtn.addEventListener('click', function () {
+            const s = getGithubSettings();
+            if (!s.owner || !s.repo || !s.token) {
+                setGithubStatus('请先填写完整的 GitHub 设置', 'error');
+                return;
+            }
 
-            webdavRequest('GET', 'seats-configs.json')
-                .then(res => {
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    return res.json();
+            setGithubStatus('正在下载…', '');
+
+            githubApiRequest('GET', `/contents/${s.path}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.content) throw new Error('文件内容为空');
+                    const decoded = decodeURIComponent(escape(atob(data.content)));
+                    return JSON.parse(decoded);
                 })
                 .then(data => {
                     if (!data.configs || typeof data.configs !== 'object') {
                         throw new Error('数据格式无效');
                     }
 
-                    // 合并配置：云端配置与本地合并（云端优先）
                     const localConfigs = getSavedConfigs();
                     const merged = { ...localConfigs, ...data.configs };
                     setSavedConfigs(merged);
 
-                    // 如果有活跃配置，应用它
                     if (data.activeName && data.configs[data.activeName]) {
                         applyConfig(data.configs[data.activeName]);
                         setActiveConfigName(data.activeName);
@@ -4322,10 +4329,14 @@
                     }
 
                     renderConfigList();
-                    setWebdavStatus('下载成功，已合并 ' + Object.keys(data.configs).length + ' 个配置', 'success');
+                    setGithubStatus('下载成功，已合并 ' + Object.keys(data.configs).length + ' 个配置', 'success');
                 })
                 .catch(err => {
-                    setWebdavStatus('下载失败: ' + err.message, 'error');
+                    if (err.message.includes('404')) {
+                        setGithubStatus('云端配置文件不存在', 'error');
+                    } else {
+                        setGithubStatus('下载失败: ' + err.message, 'error');
+                    }
                 });
         });
 
