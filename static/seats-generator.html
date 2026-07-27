@@ -2251,7 +2251,8 @@
             }
 
             html, body {
-                width: 100%;
+                width: 287mm;
+                height: 200mm;
                 margin: 0;
                 padding: 0;
                 background: #fff;
@@ -2261,10 +2262,7 @@
             }
 
             body {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
+                display: block;
             }
 
             h1 {
@@ -2278,6 +2276,9 @@
                 background: none !important;
                 box-shadow: none !important;
                 padding: 0 !important;
+                height: 5mm;
+                line-height: 1.2;
+                overflow: hidden;
             }
 
             .drag-hint,
@@ -2292,10 +2293,10 @@
             }
 
             .container {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                width: 100%;
+                display: block;
+                width: 287mm;
+                height: 195mm;
+                margin: 0;
                 gap: 0;
                 overflow: hidden;
             }
@@ -2304,7 +2305,12 @@
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                position: static;
+                width: 100%;
+                height: 195mm;
+                position: relative;
+                overflow: hidden;
+                break-inside: avoid;
+                page-break-inside: avoid;
             }
 
             .classroom {
@@ -2317,6 +2323,8 @@
                 margin: 0 auto;
                 min-height: 0 !important;
                 gap: 3px !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
             }
 
             .classroom::after {
@@ -2342,6 +2350,10 @@
             .seat-name, .seat-number {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+            }
+
+            .seat-name {
+                font-size: calc(var(--seat-width) * 0.22) !important;
             }
 
             .seat.checked-in::before {
@@ -2415,7 +2427,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.1.2</span></span></h3>
+                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.1.5</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2680,7 +2692,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.1.2';
+        const APP_VERSION = '1.1.5';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -2692,6 +2704,7 @@
 
         // DOM 引用
         const classroom = document.getElementById('classroom');
+        const classroomWrapper = classroom.parentElement;
         const pageTitle = document.getElementById('pageTitle');
         const studentList = document.getElementById('studentList');
         const fileInput = document.getElementById('fileInput');
@@ -4877,27 +4890,35 @@
 
         // ==================== 打印/PDF ====================
         let printScaleValue = 1;
+        let printPrepared = false;
 
-        function applyPrintScale() {
+        function applyPrintScale(force) {
+            if (printPrepared && !force) return;
+            printPrepared = true;
+            classroom.style.zoom = '';
+            classroomWrapper.style.width = '';
+            classroomWrapper.style.height = '';
             printScaleValue = calculatePrintScale();
-            // 使用 zoom 而非 transform: scale()，zoom 会同时改变视觉和布局尺寸，不会产生空白页
             classroom.style.zoom = printScaleValue;
         }
 
         function resetPrintScale() {
             classroom.style.zoom = '';
+            classroomWrapper.style.width = '';
+            classroomWrapper.style.height = '';
+            printPrepared = false;
         }
 
         function calculatePrintScale() {
-            const pageWidthMm = 297 - 10;
-            const pageHeightMm = 210 - 10;
+            const pageWidthMm = 297 - 10 - 6;
+            const pageHeightMm = 210 - 10 - 6;
             const mmToPx = 96 / 25.4;
 
             const pageWidthPx = pageWidthMm * mmToPx;
-            const pageHeightPx = pageHeightMm * mmToPx;
+            const pageHeightPx = (pageHeightMm - 7) * mmToPx;
 
-            const classroomWidth = classroom.offsetWidth;
-            const classroomHeight = classroom.offsetHeight;
+            const classroomWidth = classroom.scrollWidth;
+            const classroomHeight = classroom.scrollHeight;
 
             if (classroomWidth === 0 || classroomHeight === 0) return 1;
 
@@ -4908,6 +4929,7 @@
         }
 
         printBtn.addEventListener('click', function () {
+            printPrepared = false;
             applyPrintScale();
             setTimeout(function () {
                 window.print();
@@ -4918,7 +4940,7 @@
             const mediaQueryList = window.matchMedia('print');
             const handleMediaChange = function (mql) {
                 if (mql.matches) {
-                    applyPrintScale();
+                    applyPrintScale(true);
                 } else {
                     setTimeout(resetPrintScale, 300);
                 }
