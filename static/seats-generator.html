@@ -4,6 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="huangdiv">
+    <meta name="description" content="班级座位表管理与签到工具">
+    <meta name="copyright" content="Copyright © huangdiv. Licensed under CC BY-NC-SA 4.0.">
+    <meta name="license" content="CC BY-NC-SA 4.0">
+    <link rel="author" href="https://huangdiv.com/">
+    <link rel="canonical" href="https://huangdiv.com/">
     <title>班级座位表</title>
     <style>
         :root {
@@ -258,6 +264,7 @@
         }
 
         .app-version {
+            cursor: pointer;
             font-size: 11px;
             font-weight: 500;
             opacity: 0.7;
@@ -266,6 +273,93 @@
             border-radius: 10px;
             margin-left: 6px;
             vertical-align: middle;
+        }
+
+        .app-version:hover,
+        .app-version:focus-visible {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.28);
+            outline: none;
+        }
+
+        .app-info-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.45);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.18s ease, visibility 0.18s ease;
+        }
+
+        .app-info-modal.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .app-info-dialog {
+            width: min(360px, 100%);
+            padding: 22px;
+            background: white;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            color: var(--text-primary);
+        }
+
+        .app-info-dialog h4 {
+            margin: 0 0 16px;
+            font-size: 17px;
+        }
+
+        .app-info-list {
+            display: grid;
+            gap: 10px;
+            margin: 0;
+            font-size: 13px;
+        }
+
+        .app-info-list div {
+            display: grid;
+            grid-template-columns: 72px 1fr;
+            gap: 10px;
+        }
+
+        .app-info-list dt {
+            color: var(--text-secondary);
+        }
+
+        .app-info-list dd {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .app-info-list a {
+            color: var(--primary);
+        }
+
+        .app-info-license {
+            margin: 16px 0 0;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+            color: var(--text-secondary);
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .app-info-close {
+            width: 100%;
+            margin-top: 18px;
+            padding: 8px 12px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
         }
 
         /* 统计卡片 */
@@ -2286,6 +2380,7 @@
             .delete-zone,
             .classroom-wrapper > .delete-zone,
             .mobile-mode-banner,
+            .app-info-modal,
             .batch-toolbar,
             .checkin-banner,
             .no-print {
@@ -2411,6 +2506,19 @@
         移动端模式：点击学生或座位选中，再点击目标位置完成移动。点击已选中的元素可取消选择。
     </div>
 
+    <div class="app-info-modal" id="appInfoModal" role="dialog" aria-modal="true" aria-labelledby="appInfoTitle">
+        <div class="app-info-dialog">
+            <h4 id="appInfoTitle">班级座位表</h4>
+            <dl class="app-info-list">
+                <div><dt>版本</dt><dd>v<span id="appInfoVersion">1.1.5</span></dd></div>
+                <div><dt>作者</dt><dd>huangdiv</dd></div>
+                <div><dt>网站</dt><dd><a href="https://huangdiv.com/" target="_blank" rel="noopener noreferrer">huangdiv.com</a></dd></div>
+            </dl>
+            <p class="app-info-license">版权归作者所有。本页面内容依据 CC BY-NC-SA 4.0 许可协议发布：允许署名、非商业性使用和相同方式共享。</p>
+            <button type="button" class="app-info-close" id="appInfoClose">关闭</button>
+        </div>
+    </div>
+
     <h1 id="pageTitle" contenteditable="true" spellcheck="false">班级座位表</h1>
 
     <div class="container">
@@ -2427,7 +2535,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.1.5</span></span></h3>
+                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.1.6</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2692,7 +2800,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.1.5';
+        const APP_VERSION = '1.1.6';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -4407,6 +4515,36 @@
         // 同步版本号到页面显示
         const versionEl = document.getElementById('appVersion');
         if (versionEl) versionEl.textContent = APP_VERSION;
+
+        const appVersionButton = document.getElementById('appVersionButton');
+        const appInfoModal = document.getElementById('appInfoModal');
+        const appInfoClose = document.getElementById('appInfoClose');
+        const appInfoVersion = document.getElementById('appInfoVersion');
+
+        function closeAppInfo() {
+            appInfoModal.classList.remove('visible');
+        }
+
+        function openAppInfo() {
+            appInfoVersion.textContent = APP_VERSION;
+            appInfoModal.classList.add('visible');
+            appInfoClose.focus();
+        }
+
+        appVersionButton.addEventListener('click', openAppInfo);
+        appVersionButton.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openAppInfo();
+            }
+        });
+        appInfoClose.addEventListener('click', closeAppInfo);
+        appInfoModal.addEventListener('click', function (e) {
+            if (e.target === appInfoModal) closeAppInfo();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && appInfoModal.classList.contains('visible')) closeAppInfo();
+        });
 
         // ==================== GitHub API 同步 ====================
 
