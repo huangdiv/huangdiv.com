@@ -525,6 +525,7 @@
         }
 
         .form-btn {
+            width: 72px;
             padding: 7px 12px;
             background: var(--primary);
             color: white;
@@ -2414,7 +2415,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.1.0</span></span></h3>
+                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.1.2</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2679,7 +2680,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.1.0';
+        const APP_VERSION = '1.1.2';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -5329,7 +5330,11 @@
         document.querySelectorAll('.collapse-header').forEach(function (header) {
             header.addEventListener('click', function () {
                 const panel = header.closest('.collapse-panel');
-                panel.classList.toggle('collapsed');
+                const willExpand = panel.classList.contains('collapsed');
+                document.querySelectorAll('.collapse-panel').forEach(function (otherPanel) {
+                    if (otherPanel !== panel) otherPanel.classList.add('collapsed');
+                });
+                panel.classList.toggle('collapsed', !willExpand);
             });
         });
 
