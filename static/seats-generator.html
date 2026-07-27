@@ -2388,7 +2388,9 @@
             }
 
             .container {
-                display: block;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 width: 287mm;
                 height: 195mm;
                 margin: 0;
@@ -2397,11 +2399,7 @@
             }
 
             .classroom-wrapper {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                width: 100%;
-                height: 195mm;
+                display: block;
                 position: relative;
                 overflow: hidden;
                 break-inside: avoid;
@@ -2415,11 +2413,12 @@
                 padding: 5px;
                 border-radius: 6px;
                 background-color: #fff;
-                margin: 0 auto;
+                margin: 0;
                 min-height: 0 !important;
                 gap: 3px !important;
                 break-inside: avoid;
                 page-break-inside: avoid;
+                transform-origin: top left;
             }
 
             .classroom::after {
@@ -2535,7 +2534,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.1.6</span></span></h3>
+                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.1.9</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2800,7 +2799,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.1.6';
+        const APP_VERSION = '1.1.9';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -5033,17 +5032,45 @@
         function applyPrintScale(force) {
             if (printPrepared && !force) return;
             printPrepared = true;
-            classroom.style.zoom = '';
-            classroomWrapper.style.width = '';
-            classroomWrapper.style.height = '';
+            // 清除旧样式
+            classroom.style.transform = '';
+            classroom.style.transformOrigin = '';
+
+            // 在标题后追加当前日期（仅打印时显示）
+            let dateLabel = document.getElementById('printDateLabel');
+            if (!dateLabel) {
+                dateLabel = document.createElement('span');
+                dateLabel.id = 'printDateLabel';
+                dateLabel.style.cssText = 'font-size:0.7em;font-weight:normal;color:#666;margin-left:12px;';
+                pageTitle.appendChild(dateLabel);
+            }
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0');
+            dateLabel.textContent = dateStr;
+
             printScaleValue = calculatePrintScale();
-            classroom.style.zoom = printScaleValue;
+
+            // 使用 transform: scale() 缩放，保持宽高比不变
+            classroom.style.transformOrigin = 'top left';
+            classroom.style.transform = 'scale(' + printScaleValue + ')';
+
+            // 显式设置 wrapper 为缩放后的尺寸，使用 offsetWidth/offsetHeight 包含边框，避免裁剪
+            const scaledWidth = Math.ceil(classroom.offsetWidth * printScaleValue);
+            const scaledHeight = Math.ceil(classroom.offsetHeight * printScaleValue);
+            classroomWrapper.style.width = scaledWidth + 'px';
+            classroomWrapper.style.height = scaledHeight + 'px';
         }
 
         function resetPrintScale() {
-            classroom.style.zoom = '';
+            classroom.style.transform = '';
+            classroom.style.transformOrigin = '';
             classroomWrapper.style.width = '';
             classroomWrapper.style.height = '';
+            // 移除打印日期标签
+            const dateLabel = document.getElementById('printDateLabel');
+            if (dateLabel) dateLabel.remove();
             printPrepared = false;
         }
 
@@ -5053,13 +5080,15 @@
             const mmToPx = 96 / 25.4;
 
             const pageWidthPx = pageWidthMm * mmToPx;
+            // 扣除标题高度约 7mm
             const pageHeightPx = (pageHeightMm - 7) * mmToPx;
 
-            const classroomWidth = classroom.scrollWidth;
-            const classroomHeight = classroom.scrollHeight;
+            const classroomWidth = classroom.offsetWidth;
+            const classroomHeight = classroom.offsetHeight;
 
             if (classroomWidth === 0 || classroomHeight === 0) return 1;
 
+            // 取宽高方向的最小比例，确保座位区域完整放入页面的同时保持宽高比不变
             const scaleX = pageWidthPx / classroomWidth;
             const scaleY = pageHeightPx / classroomHeight;
 
