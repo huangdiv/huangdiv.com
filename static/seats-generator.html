@@ -2119,6 +2119,21 @@
             cursor: pointer;
         }
 
+        .import-filter-controls {
+            padding: 8px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+        }
+
+        .import-filter-summary {
+            min-height: 16px;
+            margin: -2px 0 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
         .table-preview {
             max-height: 150px;
             overflow: auto;
@@ -2399,7 +2414,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.0.1</span></span></h3>
+                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.1.0</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2565,6 +2580,12 @@
                         <label for="fileInput" class="io-btn">选择 Excel 文件</label>
                         <div id="fileInfo" class="file-info"></div>
                         <div id="previewArea" style="display:none;">
+                            <div id="sheetSelectArea" style="display:none;">
+                                <div class="section-head">
+                                    <span>选择工作表</span>
+                                </div>
+                                <select id="sheetSelect" class="full-select"></select>
+                            </div>
                             <div class="section-head">
                                 <span>选择姓名列</span>
                             </div>
@@ -2576,6 +2597,21 @@
                                     <span>同时导入分组</span>
                                 </label>
                                 <div id="groupImportControls" style="display:none;">
+                                    <label class="check-row">
+                                        <input type="checkbox" id="enableRowFilter">
+                                        <span>导入前先筛选数据</span>
+                                    </label>
+                                    <div id="rowFilterControls" class="import-filter-controls" style="display:none;">
+                                        <div class="section-head">
+                                            <span>筛选依据列</span>
+                                        </div>
+                                        <select id="filterColumnSelect" class="full-select"></select>
+                                        <div class="section-head">
+                                            <span>保留的数据值</span>
+                                        </div>
+                                        <select id="filterValueSelect" class="full-select"></select>
+                                    </div>
+                                    <div id="filterSummary" class="import-filter-summary"></div>
                                     <div class="section-head">
                                         <span>分组依据列</span>
                                     </div>
@@ -2643,7 +2679,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.0.1';
+        const APP_VERSION = '1.1.0';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -2660,6 +2696,8 @@
         const fileInput = document.getElementById('fileInput');
         const fileInfo = document.getElementById('fileInfo');
         const previewArea = document.getElementById('previewArea');
+        const sheetSelectArea = document.getElementById('sheetSelectArea');
+        const sheetSelect = document.getElementById('sheetSelect');
         const columnSelect = document.getElementById('columnSelect');
         const tablePreview = document.getElementById('tablePreview');
         const confirmImportBtn = document.getElementById('confirmImportBtn');
@@ -2681,6 +2719,11 @@
         const groupImportSection = document.getElementById('groupImportSection');
         const enableGroupImport = document.getElementById('enableGroupImport');
         const groupImportControls = document.getElementById('groupImportControls');
+        const enableRowFilter = document.getElementById('enableRowFilter');
+        const rowFilterControls = document.getElementById('rowFilterControls');
+        const filterColumnSelect = document.getElementById('filterColumnSelect');
+        const filterValueSelect = document.getElementById('filterValueSelect');
+        const filterSummary = document.getElementById('filterSummary');
         const groupColumnSelect = document.getElementById('groupColumnSelect');
         const groupPreviewSection = document.getElementById('groupPreviewSection');
         const groupPreviewList = document.getElementById('groupPreviewList');
@@ -2703,6 +2746,9 @@
         let tempImportGroups = [];
         let selectedGroupColumnIndex = -1;
         let isGroupImportEnabled = false;
+        let excelWorkbook = null;
+        let selectedFilterColumnIndex = -1;
+        let selectedFilterValue = '';
 
         let draggedStudentId = null;
         let draggedFromIndex = null;
@@ -3315,62 +3361,98 @@
             colorIndex = 0;
         }
 
-        // 初始化分组列选择器
-        function initGroupColumnSelector() {
-            if (!excelData || excelData.length === 0) return;
-            
-            groupColumnSelect.innerHTML = '';
-            
-            // 添加"不使用分组"选项
-            const emptyOption = document.createElement('option');
-            emptyOption.value = -1;
-            emptyOption.textContent = '-- 不使用分组 --';
-            groupColumnSelect.appendChild(emptyOption);
-            
-            // 添加所有列选项
-            for (let i = 0; i < excelData[0].length; i++) {
-                const colName = excelData[0][i] || `列 ${i + 1}`;
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = colName;
-                
-                // 自动检测可能包含分组信息的列
-                const lowerColName = String(colName).toLowerCase();
-                if (lowerColName.includes('分组') || lowerColName.includes('group') || 
-                    lowerColName.includes('班级') || lowerColName.includes('class')) {
-                    option.selected = true;
-                }
-                
-                groupColumnSelect.appendChild(option);
-            }
+        function getCellText(value) {
+            return value === null || value === undefined ? '' : String(value).trim();
         }
 
-        // 根据分组列生成分组
+        function getImportRows() {
+            if (!excelData || excelData.length < 2) return [];
+            const rows = excelData.slice(1);
+            if (!isGroupImportEnabled || !enableRowFilter.checked || selectedFilterColumnIndex < 0) return rows;
+            return rows.filter(row => getCellText(row[selectedFilterColumnIndex]) === selectedFilterValue);
+        }
+
+        function populateColumnSelect(select, includeEmptyOption) {
+            select.innerHTML = '';
+            if (includeEmptyOption) {
+                const emptyOption = document.createElement('option');
+                emptyOption.value = -1;
+                emptyOption.textContent = '-- 不使用分组 --';
+                select.appendChild(emptyOption);
+            }
+            excelData[0].forEach((cell, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = getCellText(cell) || `列 ${index + 1}`;
+                select.appendChild(option);
+            });
+        }
+
+        function initGroupColumnSelector() {
+            if (!excelData || excelData.length === 0) return;
+            populateColumnSelect(groupColumnSelect, true);
+            let detectedIndex = -1;
+            excelData[0].forEach((cell, index) => {
+                const name = getCellText(cell).toLowerCase();
+                if (detectedIndex < 0 && (name.includes('分组') || name.includes('group') || name.includes('班级') || name.includes('class'))) {
+                    detectedIndex = index;
+                }
+            });
+            groupColumnSelect.value = detectedIndex;
+            selectedGroupColumnIndex = detectedIndex;
+        }
+
+        function initFilterColumnSelector() {
+            if (!excelData || excelData.length === 0) return;
+            populateColumnSelect(filterColumnSelect, false);
+            selectedFilterColumnIndex = 0;
+            filterColumnSelect.value = 0;
+            updateFilterValueOptions();
+        }
+
+        function updateFilterValueOptions() {
+            const previousValue = selectedFilterValue;
+            const values = [];
+            const seen = new Set();
+            excelData.slice(1).forEach(row => {
+                const value = getCellText(row[selectedFilterColumnIndex]);
+                if (!seen.has(value)) {
+                    seen.add(value);
+                    values.push(value);
+                }
+            });
+            filterValueSelect.innerHTML = '';
+            values.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value || '（空白）';
+                filterValueSelect.appendChild(option);
+            });
+            selectedFilterValue = seen.has(previousValue) ? previousValue : (values[0] || '');
+            filterValueSelect.value = selectedFilterValue;
+        }
+
         function generateGroupsFromColumn(groupColumnIndex) {
             if (groupColumnIndex < 0 || !excelData || excelData.length < 2) {
                 tempImportGroups = [];
                 return;
             }
-            
             resetColorIndex();
             const groupMap = new Map();
-            
-            // 遍历数据（跳过标题行）
-            for (let i = 1; i < excelData.length; i++) {
-                const groupValue = excelData[i][groupColumnIndex];
-                if (!groupValue || String(groupValue).trim() === '') continue;
-                
-                const groupName = String(groupValue).trim();
-                if (!groupMap.has(groupName)) {
-                    groupMap.set(groupName, {
+            getImportRows().forEach(row => {
+                const sourceValue = getCellText(row[groupColumnIndex]);
+                if (!sourceValue) return;
+                if (!groupMap.has(sourceValue)) {
+                    groupMap.set(sourceValue, {
                         id: generateId('g'),
-                        name: groupName,
+                        sourceValue: sourceValue,
+                        name: sourceValue,
                         color: getNextDistinctColor(),
-                        students: []
+                        count: 0
                     });
                 }
-            }
-            
+                groupMap.get(sourceValue).count++;
+            });
             tempImportGroups = Array.from(groupMap.values());
         }
 
@@ -3384,17 +3466,6 @@
             groupPreviewSection.style.display = 'block';
 
             groupPreviewList.innerHTML = tempImportGroups.map((group, index) => {
-                const nameColIndex = parseInt(columnSelect.value);
-                let studentCount = 0;
-                if (nameColIndex >= 0 && selectedGroupColumnIndex >= 0) {
-                    for (let i = 1; i < excelData.length; i++) {
-                        const name = excelData[i][nameColIndex];
-                        const groupVal = excelData[i][selectedGroupColumnIndex];
-                        if (name && String(name).trim() && groupVal && String(groupVal).trim() === group.name) {
-                            studentCount++;
-                        }
-                    }
-                }
                 return (
                     '<div class="group-preview-item" data-index="' + index + '">' +
                         '<div class="group-preview-color" style="background-color: ' + escapeHtml(group.color) + ';"></div>' +
@@ -3402,7 +3473,7 @@
                             '<div class="group-preview-name">' +
                                 '<input type="text" value="' + escapeHtml(group.name) + '" class="preview-group-name-input">' +
                             '</div>' +
-                            '<div class="group-preview-count">学生数量: ' + studentCount + '</div>' +
+                            '<div class="group-preview-count">数据行数: ' + group.count + '</div>' +
                         '</div>' +
                         '<div class="group-preview-edit">' +
                             '<input type="color" value="' + escapeHtml(group.color) + '" class="preview-group-color-input">' +
@@ -3432,25 +3503,22 @@
         function handleGroupImportToggle() {
             isGroupImportEnabled = enableGroupImport.checked;
             groupImportControls.style.display = isGroupImportEnabled ? 'block' : 'none';
-            
             if (isGroupImportEnabled) {
+                initFilterColumnSelector();
                 initGroupColumnSelector();
-                const selectedIndex = parseInt(groupColumnSelect.value);
-                selectedGroupColumnIndex = selectedIndex;
-                if (selectedIndex >= 0) {
-                    generateGroupsFromColumn(selectedIndex);
-                    renderGroupPreview();
-                }
+                refreshImportPreview();
             } else {
                 groupPreviewSection.style.display = 'none';
+                rowFilterControls.style.display = 'none';
+                filterSummary.textContent = '';
                 tempImportGroups = [];
+                tablePreview.innerHTML = createPreviewTable(excelData, selectedColumnIndex);
             }
         }
 
         // 处理分组列选择变化
         function handleGroupColumnChange() {
             selectedGroupColumnIndex = parseInt(groupColumnSelect.value);
-            
             if (selectedGroupColumnIndex >= 0) {
                 generateGroupsFromColumn(selectedGroupColumnIndex);
                 renderGroupPreview();
@@ -3460,70 +3528,62 @@
             }
         }
 
+        function refreshImportPreview() {
+            const rows = getImportRows();
+            const previewData = [excelData[0]].concat(rows);
+            tablePreview.innerHTML = createPreviewTable(previewData, selectedColumnIndex);
+            if (isGroupImportEnabled && enableRowFilter.checked) {
+                filterSummary.textContent = '筛选后保留 ' + rows.length + ' 行，共 ' + Math.max(0, excelData.length - 1) + ' 行数据';
+            } else {
+                filterSummary.textContent = '';
+            }
+            if (isGroupImportEnabled && selectedGroupColumnIndex >= 0) {
+                generateGroupsFromColumn(selectedGroupColumnIndex);
+                renderGroupPreview();
+            }
+        }
+
         // 导入学生并应用分组
         function importStudentsWithGroups(nameColumnIndex) {
             const newStudents = [];
-
-            // 首先确定分组映射
-            const groupNameToId = new Map();
+            const sourceValueToId = new Map();
+            const groupsToAdd = [];
+            const groupsToUpdate = [];
             if (isGroupImportEnabled && tempImportGroups.length > 0) {
                 tempImportGroups.forEach(group => {
-                    groupNameToId.set(group.name, group.id);
+                    const existingGroup = groups.find(item => item.name === group.name);
+                    if (existingGroup) {
+                        groupsToUpdate.push({ group: existingGroup, color: group.color });
+                        sourceValueToId.set(group.sourceValue, existingGroup.id);
+                    } else {
+                        const newGroup = { id: group.id, name: group.name, color: group.color };
+                        groupsToAdd.push(newGroup);
+                        sourceValueToId.set(group.sourceValue, newGroup.id);
+                    }
                 });
             }
 
-            // 处理学生数据
-            for (let i = 1; i < excelData.length; i++) {
-                const nameCell = excelData[i][nameColumnIndex];
-                if (!nameCell || typeof nameCell !== 'string') continue;
-
-                const name = nameCell.trim();
-                if (!name) continue;
-
+            getImportRows().forEach(row => {
+                const name = getCellText(row[nameColumnIndex]);
+                if (!name) return;
                 let groupId = null;
                 if (isGroupImportEnabled && selectedGroupColumnIndex >= 0) {
-                    const groupVal = excelData[i][selectedGroupColumnIndex];
-                    if (groupVal) {
-                        const groupName = String(groupVal).trim();
-                        if (groupNameToId.has(groupName)) {
-                            groupId = groupNameToId.get(groupName);
-                        } else {
-                            for (const [gName, gId] of groupNameToId.entries()) {
-                                if (gName.toLowerCase().includes(groupName.toLowerCase()) ||
-                                    groupName.toLowerCase().includes(gName.toLowerCase())) {
-                                    groupId = gId;
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    groupId = sourceValueToId.get(getCellText(row[selectedGroupColumnIndex])) || null;
                 }
-
                 newStudents.push({ id: generateId('s'), name: name, groupId: groupId, checkedIn: false });
-            }
+            });
 
             if (newStudents.length === 0) {
-                fileInfo.innerHTML = '<span style="color:red">未找到学生名单，请选择正确的列</span>';
+                fileInfo.innerHTML = '<span style="color:red">筛选结果中未找到学生名单，请检查筛选条件和姓名列</span>';
                 return;
             }
 
-            // 更新学生数据
+            pushSnapshot();
             students = newStudents;
-
-            // 如果启用了分组导入，添加分组到系统
-            if (isGroupImportEnabled && tempImportGroups.length > 0) {
-                const existingGroupNames = new Set(groups.map(g => g.name));
-                tempImportGroups.forEach(newGroup => {
-                    if (!existingGroupNames.has(newGroup.name)) {
-                        groups.push(newGroup);
-                    } else {
-                        const existingGroup = groups.find(g => g.name === newGroup.name);
-                        if (existingGroup) {
-                            existingGroup.color = newGroup.color;
-                        }
-                    }
-                });
-            }
+            groupsToUpdate.forEach(item => {
+                item.group.color = item.color;
+            });
+            groups.push(...groupsToAdd);
 
             // 更新UI
             fileInfo.innerHTML = '<span style="color:green">成功导入 ' + students.length + ' 名学生' +
@@ -4566,93 +4626,105 @@
 
 
 
-        // Excel文件导入处理
+        function loadSelectedSheet() {
+            if (!excelWorkbook) return;
+            const sheetName = sheetSelect.value;
+            const worksheet = excelWorkbook.Sheets[sheetName];
+            excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+            while (excelData.length && excelData[excelData.length - 1].every(cell => !getCellText(cell))) {
+                excelData.pop();
+            }
+            if (excelData.length === 0 || excelData[0].every(cell => !getCellText(cell))) {
+                previewArea.style.display = 'none';
+                fileInfo.innerHTML = '<span style="color:red">工作表“' + escapeHtml(sheetName) + '”中没有可导入的数据</span>';
+                return;
+            }
+
+            columnSelect.innerHTML = '';
+            let nameColumnIndex = 0;
+            excelData[0].forEach((cell, index) => {
+                const colName = getCellText(cell).toLowerCase();
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = getCellText(cell) || `列 ${index + 1}`;
+                columnSelect.appendChild(option);
+                if (colName.includes('姓名') || colName.includes('name')) nameColumnIndex = index;
+            });
+            columnSelect.value = nameColumnIndex;
+            selectedColumnIndex = nameColumnIndex;
+            enableGroupImport.checked = false;
+            enableRowFilter.checked = false;
+            isGroupImportEnabled = false;
+            selectedGroupColumnIndex = -1;
+            selectedFilterColumnIndex = -1;
+            selectedFilterValue = '';
+            tempImportGroups = [];
+            groupImportControls.style.display = 'none';
+            rowFilterControls.style.display = 'none';
+            groupPreviewSection.style.display = 'none';
+            filterSummary.textContent = '';
+            groupImportSection.style.display = excelData[0].length > 1 ? 'block' : 'none';
+            tablePreview.innerHTML = createPreviewTable(excelData, nameColumnIndex);
+            previewArea.style.display = 'block';
+            const columnName = escapeHtml(excelData[0][nameColumnIndex] || '列' + (nameColumnIndex + 1));
+            fileInfo.innerHTML = '<span>当前工作表：“' + escapeHtml(sheetName) + '”，已自动选择姓名列“' + columnName + '”</span>';
+        }
+
         fileInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
-
-            // 重置分组导入相关状态
-            isGroupImportEnabled = false;
-            enableGroupImport.checked = false;
-            tempImportGroups = [];
-            selectedGroupColumnIndex = -1;
-            groupImportControls.style.display = 'none';
-            groupPreviewSection.style.display = 'none';
-
             fileInfo.textContent = `正在处理文件: ${file.name}`;
-
             const reader = new FileReader();
             reader.onload = function (e) {
                 try {
+                    if (typeof XLSX === 'undefined') throw new Error('Excel 解析组件加载失败，请检查网络后刷新页面');
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-
-                    // 获取第一个工作表
-                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    // 将工作表转换为JSON数组
-                    excelData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-
-                    if (excelData.length === 0) {
-                        fileInfo.innerHTML = '<span style="color:red">Excel文件中没有数据</span>';
-                        return;
-                    }
-
-                    // 清空并填充列选择器
-                    columnSelect.innerHTML = '';
-                    let nameColumnIndex = 0;
-
-                    // 查找可能包含"姓名"的列
-                    for (let i = 0; i < excelData[0].length; i++) {
-                        const colName = String(excelData[0][i] || '').toLowerCase();
-                        const option = document.createElement('option');
-                        option.value = i;
-                        option.textContent = excelData[0][i] || `列 ${i + 1}`;
-                        columnSelect.appendChild(option);
-
-                        // 自动检测包含"姓名"的列
-                        if (colName.includes('姓名') || colName.includes('name')) {
-                            nameColumnIndex = i;
-                        }
-                    }
-
-                    // 设置默认选中包含"姓名"的列
-                    columnSelect.value = nameColumnIndex;
-                    selectedColumnIndex = nameColumnIndex;
-
-                    // 显示分组导入功能（如果有多个列）
-                    if (excelData[0].length > 1) {
-                        groupImportSection.style.display = 'block';
-                    } else {
-                        groupImportSection.style.display = 'none';
-                    }
-
-                    // 显示预览
-                    tablePreview.innerHTML = createPreviewTable(excelData, nameColumnIndex);
-                    previewArea.style.display = 'block';
-                    const autoColName = escapeHtml(excelData[0][nameColumnIndex] || '列' + (nameColumnIndex + 1));
-                    fileInfo.innerHTML = `<span>请选择包含学生姓名的列 (已自动选择"${autoColName}")</span>`;
-
+                    excelWorkbook = XLSX.read(data, { type: 'array' });
+                    if (!excelWorkbook.SheetNames.length) throw new Error('Excel 工作簿中没有工作表');
+                    sheetSelect.innerHTML = excelWorkbook.SheetNames.map(name =>
+                        '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>'
+                    ).join('');
+                    sheetSelectArea.style.display = excelWorkbook.SheetNames.length > 1 ? 'block' : 'none';
+                    sheetSelect.value = excelWorkbook.SheetNames[0];
+                    loadSelectedSheet();
                 } catch (error) {
                     fileInfo.innerHTML = `<span style="color:red">文件处理错误: ${escapeHtml(error.message)}</span>`;
                     console.error(error);
                 }
             };
+            reader.onerror = function () {
+                fileInfo.innerHTML = '<span style="color:red">文件读取失败，请重新选择 Excel 文件</span>';
+            };
             reader.readAsArrayBuffer(file);
         });
+
+        sheetSelect.addEventListener('change', loadSelectedSheet);
 
         // 列选择变化事件
         columnSelect.addEventListener('change', function () {
             selectedColumnIndex = parseInt(this.value);
-            tablePreview.innerHTML = createPreviewTable(excelData, selectedColumnIndex);
-            
-            // 如果启用了分组导入，更新分组预览
-            if (isGroupImportEnabled && selectedGroupColumnIndex >= 0) {
-                renderGroupPreview();
-            }
+            refreshImportPreview();
         });
 
         // 分组导入启用复选框事件
         enableGroupImport.addEventListener('change', handleGroupImportToggle);
+
+        enableRowFilter.addEventListener('change', function () {
+            rowFilterControls.style.display = this.checked ? 'block' : 'none';
+            refreshImportPreview();
+        });
+
+        filterColumnSelect.addEventListener('change', function () {
+            selectedFilterColumnIndex = parseInt(this.value);
+            selectedFilterValue = '';
+            updateFilterValueOptions();
+            refreshImportPreview();
+        });
+
+        filterValueSelect.addEventListener('change', function () {
+            selectedFilterValue = this.value;
+            refreshImportPreview();
+        });
 
         // 分组列选择变化事件
         groupColumnSelect.addEventListener('change', handleGroupColumnChange);
