@@ -7,6 +7,9 @@
     <title>班级座位表</title>
     <style>
         :root {
+            --seat-width: 100px;
+            --seat-height: 60px;
+            --classroom-gap: 10px;
             --bg: #f0f4f8;
             --surface: #ffffff;
             --surface-hover: #f8fafc;
@@ -78,19 +81,22 @@
             flex-wrap: wrap;
             align-items: flex-start;
             max-width: 1400px;
+            width: 100%;
+            min-width: 0;
             margin: 0 auto;
         }
 
         /* 教室区域 */
         .classroom {
             display: grid;
-            gap: 10px;
+            gap: var(--classroom-gap);
             background-color: var(--surface);
             padding: 24px;
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
             position: relative;
-            min-height: 400px;
+            width: max-content;
+            height: max-content;
         }
 
         .classroom.teacher-view {
@@ -100,12 +106,9 @@
         .classroom::after {
             content: '';
             position: absolute;
-            top: -3px;
-            left: -3px;
-            right: -3px;
-            bottom: -3px;
+            inset: 0;
             border: 3px solid transparent;
-            border-radius: calc(var(--radius-lg) + 3px);
+            border-radius: var(--radius-lg);
             pointer-events: none;
             transition: border-color 0.2s;
         }
@@ -115,8 +118,8 @@
         }
 
         .seat {
-            width: 100px;
-            height: 60px;
+            width: var(--seat-width);
+            height: var(--seat-height);
             background-color: #eff6ff;
             border: 1px solid #bfdbfe;
             border-radius: var(--radius-sm);
@@ -142,6 +145,38 @@
 
         .seat.dragging {
             opacity: 0.5;
+        }
+
+        .seat-delete-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ef4444;
+            color: white;
+            border: none;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            display: none;
+            min-width: 0;
+            flex: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            z-index: 10;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .seat:hover .seat-delete-btn,
+        .seat.selected-for-move .seat-delete-btn {
+            display: flex;
+        }
+
+        .seat-delete-btn:hover {
+            background: #dc2626;
         }
 
         .seat.empty {
@@ -198,6 +233,8 @@
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
             width: 320px;
+            flex: none;
+            min-width: 0;
             position: relative;
             overflow: hidden;
         }
@@ -1443,6 +1480,12 @@
 
         /* ==================== 响应式布局 ==================== */
         @media (max-width: 768px) {
+            :root {
+                --seat-width: 70px;
+                --seat-height: 50px;
+                --classroom-gap: 6px;
+            }
+
             body {
                 padding: 10px;
             }
@@ -1459,17 +1502,11 @@
 
             .classroom {
                 padding: 10px;
-                overflow-x: auto;
-            }
-
-            .controls {
-                width: 100%;
-                padding: 10px;
             }
 
             .seat {
-                width: 70px;
-                height: 50px;
+                width: var(--seat-width);
+                height: var(--seat-height);
             }
 
             .seat-name {
@@ -1478,6 +1515,14 @@
 
             .seat-number {
                 font-size: 8px;
+            }
+
+            .seat-delete-btn {
+                width: 16px;
+                height: 16px;
+                top: -5px;
+                right: -5px;
+                font-size: 11px;
             }
 
             .stats-container {
@@ -1492,6 +1537,35 @@
                 padding: 6px 1px;
                 font-size: 12px;
                 min-width: 60px;
+            }
+        }
+
+        @media (max-width: 319px) {
+            body {
+                padding: 10px 0;
+            }
+
+            .controls {
+                width: 100vw;
+                margin-left: 0;
+                border-radius: 0;
+                box-shadow: none;
+            }
+        }
+
+        @media (pointer: coarse) {
+            .seat {
+                cursor: pointer;
+                touch-action: manipulation;
+            }
+
+            .student-item {
+                cursor: pointer;
+                touch-action: manipulation;
+            }
+
+            .seat:hover {
+                transform: none;
             }
         }
 
@@ -1796,14 +1870,19 @@
         .classroom-wrapper {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
             position: relative;
+            width: fit-content;
+            max-width: 100%;
+            min-width: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
         }
 
         /* 删除区 - 浮动垃圾桶样式 */
         .delete-zone {
-            position: absolute;
-            bottom: -60px;
+            position: fixed;
+            bottom: 24px;
             left: 50%;
             transform: translateX(-50%) scale(0.8);
             opacity: 0;
@@ -2133,14 +2212,8 @@
                 align-items: center;
             }
 
-            .controls {
-                width: 100%;
-                max-width: 420px;
-            }
-
             .classroom {
                 padding: 12px;
-                overflow-x: auto;
             }
 
             .delete-zone {
@@ -2326,7 +2399,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.0.0</span></span></h3>
+                <h3>班级座位表 <span class="app-version">v<span id="appVersion">1.0.1</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2457,7 +2530,7 @@
                             <span class="empty-hint">暂无分组</span>
                         </div>
 
-                        <div class="student-assignment" id="studentAssignment" style="display: none;">
+                        <div class="student-assignment" id="studentAssignment">
                             <div class="section-head">
                                 <span>分配学生到分组</span>
                                 <button id="batchModeBtn" class="mini-btn no-print">批量操作</button>
@@ -2570,7 +2643,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.0.0';
+        const APP_VERSION = '1.0.1';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -2666,6 +2739,27 @@
 
         // 签到模式状态
         let isCheckinMode = false;
+
+        // ==================== 设备检测 ====================
+        function detectTouchDevice() {
+            if (!window.matchMedia) return false;
+            const hasCoarsePrimaryPointer = window.matchMedia('(pointer: coarse)').matches;
+            const hasNoPrimaryHover = window.matchMedia('(hover: none)').matches;
+            const hasTouchPoints = navigator.maxTouchPoints > 0;
+            return hasCoarsePrimaryPointer && hasNoPrimaryHover && hasTouchPoints;
+        }
+
+        function initMobileSupport() {
+            isTouchDevice = detectTouchDevice();
+            if (isTouchDevice) {
+                mobileBanner.classList.add('visible');
+            } else {
+                mobileBanner.classList.remove('visible');
+            }
+        }
+
+        // 提前初始化设备类型，确保后续事件绑定使用正确的值
+        initMobileSupport();
 
         // ==================== 工具函数 ====================
 
@@ -2996,9 +3090,7 @@
                     '</div>'
                 ).join('') + newRow;
             }
-            if (groups.length > 0) {
-                studentAssignment.style.display = 'block';
-            }
+            studentAssignment.style.display = 'block';
         }
 
         // 分组列表事件委托
@@ -3551,9 +3643,12 @@
                             seat.style.borderColor = adjustColor(groupColor, -30);
                             seat.style.color = isLightColor(groupColor) ? '#000' : '#fff';
                         }
+                        // 签到模式下不显示删除按钮（√ 由 CSS ::before 显示）
+                        const deleteBtnHtml = isCheckinMode ? '' : '<button class="seat-delete-btn" title="删除学生">×</button>';
                         seat.innerHTML =
                             '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
-                            '<span class="seat-name">' + escapeHtml(displayName) + '</span>';
+                            '<span class="seat-name">' + escapeHtml(displayName) + '</span>' +
+                            deleteBtnHtml;
                         seat.draggable = !isTouchDevice && !isCheckinMode;
                     } else {
                         seat.innerHTML =
@@ -3601,7 +3696,7 @@
             if (isTeacherView) {
                 // 教师视角：需要镜像，从右向左遍历
                 for (let i = cols; i >= 1; i--) {
-                    template += '100px ';
+                    template += 'var(--seat-width) ';
 
                     // 检查是否需要在此列后添加走道（镜像位置）
                     // 镜像公式：如果走道在学生视角的第X列后，教师视角在第(cols-X)列后
@@ -3613,7 +3708,7 @@
             } else {
                 // 学生视角：正常从左到右遍历
                 for (let i = 1; i <= cols; i++) {
-                    template += '100px ';
+                    template += 'var(--seat-width) ';
 
                     // 检查是否需要在此列后添加走道
                     const aisle = aisles.find(a => a.afterCol === i);
@@ -3665,6 +3760,10 @@
         }
 
         function toggleCheckinMode() {
+            if (typeof clearTapSelection === 'function') {
+                clearTapSelection();
+            }
+            clearDragHighlights();
             isCheckinMode = !isCheckinMode;
             updateCheckinModeButton();
             if (isCheckinMode) {
@@ -3678,6 +3777,9 @@
             }
             generateSeats();
             updateCheckinStats();
+            if (typeof updateMobileBanner === 'function') {
+                updateMobileBanner();
+            }
         }
 
         // 切换学生签到状态
@@ -3711,7 +3813,7 @@
                 const studentItem = document.createElement('div');
                 studentItem.className = 'student-item';
                 studentItem.setAttribute('data-student', student.id);
-                studentItem.draggable = !isTouchDevice;
+                studentItem.draggable = !isTouchDevice && !isCheckinMode;
 
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'student-name';
@@ -3734,21 +3836,23 @@
                     studentItem.style.color = isLightColor(groupColor) ? '#000' : '#fff';
                 }
 
-                studentItem.addEventListener('dragstart', function (e) {
-                    dragStartTime = Date.now();
-                    draggedStudentId = student.id;
-                    draggedFromIndex = null;
-                    e.dataTransfer.setData('text/plain', student.id);
-                    studentItem.classList.add('dragging');
-                    dragHint.style.display = 'block';
-                    classroom.classList.add('highlight');
-                    studentList.classList.add('highlight');
-                    deleteZone.classList.add('visible');
-                });
+                if (!isTouchDevice && !isCheckinMode) {
+                    studentItem.addEventListener('dragstart', function (e) {
+                        dragStartTime = Date.now();
+                        draggedStudentId = student.id;
+                        draggedFromIndex = null;
+                        e.dataTransfer.setData('text/plain', student.id);
+                        studentItem.classList.add('dragging');
+                        dragHint.style.display = 'block';
+                        classroom.classList.add('highlight');
+                        studentList.classList.add('highlight');
+                        deleteZone.classList.add('visible');
+                    });
 
-                studentItem.addEventListener('dragend', function (e) {
-                    clearDragHighlights();
-                });
+                    studentItem.addEventListener('dragend', function (e) {
+                        clearDragHighlights();
+                    });
+                }
 
                 studentList.appendChild(studentItem);
             });
@@ -3882,53 +3986,57 @@
         }
 
         // 为学生名单区域添加拖放支持
-        studentList.addEventListener('dragover', function (e) {
-            e.preventDefault();
-        });
+        if (!isTouchDevice) {
+            studentList.addEventListener('dragover', function (e) {
+                e.preventDefault();
+            });
 
-        studentList.addEventListener('dragenter', function (e) {
-            e.preventDefault();
-            this.classList.add('highlight');
-        });
+            studentList.addEventListener('dragenter', function (e) {
+                e.preventDefault();
+                this.classList.add('highlight');
+            });
 
-        studentList.addEventListener('dragleave', function (e) {
-            this.classList.remove('highlight');
-        });
+            studentList.addEventListener('dragleave', function (e) {
+                this.classList.remove('highlight');
+            });
 
-        studentList.addEventListener('drop', function (e) {
-            e.preventDefault();
-            this.classList.remove('highlight');
-            handleDrop(e); // 复用handleDrop函数
-        });
+            studentList.addEventListener('drop', function (e) {
+                e.preventDefault();
+                this.classList.remove('highlight');
+                handleDrop(e); // 复用handleDrop函数
+            });
 
-        // 为删除区域添加拖放支持
-        deleteZone.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            this.classList.add('highlight');
-        });
+            // 为删除区域添加拖放支持
+            deleteZone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                this.classList.add('highlight');
+            });
 
-        deleteZone.addEventListener('dragenter', function (e) {
-            e.preventDefault();
-            this.classList.add('highlight');
-        });
+            deleteZone.addEventListener('dragenter', function (e) {
+                e.preventDefault();
+                this.classList.add('highlight');
+            });
 
-        deleteZone.addEventListener('dragleave', function (e) {
-            this.classList.remove('highlight');
-        });
+            deleteZone.addEventListener('dragleave', function (e) {
+                this.classList.remove('highlight');
+            });
 
-        deleteZone.addEventListener('drop', function (e) {
-            e.preventDefault();
-            this.classList.remove('highlight');
-            handleDrop(e); // 复用handleDrop函数
-        });
+            deleteZone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                this.classList.remove('highlight');
+                handleDrop(e); // 复用handleDrop函数
+            });
+        }
 
         // 为座位表区域添加拖放支持（事件委托）
-        classroom.addEventListener('dragstart', handleDragStart);
-        classroom.addEventListener('dragover', handleDragOver);
-        classroom.addEventListener('dragenter', handleDragEnter);
-        classroom.addEventListener('dragleave', handleDragLeave);
-        classroom.addEventListener('drop', handleDrop);
-        classroom.addEventListener('dragend', handleDragEnd);
+        if (!isTouchDevice) {
+            classroom.addEventListener('dragstart', handleDragStart);
+            classroom.addEventListener('dragover', handleDragOver);
+            classroom.addEventListener('dragenter', handleDragEnter);
+            classroom.addEventListener('dragleave', handleDragLeave);
+            classroom.addEventListener('drop', handleDrop);
+            classroom.addEventListener('dragend', handleDragEnd);
+        }
 
         // 标题编辑后自动保存
         pageTitle.addEventListener('input', autoSave);
@@ -4751,14 +4859,30 @@
 
         // ==================== 移动端触摸交互 ====================
 
-        function detectTouchDevice() {
-            return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        }
+        const MOBILE_BANNER_DEFAULT = '移动端模式：点击学生或座位选中，再点击目标位置完成移动。点击已选中的元素可取消选择。';
 
-        function initMobileSupport() {
-            isTouchDevice = detectTouchDevice();
-            if (isTouchDevice) {
-                mobileBanner.classList.add('visible');
+        function updateMobileBanner() {
+            if (!isTouchDevice) return;
+            // 签到模式不显示移动端操作提示
+            if (isCheckinMode) {
+                mobileBanner.classList.remove('visible');
+                return;
+            }
+            if (tapSelectedStudentId !== null) {
+                const student = getStudentById(tapSelectedStudentId);
+                const name = student ? student.name : '学生';
+                mobileBanner.textContent = '已选中：' + name + '，请点击目标座位（再次点击可取消）';
+            } else if (tapSelectedSeatIndex !== null) {
+                const seatStudentId = currentSeats[tapSelectedSeatIndex];
+                if (seatStudentId) {
+                    const student = getStudentById(seatStudentId);
+                    const name = student ? student.name : '学生';
+                    mobileBanner.textContent = '已选中：' + name + '（' + (tapSelectedSeatIndex + 1) + '号座位），请点击目标位置（再次点击可取消）';
+                } else {
+                    mobileBanner.textContent = '已选中：' + (tapSelectedSeatIndex + 1) + '号空座位，请点击目标学生（再次点击可取消）';
+                }
+            } else {
+                mobileBanner.textContent = MOBILE_BANNER_DEFAULT;
             }
         }
 
@@ -4768,13 +4892,31 @@
             document.querySelectorAll('.selected-for-move').forEach(el => {
                 el.classList.remove('selected-for-move');
             });
+            updateMobileBanner();
         }
 
-        // 点击学生名单项
+        // 点击学生名单区域（包括学生项和空白处）
         studentList.addEventListener('click', function (e) {
-            if (!isTouchDevice) return;
+            if (!isTouchDevice || isCheckinMode) return;
             const item = e.target.closest('.student-item');
-            if (!item) return;
+
+            // 点击空白处
+            if (!item) {
+                // 如果有选中的座位，将座位上的学生移回未安排座位区（即从座位中移除）
+                if (tapSelectedSeatIndex !== null) {
+                    const selectedStudentId = currentSeats[tapSelectedSeatIndex];
+                    if (selectedStudentId) {
+                        pushSnapshot();
+                        currentSeats[tapSelectedSeatIndex] = null;
+                        clearTapSelection();
+                        generateSeats();
+                        return;
+                    }
+                }
+                // 没有选中座位或选中座位为空，取消选择
+                clearTapSelection();
+                return;
+            }
 
             const studentId = item.getAttribute('data-student');
             if (!studentId) return;
@@ -4782,10 +4924,8 @@
             // 如果已有选中的座位，将学生放入该座位
             if (tapSelectedSeatIndex !== null) {
                 pushSnapshot();
-                // 先把学生从原座位移出（如果有）
                 const existingIdx = currentSeats.indexOf(studentId);
                 if (existingIdx >= 0) currentSeats[existingIdx] = null;
-                // 交换：目标座位原学生（如有）放回原座位
                 const targetId = currentSeats[tapSelectedSeatIndex];
                 if (existingIdx >= 0 && targetId) {
                     currentSeats[existingIdx] = targetId;
@@ -4803,11 +4943,31 @@
                 clearTapSelection();
                 tapSelectedStudentId = studentId;
                 item.classList.add('selected-for-move');
+                updateMobileBanner();
             }
         });
 
         // 点击座位
         classroom.addEventListener('click', function (e) {
+            // 点击删除按钮：删除学生
+            const deleteBtn = e.target.closest('.seat-delete-btn');
+            if (deleteBtn) {
+                e.stopPropagation();
+                const seat = deleteBtn.closest('.seat');
+                const studentId = seat.getAttribute('data-student');
+                if (studentId) {
+                    const student = getStudentById(studentId);
+                    if (student && confirm('确定要删除学生 ' + student.name + ' 吗？')) {
+                        pushSnapshot();
+                        currentSeats = currentSeats.map(id => id === studentId ? null : id);
+                        students = students.filter(s => s.id !== studentId);
+                        updateStudentAssignmentDisplay();
+                        generateSeats();
+                    }
+                }
+                return;
+            }
+
             const seat = e.target.closest('.seat');
 
             // 签到模式：点击座位签到/取消签到（支持桌面端和移动端）
@@ -4825,7 +4985,9 @@
             const seatIndex = parseInt(seat.getAttribute('data-index'));
             if (Number.isNaN(seatIndex)) return;
 
-            // 如果有选中的学生，将其放入此座位
+            const seatStudentId = seat.getAttribute('data-student');
+
+            // 如果有选中的学生（来自学生名单），将其放入此座位
             if (tapSelectedStudentId !== null) {
                 pushSnapshot();
                 const existingIdx = currentSeats.indexOf(tapSelectedStudentId);
@@ -4840,16 +5002,55 @@
                 return;
             }
 
-            // 选中此座位上的学生用于移动
-            const studentId = seat.getAttribute('data-student');
-            if (!studentId) return;
+            // 如果有选中的座位
+            if (tapSelectedSeatIndex !== null) {
+                // 点击同一个座位：取消选择
+                if (tapSelectedSeatIndex === seatIndex) {
+                    clearTapSelection();
+                    return;
+                }
 
+                pushSnapshot();
+
+                // 获取选中座位上的学生
+                const selectedStudentId = currentSeats[tapSelectedSeatIndex];
+
+                // 场景1：选中座位有学生，目标座位有学生 → 交换
+                if (selectedStudentId && seatStudentId) {
+                    currentSeats[tapSelectedSeatIndex] = seatStudentId;
+                    currentSeats[seatIndex] = selectedStudentId;
+                }
+                // 场景2：选中座位有学生，目标座位是空座位 → 移动到空座位
+                else if (selectedStudentId && !seatStudentId) {
+                    currentSeats[seatIndex] = selectedStudentId;
+                    currentSeats[tapSelectedSeatIndex] = null;
+                }
+                // 场景3：选中座位是空座位，目标座位有学生 → 将学生移动到空座位
+                else if (!selectedStudentId && seatStudentId) {
+                    currentSeats[tapSelectedSeatIndex] = seatStudentId;
+                    currentSeats[seatIndex] = null;
+                }
+                // 场景4：两个都是空座位 → 取消选择
+                else {
+                    clearTapSelection();
+                    generateSeats();
+                    return;
+                }
+
+                clearTapSelection();
+                generateSeats();
+                return;
+            }
+
+            // 选中此座位（无论是否有学生）
             if (tapSelectedSeatIndex === seatIndex) {
                 clearTapSelection();
             } else {
                 clearTapSelection();
                 tapSelectedSeatIndex = seatIndex;
                 seat.classList.add('selected-for-move');
+                updateMobileBanner();
+                seat.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
             }
         });
 
@@ -4878,8 +5079,6 @@
                 clearTapSelection();
             }
         });
-
-        initMobileSupport();
 
         // ==================== 批量操作 ====================
 
