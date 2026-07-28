@@ -2548,7 +2548,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.1.9</span></span></h3>
+                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.2.1</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -2813,7 +2813,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.2.0';
+        const APP_VERSION = '1.2.1';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -4254,6 +4254,15 @@
             exportWrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;background:#fff;padding:20px;border-radius:8px;';
             const titleClone = pageTitle.cloneNode(true);
             titleClone.style.cssText = 'margin:0 0 16px 0;font-size:24px;font-weight:700;text-align:center;cursor:default;background:none;box-shadow:none;position:static;transform:none;display:block;left:auto;';
+            // 在标题后追加当前日期
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0');
+            const dateLabel = document.createElement('span');
+            dateLabel.textContent = dateStr;
+            dateLabel.style.cssText = 'font-size:0.6em;font-weight:normal;color:#666;margin-left:12px;';
+            titleClone.appendChild(dateLabel);
             exportWrapper.appendChild(titleClone);
             exportWrapper.appendChild(classroom.cloneNode(true));
 
