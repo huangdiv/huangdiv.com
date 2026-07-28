@@ -1648,6 +1648,20 @@
             }
         }
 
+        /* 移动端竖屏：控制面板撑满设备宽度，左右不留空白 */
+        @media (max-width: 768px) and (orientation: portrait) {
+            body {
+                padding-left: 0;
+                padding-right: 0;
+            }
+
+            .controls {
+                width: 100%;
+                border-radius: 0;
+                box-shadow: none;
+            }
+        }
+
         @media (pointer: coarse) {
             .seat {
                 cursor: pointer;
@@ -2799,7 +2813,7 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.1.9';
+        const APP_VERSION = '1.2.0';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
