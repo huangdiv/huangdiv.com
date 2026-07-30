@@ -5089,6 +5089,11 @@
                     localStorage.removeItem('classroomConfig');
                     alert('检测到本地存储数据损坏，已重置为默认配置。');
                 }
+            } else {
+                // 新用户首次进入：无配置文件、无分组、无学生，渲染新增分组与新增学生输入行
+                updateAisleDisplay();
+                updateGroupDisplay();
+                updateStudentAssignmentDisplay();
             }
 
             generateSeats();
