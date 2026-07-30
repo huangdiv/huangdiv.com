@@ -379,6 +379,38 @@
 
         .stat-block {
             text-align: center;
+            cursor: pointer;
+            padding: 6px 8px;
+            border: 0;
+            background: transparent;
+            font: inherit;
+            color: inherit;
+            border-radius: var(--radius-sm);
+            transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+            outline: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .stat-block:hover {
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .stat-block:hover .stat-num {
+            color: var(--primary);
+        }
+
+        .stat-block:focus-visible {
+            background: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .stat-block:focus-visible .stat-num {
+            color: var(--primary);
+        }
+
+        .stat-block:active {
+            transform: scale(0.97);
         }
 
         .stat-num {
@@ -386,6 +418,7 @@
             font-weight: 700;
             color: var(--text-primary);
             line-height: 1.2;
+            transition: color 0.15s ease;
         }
 
         .stat-label {
@@ -430,6 +463,103 @@
             background: linear-gradient(90deg, #34d399, var(--success));
             border-radius: 3px;
             transition: width 0.4s ease;
+        }
+
+        /* 统计项操作菜单 */
+        .stat-action-menu {
+            position: fixed;
+            z-index: 3000;
+            min-width: 172px;
+            padding: 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            transform: translateY(-4px) scale(0.97);
+            transform-origin: top center;
+            transition: opacity 0.14s ease, transform 0.14s ease;
+            pointer-events: none;
+        }
+
+        .stat-action-menu.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .stat-action-menu-header {
+            padding: 4px 10px 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stat-action-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 8px 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: background 0.12s ease, color 0.12s ease;
+        }
+
+        .stat-action-menu-item:hover,
+        .stat-action-menu-item:focus-visible {
+            background: var(--primary-light);
+            color: var(--primary-hover);
+            outline: none;
+        }
+
+        .stat-action-icon {
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        /* 统计操作反馈提示 */
+        .stat-toast {
+            position: fixed;
+            z-index: 4000;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(12px);
+            padding: 10px 18px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #fff;
+            font-size: 13px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            pointer-events: none;
+            max-width: 80vw;
+            text-align: center;
+        }
+
+        .stat-toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .stat-block,
+            .stat-num,
+            .stat-action-menu,
+            .stat-action-menu-item,
+            .stat-toast {
+                transition: none !important;
+            }
         }
 
         /* 快捷操作 */
@@ -2555,32 +2685,32 @@
             <!-- 统计卡片 -->
             <div class="stats-card">
                 <div class="stats-row" id="normalStatsRow">
-                    <div class="stat-block">
+                    <button type="button" class="stat-block" data-stat="totalStudents" aria-label="学生总数，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
                         <div class="stat-num" id="totalStudents">0</div>
                         <div class="stat-label">学生总数</div>
-                    </div>
-                    <div class="stat-block">
+                    </button>
+                    <button type="button" class="stat-block" data-stat="assignedStudents" aria-label="已入座，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
                         <div class="stat-num" id="assignedStudents">0</div>
                         <div class="stat-label">已入座</div>
-                    </div>
-                    <div class="stat-block">
+                    </button>
+                    <button type="button" class="stat-block" data-stat="unassignedStudents" aria-label="未入座，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
                         <div class="stat-num" id="unassignedStudents">0</div>
                         <div class="stat-label">未入座</div>
-                    </div>
+                    </button>
                 </div>
                 <div class="stats-row checkin-stats" id="checkinStatsRow" style="display:none;">
-                    <div class="stat-block">
+                    <button type="button" class="stat-block" data-stat="assignedStudentsCheckin" aria-label="入座学生数，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
                         <div class="stat-num" id="assignedStudentsCheckin">0</div>
                         <div class="stat-label">入座学生数</div>
-                    </div>
-                    <div class="stat-block">
+                    </button>
+                    <button type="button" class="stat-block" data-stat="checkedInCount" aria-label="已签到，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
                         <div class="stat-num" id="checkedInCount">0</div>
                         <div class="stat-label">已签到</div>
-                    </div>
-                    <div class="stat-block">
+                    </button>
+                    <button type="button" class="stat-block" data-stat="notCheckedInCount" aria-label="未签到，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
                         <div class="stat-num" id="notCheckedInCount">0</div>
                         <div class="stat-label">未签到</div>
-                    </div>
+                    </button>
                 </div>
                 <div class="checkin-mini" id="checkinMini">
                     <div class="checkin-mini-label">
@@ -5567,8 +5697,230 @@
             }
         }
 
+        // ==================== 统计项点击：复制姓名 / 下载 Excel ====================
+
+        let statActionMenuEl = null;
+        let statToastEl = null;
+        let statToastTimer = null;
+        let currentStatContext = null; // { statId, title, students }
+
+        function ensureStatActionMenu() {
+            if (statActionMenuEl) return;
+            statActionMenuEl = document.createElement('div');
+            statActionMenuEl.className = 'stat-action-menu';
+            statActionMenuEl.setAttribute('role', 'menu');
+            statActionMenuEl.innerHTML =
+                '<div class="stat-action-menu-header" id="statActionHeader"></div>' +
+                '<button class="stat-action-menu-item" data-action="copy" role="menuitem">' +
+                    '<span class="stat-action-icon">📋</span><span>复制姓名</span>' +
+                '</button>' +
+                '<button class="stat-action-menu-item" data-action="excel" role="menuitem">' +
+                    '<span class="stat-action-icon">📊</span><span>下载 Excel</span>' +
+                '</button>';
+            document.body.appendChild(statActionMenuEl);
+
+            statActionMenuEl.addEventListener('click', function (e) {
+                const btn = e.target.closest('.stat-action-menu-item');
+                if (!btn) return;
+                const action = btn.getAttribute('data-action');
+                const ctx = currentStatContext;
+                if (!ctx) return;
+                hideStatActionMenu();
+                if (action === 'copy') copyStatNames(ctx);
+                else if (action === 'excel') downloadStatExcel(ctx);
+            });
+
+            statActionMenuEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    hideStatActionMenu();
+                }
+            });
+        }
+
+        function ensureStatToast() {
+            if (statToastEl) return;
+            statToastEl = document.createElement('div');
+            statToastEl.className = 'stat-toast';
+            statToastEl.setAttribute('role', 'status');
+            statToastEl.setAttribute('aria-live', 'polite');
+            document.body.appendChild(statToastEl);
+        }
+
+        function showStatToast(message) {
+            ensureStatToast();
+            statToastEl.textContent = message;
+            requestAnimationFrame(function () {
+                statToastEl.classList.add('visible');
+            });
+            clearTimeout(statToastTimer);
+            statToastTimer = setTimeout(function () {
+                statToastEl.classList.remove('visible');
+            }, 2200);
+        }
+
+        // 根据统计项 id 计算 { title, students }
+        function getStatContext(statId) {
+            const block = document.querySelector('.stat-block[data-stat="' + statId + '"]');
+            let title = statId;
+            if (block) {
+                const labelEl = block.querySelector('.stat-label');
+                if (labelEl) title = labelEl.textContent.trim();
+            }
+
+            const assignedIds = new Set(currentSeats.filter(function (s) { return s !== null; }));
+            const assignedStudentsArr = students.filter(function (s) { return assignedIds.has(s.id); });
+
+            let list = [];
+            switch (statId) {
+                case 'totalStudents':
+                    list = students.slice();
+                    break;
+                case 'assignedStudents':
+                case 'assignedStudentsCheckin':
+                    list = assignedStudentsArr.slice();
+                    break;
+                case 'unassignedStudents':
+                    list = students.filter(function (s) { return !assignedIds.has(s.id); });
+                    break;
+                case 'checkedInCount':
+                    list = assignedStudentsArr.filter(function (s) { return s.checkedIn; });
+                    break;
+                case 'notCheckedInCount':
+                    list = assignedStudentsArr.filter(function (s) { return !s.checkedIn; });
+                    break;
+            }
+            return { statId: statId, title: title, students: list };
+        }
+
+        function showStatActionMenu(statId, anchorX, anchorY) {
+            const ctx = getStatContext(statId);
+            currentStatContext = ctx;
+            ensureStatActionMenu();
+
+            const header = statActionMenuEl.querySelector('#statActionHeader');
+            header.textContent = ctx.title + ' · ' + ctx.students.length + ' 人';
+
+            statActionMenuEl.classList.add('visible');
+
+            const w = statActionMenuEl.offsetWidth || 172;
+            const h = statActionMenuEl.offsetHeight || 120;
+            let left = anchorX - w / 2;
+            let top = anchorY + 6;
+            if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+            if (left < 8) left = 8;
+            if (top + h > window.innerHeight - 8) top = anchorY - h - 6;
+            if (top < 8) top = 8;
+            statActionMenuEl.style.left = left + 'px';
+            statActionMenuEl.style.top = top + 'px';
+        }
+
+        function hideStatActionMenu() {
+            if (statActionMenuEl) statActionMenuEl.classList.remove('visible');
+            currentStatContext = null;
+        }
+
+        function copyStatNames(ctx) {
+            if (!ctx.students.length) {
+                showStatToast(ctx.title + '：暂无学生');
+                return;
+            }
+            const names = ctx.students.map(function (s) { return s.name; }).join('，');
+            const text = ctx.title + '：' + names;
+
+            function onSuccess() {
+                showStatToast('已复制 ' + ctx.students.length + ' 个姓名到剪贴板');
+            }
+            function onFail() {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'fixed';
+                    ta.style.top = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (ok) onSuccess();
+                    else showStatToast('复制失败，请手动复制');
+                } catch (err) {
+                    showStatToast('复制失败，请手动复制');
+                }
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(onSuccess).catch(function () { onFail(); });
+            } else {
+                onFail();
+            }
+        }
+
+        function downloadStatExcel(ctx) {
+            if (!ctx.students.length) {
+                showStatToast(ctx.title + '：暂无学生');
+                return;
+            }
+            if (typeof XLSX === 'undefined') {
+                showStatToast('Excel 库未加载，无法导出');
+                return;
+            }
+            const aoa = [['姓名', '分组', '签到']];
+            ctx.students.forEach(function (s) {
+                const group = s.groupId ? getGroupById(s.groupId) : null;
+                const groupName = group ? group.name : '未分组';
+                const checkinText = s.checkedIn ? '是' : '否';
+                aoa.push([s.name, groupName, checkinText]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 8 }];
+            const wb = XLSX.utils.book_new();
+            const sheetName = (ctx.title || '学生名单').slice(0, 28);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            const d = new Date();
+            const dateStr = d.getFullYear() + '-' +
+                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0');
+            const fileName = ctx.title + '_学生名单_' + dateStr + '.xlsx';
+            XLSX.writeFile(wb, fileName);
+            showStatToast('已下载 ' + ctx.students.length + ' 条学生记录');
+        }
+
+        function initStatBlockActions() {
+            const blocks = document.querySelectorAll('.stat-block[data-stat]');
+            blocks.forEach(function (block) {
+                const statId = block.getAttribute('data-stat');
+                block.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const ctx = getStatContext(statId);
+                    if (!ctx.students.length) {
+                        showStatToast(ctx.title + '：暂无学生');
+                        return;
+                    }
+                    const rect = block.getBoundingClientRect();
+                    showStatActionMenu(statId, rect.left + rect.width / 2, rect.bottom);
+                });
+            });
+
+            // 点击菜单外部关闭
+            document.addEventListener('click', function (e) {
+                if (!statActionMenuEl || !statActionMenuEl.classList.contains('visible')) return;
+                if (!statActionMenuEl.contains(e.target)) hideStatActionMenu();
+            });
+            // Esc 关闭
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && statActionMenuEl && statActionMenuEl.classList.contains('visible')) {
+                    hideStatActionMenu();
+                }
+            });
+            // 滚动 / 尺寸变化时关闭，避免菜单飘离锚点
+            window.addEventListener('scroll', hideStatActionMenu, true);
+            window.addEventListener('resize', hideStatActionMenu);
+        }
+
         // 执行初始化
         initialize();
+        initStatBlockActions();
 
     })();
     </script>
