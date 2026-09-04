@@ -3078,7 +3078,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.2.1</span></span></h3>
+                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.3.1</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -3408,15 +3408,139 @@
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.3.0';
+        const APP_VERSION = '1.3.1';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
         // groups:  [{ id: 'g1', name: '第一组', color: '#4CAF50' }]
         // currentSeats: [null, 's1', null, 's2', ...]  — 存储学生 ID
 
-        let students = [];
-        let groups = [];
+        // === MODULE: state-center (path-A0) ==================================
+        //   引入集中数据源 state 对象 + 事件总线 bus。所有新建/改动的代码应通过
+        //   commit() 修改 state;监听者可订阅 bus 的 'change' 事件执行渲染、
+        //   自动保存等副作用。
+        //
+        //   迁移策略(后续 path-A1/A2/...):
+        //     1) 当前顶层 `let students = []` 等临时保留(单文件回归零成本)
+        //     2) 任何本轮新增或被改动的代码必须改走 state + commit
+        //     3) 后续轮次逐步把已有函数迁到 state;完成前不删除旧变量
+        //
+        //   为什么不一次性全替换:
+        //     此文件 7675 行、283 个函数,全量替换风险极高;集中迁移可在每个
+        //     编辑时零散完成,review 成本低,git blame 清晰。
+        // ====================================================================
+        const state = {
+            // —— 数据(与顶层 let 镜像) ——
+            students: [],
+            groups: [],
+            aisles: [],
+            forcedPairs: [],   // [[idA, idB], ...]
+            avoidPairs: [],    // [[idA, idB], ...]
+            batchSelectedIds: new Set(),
+
+            // —— 座位表几何 ——
+            rows: 7,
+            cols: 7,
+            seats: null,        // 长度 rows*cols,占座时为 studentId
+
+            // —— 视图与模式 ——
+            viewMode: 'student',     // 'student' | 'teacher'
+            isCheckinMode: false,
+            isBatchMode: false,
+            showStudentIcons: true,
+            isTouchDevice: false,
+
+            // —— 元信息 ——
+            title: '班级座位表'
+        };
+
+        // 占用一个数组变量的运行时常驻空间(避免被 GC 回收时与顶层 seats 脱节)
+        if (!state.seats || state.seats.length !== state.rows * state.cols) {
+            state.seats = Array(state.rows * state.cols).fill(null);
+        }
+
+        // —— 轻量事件总线 ——
+        const bus = new EventTarget();
+
+        /**
+         * 修改状态 + 派发 change 事件(浅合并)。
+         * @param {Partial<typeof state>} patch
+         */
+        function commit(patch) {
+            if (!patch) return;
+            // 简单 deep-frozen guard:顶层浅合并;数组/集合引用会被同步替换
+            for (const key of Object.keys(patch)) {
+                state[key] = patch[key];
+            }
+            try {
+                bus.dispatchEvent(new CustomEvent('change', { detail: patch }));
+            } catch (e) {
+                // CustomEvent 在某些老环境下可能失败,降级到 Event
+                bus.dispatchEvent(new Event('change'));
+            }
+        }
+
+        /**
+         * 订阅状态变化。返回取消订阅函数。
+         * @param {(event: {detail:object}) => void} listener
+         */
+        function subscribe(listener) {
+            const handler = (e) => listener(e);
+            bus.addEventListener('change', handler);
+            return () => bus.removeEventListener('change', handler);
+        }
+
+        // —— 派生选择器(常见访问模式抽到这里,降低后续迁移成本) ——
+        const selectors = {
+            getStudentById: (id) => state.students.find(s => s.id === id),
+            getGroupById: (gid) => state.groups.find(g => g.id === gid),
+            getSeatRows: () => state.rows,
+            getSeatCols: () => state.cols,
+            getSeats: () => state.seats,
+            getAssignedIds: () => new Set(state.seats.filter(s => s !== null)),
+            getUnassignedStudents: () => {
+                const assigned = selectors.getAssignedIds();
+                return state.students.filter(s => !assigned.has(s.id));
+            }
+        };
+
+        // —— 调试助手(可移除) ——
+        // 开发期挂一个订阅者把每一次 commit 详情打印出来,辅助迁移调试;
+        // 生产期可通过 query string `?dev=quiet` 关掉。
+        const __DEV__ = !/dev=quiet/.test(location.search);
+        if (__DEV__) {
+            subscribe(function (e) {
+                const keys = e.detail ? Object.keys(e.detail) : [];
+                if (keys.length) console.debug('[commit]', keys, e.detail);
+            });
+        }
+
+// === 顶层状态别名(同步 state 中心,path-A1)===
+// 这些 let/const 别名仅用于兼容既有 283 个函数对顶层变量的读写,
+// 与 state 中心始终保持「初始时同引用」。对数组/对象的方法调用
+// (push/pop/filter/sort 等)会自动反映到 state.*。
+//
+// 对 let 别名的「重新指向新对象」(92 处写点)目前只更新本地别名,
+// 不主动同步 state/commit — 这是有意的渐进策略:
+//   1) path-A1(本轮):读路径透明,行为等价于旧代码,零回归
+//   2) path-A1-follow(本轮内最小切口):每改一处写点就同步 commit
+//   3) path-A2(下一轮):全部写点接入 commit,完成 bus 驱动
+//
+// 如果不需要双轨可彻底切换,改写点并 add commit 是必经之路。
+const batchSelectedIds = state.batchSelectedIds;  // Set 引用稳定,用 const 安全
+let students = state.students;
+let groups = state.groups;
+let aisles = state.aisles;
+let forcedPairs = state.forcedPairs;
+let avoidPairs = state.avoidPairs;
+let currentSeats = state.seats;
+let rows = state.rows;
+let cols = state.cols;
+let isTeacherView = state.viewMode === 'teacher';
+let isCheckinMode = state.isCheckinMode;
+let isBatchMode = state.isBatchMode;
+let showStudentIcons = state.showStudentIcons;
+let isTouchDevice = state.isTouchDevice;
 
         // DOM 引用
         const classroom = document.getElementById('classroom');
@@ -3498,19 +3622,10 @@
         let excelData = null;
         let selectedColumnIndex = 0;
         let dragStartTime = 0;
-        let isTeacherView = false;
 
-        // 座位表配置
-        let rows = 7;
-        let cols = 7;
-        let currentSeats = Array(rows * cols).fill(null);
-
-        // 走道配置
-        let aisles = [];
-
-        // 配对约束：强制同桌 / 回避同桌（存学生 ID 对）
-        let forcedPairs = [];   // [[idA, idB], ...]
-        let avoidPairs = [];    // [[idA, idB], ...]
+        // 座位表配置 — 见顶部 path-A1 别名(rows / cols / currentSeats)
+        // 走道配置 — 见顶部 path-A1 别名(aisles)
+        // 配对约束 — 见顶部 path-A1 别名(forcedPairs / avoidPairs)
 
         let isInitialized = false;
         let autoSaveTimer = null;
@@ -3522,19 +3637,19 @@
         let isUndoing = false;
 
         // 移动端触摸交互状态
-        let isTouchDevice = false;
-        let tapSelectedStudentId = null;   // 选中的学生 ID（来自学生列表）
-        let tapSelectedSeatIndex = null;    // 选中的座位索引（来自座位表）
+        // let isTouchDevice = false;  // 见顶部 path-A1 别名
+        let tapSelectedStudentId = null;   // 选中的学生 ID(来自学生列表)
+        let tapSelectedSeatIndex = null;    // 选中的座位索引(来自座位表)
 
         // 批量操作状态
-        let isBatchMode = false;
-        const batchSelectedIds = new Set();
+        // let isBatchMode = false;        // 见顶部 path-A1 别名
+        // const batchSelectedIds = new Set();  // 见顶部 path-A1 别名
 
         // 签到模式状态
-        let isCheckinMode = false;
+        // let isCheckinMode = false;  // 见顶部 path-A1 别名
 
         // 学生图标显示开关
-        let showStudentIcons = true;
+        // let showStudentIcons = true;  // 见顶部 path-A1 别名
 
         // ==================== 设备检测 ====================
         function detectTouchDevice() {
@@ -3547,6 +3662,8 @@
 
         function initMobileSupport() {
             isTouchDevice = detectTouchDevice();
+            state.isTouchDevice = isTouchDevice;
+            commit({ isTouchDevice: isTouchDevice });
             if (isTouchDevice) {
                 mobileBanner.classList.add('visible');
             } else {
@@ -3630,7 +3747,7 @@
                 showStudentIcons: showStudentIcons,
                 forcedPairs: forcedPairs,
                 avoidPairs: avoidPairs,
-                version: '2.0'
+                version: APP_VERSION
             };
         }
 
@@ -3681,6 +3798,7 @@
             aisles = JSON.parse(JSON.stringify(snap.aisles));
             rows = snap.rows;
             cols = snap.cols;
+            commit({ seats: currentSeats, students: students, groups: groups, aisles: aisles, rows: rows, cols: cols });
             rowsInput.value = rows;
             colsInput.value = cols;
             updateAisleDisplay();
@@ -3709,6 +3827,7 @@
             aisles = JSON.parse(JSON.stringify(snap.aisles));
             rows = snap.rows;
             cols = snap.cols;
+            commit({ seats: currentSeats, students: students, groups: groups, aisles: aisles, rows: rows, cols: cols });
             rowsInput.value = rows;
             colsInput.value = cols;
             updateAisleDisplay();
@@ -3761,7 +3880,12 @@
             // 为旧数据补充配对约束
             if (!Array.isArray(config.forcedPairs)) config.forcedPairs = [];
             if (!Array.isArray(config.avoidPairs)) config.avoidPairs = [];
-            config.version = '2.0';
+            // 补全 v1.3.0 新增的顶层字段默认值（P0-a 修复）
+            if (!Array.isArray(config.aisles)) config.aisles = [];
+            if (config.showStudentIcons === undefined) config.showStudentIcons = true;
+            if (!config.viewMode) config.viewMode = 'student';
+            if (typeof config.title !== 'string' || !config.title.trim()) config.title = '班级座位表';
+            config.version = APP_VERSION;
             return config;
         }
 
@@ -3782,6 +3906,7 @@
 
             aisles.push({ afterCol: afterCol, width: width });
             aisles.sort((a, b) => a.afterCol - b.afterCol);
+            commit({ aisles: aisles });
             updateAisleDisplay();
             generateSeats();
         });
@@ -3806,6 +3931,7 @@
             if (!btn) return;
             const afterCol = parseInt(btn.getAttribute('data-after-col'));
             aisles = aisles.filter(a => a.afterCol !== afterCol);
+            commit({ aisles: aisles });
             updateAisleDisplay();
             generateSeats();
         });
@@ -3835,6 +3961,7 @@
                 name: name,
                 color: color
             });
+            commit({ groups: groups });
 
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
@@ -3846,6 +3973,7 @@
             if (group) {
                 group.name = newName;
                 group.color = newColor;
+                commit({ groups: groups });
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
                 generateSeats();
@@ -3859,6 +3987,7 @@
                     if (s.groupId === groupId) s.groupId = null;
                 });
                 groups = groups.filter(g => g.id !== groupId);
+                commit({ students: students, groups: groups });
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
                 generateSeats();
@@ -4155,6 +4284,7 @@
                 }
                 currentSeats = currentSeats.map(id => id === studentId ? null : id);
                 students = students.filter(s => s.id !== studentId);
+                commit({ seats: currentSeats, students: students });
                 updateStudentAssignmentDisplay();
                 generateSeats();
                 autoSave();
@@ -5175,6 +5305,7 @@
             } else {
                 generateSeats();
             }
+            commit({ students: students, groups: groups, seats: currentSeats });
             autoSave();
         }
 
@@ -5404,6 +5535,8 @@
             }
             clearDragHighlights();
             isCheckinMode = !isCheckinMode;
+            state.isCheckinMode = isCheckinMode;
+            commit({ isCheckinMode: isCheckinMode });
             updateCheckinModeButton();
             if (isCheckinMode) {
                 classroom.classList.add('checkin-mode');
@@ -5570,6 +5703,7 @@
                     if (draggedFromIndex !== null) {
                         currentSeats[draggedFromIndex] = null;
                     }
+                    commit({ seats: currentSeats, students: students });
                     updateStudentAssignmentDisplay();
                     generateSeats();
                 }
@@ -5581,6 +5715,7 @@
             if (e.target.closest('.student-list')) {
                 if (draggedFromIndex !== null) {
                     currentSeats[draggedFromIndex] = null;
+                    commit({ seats: currentSeats });
                     generateSeats();
                 }
                 clearDragHighlights();
@@ -5608,12 +5743,14 @@
                     return;
                 }
                 currentSeats[seatIndex] = draggedStudentId;
+                commit({ seats: currentSeats });
             }
             // 座位间交换
             else if (draggedFromIndex !== null) {
                 const targetStudentId = currentSeats[seatIndex];
                 currentSeats[seatIndex] = draggedStudentId;
                 currentSeats[draggedFromIndex] = targetStudentId;
+                commit({ seats: currentSeats });
             }
 
             generateSeats();
@@ -6065,6 +6202,7 @@
                 conflicts = findConflicts();
             }
 
+            commit({ seats: currentSeats });
             generateSeats();
         }
 
@@ -6073,6 +6211,7 @@
             if (confirm('确定要重置所有座位吗？')) {
                 pushSnapshot();
                 currentSeats = Array(rows * cols).fill(null);
+                commit({ seats: currentSeats });
                 generateSeats();
             }
         });
@@ -6080,6 +6219,8 @@
         // 切换视角
         toggleViewBtn.addEventListener('click', function () {
             isTeacherView = !isTeacherView;
+            state.viewMode = isTeacherView ? 'teacher' : 'student';
+            commit({ viewMode: state.viewMode });
             toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
             generateSeats();
         });
@@ -6093,6 +6234,8 @@
         updateToggleIconsBtnText();
         toggleIconsBtn.addEventListener('click', function () {
             showStudentIcons = !showStudentIcons;
+            state.showStudentIcons = showStudentIcons;
+            commit({ showStudentIcons: showStudentIcons });
             updateToggleIconsBtnText();
             generateSeats();
             autoSave();
@@ -6115,6 +6258,7 @@
                     return;
                 }
                 aisles = aisles.filter(a => a.afterCol < newCols);
+                commit({ aisles: aisles });
             }
 
             // 保存当前座位安排
@@ -6143,6 +6287,7 @@
             rows = newRows;
             cols = newCols;
             currentSeats = newSeats;
+            commit({ rows: rows, cols: cols, seats: currentSeats });
 
             updateAisleDisplay();
             generateSeats();
@@ -6164,6 +6309,12 @@
                 isTeacherView = false;
                 aisles = [];
                 showStudentIcons = true;
+                state.viewMode = 'student';
+                commit({
+                    students: students, groups: groups, rows: rows, cols: cols,
+                    seats: currentSeats, aisles: aisles, viewMode: state.viewMode,
+                    showStudentIcons: showStudentIcons
+                });
                 toggleViewBtn.textContent = '教师视角';
                 updateAisleDisplay();
                 updateGroupDisplay();
@@ -6285,7 +6436,6 @@
             showStudentIcons = config.showStudentIcons !== false;
             forcedPairs = config.forcedPairs || [];
             avoidPairs = config.avoidPairs || [];
-            if (config.title) pageTitle.textContent = config.title;
 
             const targetLen = rows * cols;
             if (currentSeats.length < targetLen) {
@@ -6294,6 +6444,15 @@
                 currentSeats = currentSeats.slice(0, targetLen);
             }
 
+            state.viewMode = isTeacherView ? 'teacher' : 'student';
+            commit({
+                students: students, groups: groups, rows: rows, cols: cols,
+                seats: currentSeats, aisles: aisles, viewMode: state.viewMode,
+                showStudentIcons: showStudentIcons,
+                forcedPairs: forcedPairs, avoidPairs: avoidPairs
+            });
+
+            if (config.title) pageTitle.textContent = config.title;
             rowsInput.value = rows;
             colsInput.value = cols;
             toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
@@ -6343,6 +6502,7 @@
         // ==================== GitHub API 同步 ====================
 
         const GITHUB_SETTINGS_KEY = 'githubSettings';
+        const GITHUB_TOKEN_KEY = 'githubToken';
         const githubOwner = document.getElementById('githubOwner');
         const githubRepo = document.getElementById('githubRepo');
         const githubPath = document.getElementById('githubPath');
@@ -6360,8 +6520,10 @@
                     githubOwner.value = s.owner || '';
                     githubRepo.value = s.repo || '';
                     githubPath.value = s.path || 'data/seats-configs.json';
-                    githubToken.value = s.token || '';
                 }
+                // Token 只存 sessionStorage（随标签页关闭清除，不持久落盘）— P0-d 安全修复
+                const token = sessionStorage.getItem(GITHUB_TOKEN_KEY);
+                if (token) githubToken.value = token;
             } catch {}
         })();
 
@@ -6379,6 +6541,13 @@
             };
         }
 
+        // 对 GitHub 文件路径做分段编码（保留斜杠，避免路径被整体编码破坏 API 语义）
+        function encodeGitHubPath(path) {
+            return path.split('/').map(function (seg) {
+                return encodeURIComponent(seg);
+            }).join('/');
+        }
+
         function githubApiRequest(method, endpoint, body) {
             const s = getGithubSettings();
             if (!s.owner || !s.repo || !s.token) {
@@ -6386,7 +6555,8 @@
                 return Promise.reject(new Error('未设置 GitHub'));
             }
 
-            const url = `https://api.github.com/repos/${s.owner}/${s.repo}${endpoint}`;
+            // 对 owner/repo 做 URL 编码，防止注入/非法字符（P0-d 修复）
+            const url = `https://api.github.com/repos/${encodeURIComponent(s.owner)}/${encodeURIComponent(s.repo)}${endpoint}`;
             const headers = {
                 'Authorization': 'token ' + s.token,
                 'Accept': 'application/vnd.github+json',
@@ -6425,8 +6595,12 @@
             if (!s.repo) { setGithubStatus('请填写仓库名', 'error'); return; }
             if (!s.token) { setGithubStatus('请填写 Personal Access Token', 'error'); return; }
             
-            localStorage.setItem(GITHUB_SETTINGS_KEY, JSON.stringify(s));
-            setGithubStatus('设置已保存，正在测试连接…', '');
+            // 非敏感字段存 localStorage；Token 只存 sessionStorage（P0-d 安全修复）
+            localStorage.setItem(GITHUB_SETTINGS_KEY, JSON.stringify({
+                owner: s.owner, repo: s.repo, path: s.path
+            }));
+            sessionStorage.setItem(GITHUB_TOKEN_KEY, s.token);
+            setGithubStatus('设置已保存（Token 仅本会话有效），正在测试连接…', '');
             testGithubConnection();
         });
 
@@ -6468,10 +6642,10 @@
             const content = JSON.stringify({ configs, activeName, current: getCurrentConfig(), savedAt: Date.now() }, null, 2);
             const encodedContent = btoa(unescape(encodeURIComponent(content)));
 
-            githubApiRequest('GET', `/contents/${s.path}`)
+            githubApiRequest('GET', `/contents/${encodeGitHubPath(s.path)}`)
                 .then(res => res.json())
                 .then(existing => {
-                    return githubApiRequest('PUT', `/contents/${s.path}`, {
+                    return githubApiRequest('PUT', `/contents/${encodeGitHubPath(s.path)}`, {
                         message: '[Seats Generator] 同步配置',
                         content: encodedContent,
                         sha: existing.sha
@@ -6479,7 +6653,7 @@
                 })
                 .catch(err => {
                     if (err.message.includes('404')) {
-                        return githubApiRequest('PUT', `/contents/${s.path}`, {
+                        return githubApiRequest('PUT', `/contents/${encodeGitHubPath(s.path)}`, {
                             message: '[Seats Generator] 初始化配置',
                             content: encodedContent
                         });
@@ -6516,18 +6690,49 @@
                     }
 
                     const localConfigs = getSavedConfigs();
-                    const merged = { ...localConfigs, ...data.configs };
+                    const localNames = Object.keys(localConfigs);
+                    const cloudNames = Object.keys(data.configs);
+
+                    // P0-c 修复：检测云端与本地「同名但内容不同」的配置冲突，交给用户决定，
+                    // 避免直接覆盖导致本地已修改但尚未上传的配置静默丢失。
+                    const collisions = cloudNames.filter(function (name) {
+                        return localNames.indexOf(name) >= 0 &&
+                            JSON.stringify(localConfigs[name]) !== JSON.stringify(data.configs[name]);
+                    });
+
+                    let cloudWins = true; // 无冲突时默认云端为准（保持原有行为）
+                    if (collisions.length > 0) {
+                        cloudWins = confirm(
+                            '检测到 ' + collisions.length + ' 个配置在云端与本地同名但内容不同：\n' +
+                            collisions.join('、') + '\n\n' +
+                            '点「确定」：用云端版本覆盖这些同名配置（本地修改将被覆盖）\n' +
+                            '点「取消」：保留本地版本，仅合并云端独有的新配置'
+                        );
+                    }
+
+                    const merged = {};
+                    localNames.forEach(function (name) { merged[name] = localConfigs[name]; });
+                    cloudNames.forEach(function (name) {
+                        if (collisions.indexOf(name) >= 0 && !cloudWins) return; // 冲突且选择保留本地
+                        merged[name] = data.configs[name];
+                    });
                     setSavedConfigs(merged);
 
-                    if (data.activeName && data.configs[data.activeName]) {
+                    // 切换活动配置：仅在不会覆盖本地正在编辑的同名配置时才应用云端版本
+                    const activeFromCloud = data.activeName && data.configs[data.activeName];
+                    if (activeFromCloud && (cloudWins || collisions.indexOf(data.activeName) < 0)) {
                         applyConfig(data.configs[data.activeName]);
                         setActiveConfigName(data.activeName);
-                    } else if (data.current) {
+                    } else if (!activeFromCloud && data.current) {
                         applyConfig(data.current);
                     }
 
                     renderConfigList();
-                    setGithubStatus('下载成功，已合并 ' + Object.keys(data.configs).length + ' 个配置', 'success');
+                    setGithubStatus(
+                        '下载成功，已合并 ' + cloudNames.length + ' 个云端配置' +
+                        (collisions.length > 0 ? '（' + collisions.length + ' 个同名冲突已处理）' : ''),
+                        'success'
+                    );
                 })
                 .catch(err => {
                     if (err.message.includes('404')) {
@@ -6576,9 +6781,16 @@
             if (!excelWorkbook) return;
             const sheetName = sheetSelect.value;
             const worksheet = excelWorkbook.Sheets[sheetName];
+            // P0 修复：限制最大导入行数，防止超大表格一次性读入内存导致页面卡死/内存溢出
+            const MAX_IMPORT_ROWS = 2000;
             excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
             while (excelData.length && excelData[excelData.length - 1].every(cell => !getCellText(cell))) {
                 excelData.pop();
+            }
+            let importTruncated = false;
+            if (excelData.length > MAX_IMPORT_ROWS) {
+                excelData = excelData.slice(0, MAX_IMPORT_ROWS);
+                importTruncated = true;
             }
             if (excelData.length === 0 || excelData[0].every(cell => !getCellText(cell))) {
                 previewArea.style.display = 'none';
@@ -6641,6 +6853,9 @@
             if (detectedGenderCol >= 0) infoHtml += '，检测到性别列"' + escapeHtml(excelData[0][detectedGenderCol]) + '"';
             if (detectedTagCol >= 0) infoHtml += '，检测到标签列"' + escapeHtml(excelData[0][detectedTagCol]) + '"';
             infoHtml += '</span>';
+            if (importTruncated) {
+                infoHtml += '<span style="color:#e67e22">（表格超过 ' + MAX_IMPORT_ROWS + ' 行，已仅加载前 ' + MAX_IMPORT_ROWS + ' 行）</span>';
+            }
             fileInfo.innerHTML = infoHtml;
         }
 
@@ -6798,6 +7013,13 @@
                 updateStudentAssignmentDisplay();
             }
 
+            state.viewMode = isTeacherView ? 'teacher' : 'student';
+            commit({
+                students: students, groups: groups, rows: rows, cols: cols,
+                seats: currentSeats, aisles: aisles, viewMode: state.viewMode,
+                showStudentIcons: showStudentIcons,
+                forcedPairs: forcedPairs, avoidPairs: avoidPairs
+            });
             generateSeats();
             isInitialized = true;
         }
@@ -6859,6 +7081,13 @@
                     rowsInput.value = rows;
                     colsInput.value = cols;
                     toggleViewBtn.textContent = isTeacherView ? '学生视角' : '教师视角';
+                    state.viewMode = isTeacherView ? 'teacher' : 'student';
+                    commit({
+                        students: students, groups: groups, rows: rows, cols: cols,
+                        seats: currentSeats, aisles: aisles, viewMode: state.viewMode,
+                        showStudentIcons: showStudentIcons,
+                        forcedPairs: forcedPairs, avoidPairs: avoidPairs
+                    });
                     generateSeats();
                     alert('配置导入成功！');
                 } catch (error) {
@@ -7120,6 +7349,7 @@
                         pushSnapshot();
                         currentSeats = currentSeats.map(id => id === studentId ? null : id);
                         students = students.filter(s => s.id !== studentId);
+                        commit({ seats: currentSeats, students: students });
                         updateStudentAssignmentDisplay();
                         generateSeats();
                     }
@@ -7226,6 +7456,7 @@
                             pushSnapshot();
                             currentSeats = currentSeats.map(id => id === studentId ? null : id);
                             students = students.filter(s => s.id !== studentId);
+                            commit({ seats: currentSeats, students: students });
                             updateStudentAssignmentDisplay();
                             generateSeats();
                         }
@@ -7254,6 +7485,8 @@
 
         function enterBatchMode() {
             isBatchMode = true;
+            state.isBatchMode = true;
+            commit({ isBatchMode: true });
             batchToolbar.classList.add('visible');
             batchModeBtn.textContent = '退出批量';
             updateBatchGroupOptions();
@@ -7263,6 +7496,8 @@
 
         function exitBatchMode() {
             isBatchMode = false;
+            state.isBatchMode = false;
+            commit({ isBatchMode: false });
             batchToolbar.classList.remove('visible');
             batchModeBtn.textContent = '批量操作';
             batchSelectedIds.clear();
@@ -7370,6 +7605,7 @@
                 currentSeats = currentSeats.map(id => idSet.has(id) ? null : id);
                 students = students.filter(s => !idSet.has(s.id));
                 batchSelectedIds.clear();
+                commit({ seats: currentSeats, students: students, batchSelectedIds: batchSelectedIds });
                 exitBatchMode();
                 generateSeats();
                 updateStudentAssignmentDisplay();
