@@ -1,4 +1,5 @@
 import { state, bus, commit, subscribe, selectors } from './modules/state.js';
+import { createSeatGrid } from './modules/seat-grid.js';
 
     (function () {
         'use strict';
@@ -1807,223 +1808,38 @@ let isTouchDevice = state.isTouchDevice;
 
         // ==================== 分组导入相关函数结束 ====================
 
-        function generateSeats() {
-            updateToggleIconsBtnText();
-            classroom.style.gridTemplateColumns = generateGridTemplateColumns();
-            classroom.innerHTML = '';
-
-            if (isCheckinMode) {
-                const banner = document.createElement('div');
-                banner.className = 'checkin-banner visible';
-                banner.innerHTML =
-                    '<span class="checkin-banner-icon">✓</span>' +
-                    '<span>签到模式 — 点击座位签到/取消签到</span>' +
-                    '<button class="checkin-banner-btn" id="resetCheckinBtn">重新签到</button>' +
-                    '<button class="checkin-banner-btn" id="allCheckinBtn">全部签到</button>' +
-                    '<button class="checkin-banner-close">×</button>';
-                classroom.appendChild(banner);
-                banner.querySelector('.checkin-banner-close').addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    if (isCheckinMode) toggleCheckinMode();
-                });
-                banner.querySelector('#resetCheckinBtn').addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    pushSnapshot();
-                    students.forEach(s => s.checkedIn = false);
-                    generateSeats();
-                });
-                banner.querySelector('#allCheckinBtn').addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    pushSnapshot();
-                    students.forEach(s => s.checkedIn = true);
-                    generateSeats();
-                });
+        // ─────────── 座位网格渲染模块 (modules/seat-grid.js) ───────────
+        // 4 个原 IIFE 函数已抽离到独立 ES module:
+        //   - generateSeats()               渲染整个座位表(讲台/座位/走道/统计)
+        //   - generateGridTemplateColumns() CSS grid 列模板(含走道)
+        //   - updateStatistics()            头部统计卡(总数/已排/未排)
+        //   - updateCheckinStats()          签到模式进度条与统计
+        // 模块内部从 state.* 直读(path-A2 等价行为);
+        // 实例化时显式注入依赖(classroom / getView / helpers / callbacks),
+        // 主 IIFE 内 50+ 处既有调用点零修改(顶层 const 别名承接)。
+        const seatGrid = createSeatGrid({
+            classroom,                                              // #classroom DOM 引用(IIFE 顶部缓存)
+            getView: () => isTeacherView,                            // 懒读:每次 generateSeats 调用时取最新视角
+            helpers: {
+                escapeHtml,
+                adjustColor,
+                isLightColor,
+                getStudentById,
+                getStudentGroupColor
+            },
+            callbacks: {
+                onUpdateToggleIconsBtnText: updateToggleIconsBtnText,
+                onToggleCheckinMode: toggleCheckinMode,
+                onPushSnapshot: pushSnapshot,
+                onGenerateStudentList: generateStudentList,
+                onAutoSave: autoSave
             }
-
-            if (!isTeacherView) {
-                const desk = document.createElement('div');
-                desk.className = 'teacher-desk';
-                desk.textContent = '讲台';
-                classroom.appendChild(desk);
-            }
-
-            for (let row = 0; row < rows; row++) {
-                for (let col = 0; col < cols; col++) {
-                    let seatIndex;
-                    let actualCol;
-
-                    if (isTeacherView) {
-                        const actualRow = rows - 1 - row;
-                        actualCol = cols - 1 - col;
-                        seatIndex = actualRow * cols + actualCol;
-                    } else {
-                        actualCol = col;
-                        seatIndex = row * cols + col;
-                    }
-
-                    const seat = document.createElement('div');
-                    const studentId = currentSeats[seatIndex];
-                    const student = studentId ? getStudentById(studentId) : null;
-                    const isCheckedIn = student && student.checkedIn;
-                    let seatClass = studentId ? 'seat' : 'seat empty';
-                    if (isCheckedIn) seatClass += ' checked-in';
-                    else if (studentId && isCheckinMode) seatClass += ' not-checked-in';
-                    seat.className = seatClass;
-                    seat.setAttribute('data-index', seatIndex);
-                    seat.setAttribute('data-student', studentId || '');
-
-                    const displayRow = Math.floor(seatIndex / cols) + 1;
-                    const displayCol = (seatIndex % cols) + 1;
-
-                    if (studentId) {
-                        const displayName = student ? student.name : '';
-                        const groupColor = getStudentGroupColor(studentId);
-                        if (groupColor) {
-                            seat.style.backgroundColor = groupColor;
-                            seat.style.borderColor = adjustColor(groupColor, -30);
-                            seat.style.color = isLightColor(groupColor) ? '#000' : '#fff';
-                        }
-                        // 签到模式下不显示删除按钮（√ 由 CSS ::before 显示）
-                        const deleteBtnHtml = isCheckinMode ? '' : '<button class="seat-delete-btn" title="删除学生">×</button>';
-                        // 构建性别和标签图标
-                        let iconsHtml = '';
-                        if (showStudentIcons && student) {
-                            const icons = [];
-                            // 性别图标
-                            if (student.gender === 'male') {
-                                icons.push({ emoji: '♂', title: '男' });
-                            } else if (student.gender === 'female') {
-                                icons.push({ emoji: '♀', title: '女' });
-                            }
-                            // 标签图标
-                            if (student.tags && student.tags.length > 0) {
-                                student.tags.forEach(function (tag) {
-                                    icons.push({
-                                        emoji: tag.emoji || '🏷',
-                                        title: tag.label
-                                    });
-                                });
-                            }
-                            if (icons.length > 0) {
-                                iconsHtml = '<span class="seat-icons">' + icons.map(function (ic) {
-                                    return '<span class="seat-icon" title="' + escapeHtml(ic.title) + '">' + escapeHtml(ic.emoji) + '</span>';
-                                }).join('') + '</span>';
-                            }
-                        }
-                        seat.innerHTML =
-                            '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
-                            '<span class="seat-name">' + escapeHtml(displayName) + '</span>' +
-                            iconsHtml +
-                            deleteBtnHtml;
-                        seat.draggable = !isTouchDevice && !isCheckinMode;
-                    } else {
-                        seat.innerHTML =
-                            '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
-                            '<span class="seat-name" style="color: #999;">空</span>';
-                        seat.draggable = false;
-                    }
-
-                    classroom.appendChild(seat);
-
-                    let checkCol = isTeacherView ? actualCol : (col + 1);
-                    const aisle = aisles.find(a => a.afterCol === checkCol);
-                    if (aisle) {
-                        const aislePlaceholder = document.createElement('div');
-                        aislePlaceholder.className = 'aisle-placeholder';
-                        classroom.appendChild(aislePlaceholder);
-                    }
-                }
-            }
-
-            if (isTeacherView) {
-                const desk = document.createElement('div');
-                desk.className = 'teacher-desk teacher-view';
-                desk.textContent = '讲台';
-                classroom.appendChild(desk);
-            }
-
-            if (isCheckinMode) {
-                classroom.classList.add('checkin-mode');
-            } else {
-                classroom.classList.remove('checkin-mode');
-            }
-
-            generateStudentList();
-            updateStatistics();
-            updateCheckinStats();
-            autoSave();
-        }
-
-        // 生成网格列模板（包含走道）
-        // 教师视角：网格列模板从右向左构建，走道位置通过 cols - afterCol 映射
-        function generateGridTemplateColumns() {
-            let template = '';
-
-            if (isTeacherView) {
-                // 教师视角：需要镜像，从右向左遍历
-                for (let i = cols; i >= 1; i--) {
-                    template += 'var(--seat-width) ';
-
-                    // 检查是否需要在此列后添加走道（镜像位置）
-                    // 镜像公式：如果走道在学生视角的第X列后，教师视角在第(cols-X)列后
-                    const aisle = aisles.find(a => a.afterCol === i - 1);
-                    if (aisle) {
-                        template += `${aisle.width}px `;
-                    }
-                }
-            } else {
-                // 学生视角：正常从左到右遍历
-                for (let i = 1; i <= cols; i++) {
-                    template += 'var(--seat-width) ';
-
-                    // 检查是否需要在此列后添加走道
-                    const aisle = aisles.find(a => a.afterCol === i);
-                    if (aisle) {
-                        template += `${aisle.width}px `;
-                    }
-                }
-            }
-
-            return template.trim();
-        }
-
-
-        // 更新统计信息
-        function updateStatistics() {
-            const total = students.length;
-            const assigned = currentSeats.filter(seat => seat !== null).length;
-            const unassigned = total - assigned;
-
-            document.getElementById('totalStudents').textContent = total;
-            document.getElementById('assignedStudents').textContent = assigned;
-            document.getElementById('unassignedStudents').textContent = unassigned;
-        }
-
-        // 更新签到统计
-        function updateCheckinStats() {
-            const assignedIds = new Set(currentSeats.filter(s => s !== null));
-            const assigned = assignedIds.size;
-            const assignedStudents = students.filter(s => assignedIds.has(s.id));
-            const checkedIn = assignedStudents.filter(s => s.checkedIn).length;
-            const notCheckedIn = assigned - checkedIn;
-            const rate = assigned > 0 ? Math.round((checkedIn / assigned) * 100) : 0;
-
-            const rateEl = document.getElementById('checkinRate');
-            const progressBar = document.getElementById('checkinProgressBar');
-
-            if (rateEl) rateEl.textContent = rate + '%';
-            if (progressBar) progressBar.style.width = rate + '%';
-
-            if (isCheckinMode) {
-                const assignedEl = document.getElementById('assignedStudentsCheckin');
-                const checkedInEl = document.getElementById('checkedInCount');
-                const notCheckedInEl = document.getElementById('notCheckedInCount');
-
-                if (assignedEl) assignedEl.textContent = assigned;
-                if (checkedInEl) checkedInEl.textContent = checkedIn;
-                if (notCheckedInEl) notCheckedInEl.textContent = notCheckedIn;
-            }
-        }
+        });
+        // 顶层别名 — 保留主 IIFE 内既有调用点零修改
+        const generateSeats = seatGrid.generateSeats;
+        const generateGridTemplateColumns = seatGrid.generateGridTemplateColumns;
+        const updateStatistics = seatGrid.updateStatistics;
+        const updateCheckinStats = seatGrid.updateCheckinStats;
 
         function toggleCheckinMode() {
             if (typeof clearTapSelection === 'function') {
