@@ -1,5 +1,6 @@
 import { state, bus, commit, subscribe, selectors } from './modules/state.js';
 import { createSeatGrid } from './modules/seat-grid.js';
+import { createDragdrop } from './modules/dragdrop.js';
 
     (function () {
         'use strict';
@@ -114,11 +115,8 @@ let isTouchDevice = state.isTouchDevice;
         let selectedTagColumnIndex = -1;
         let isTagImportEnabled = false;
 
-        let draggedStudentId = null;
-        let draggedFromIndex = null;
         let excelData = null;
         let selectedColumnIndex = 0;
-        let dragStartTime = 0;
 
         // 座位表配置 — 见顶部 path-A1 别名(rows / cols / currentSeats)
         // 走道配置 — 见顶部 path-A1 别名(aisles)
@@ -1921,21 +1919,7 @@ let isTouchDevice = state.isTouchDevice;
                 }
 
                 if (!isTouchDevice && !isCheckinMode) {
-                    studentItem.addEventListener('dragstart', function (e) {
-                        dragStartTime = Date.now();
-                        draggedStudentId = student.id;
-                        draggedFromIndex = null;
-                        e.dataTransfer.setData('text/plain', student.id);
-                        studentItem.classList.add('dragging');
-                        dragHint.style.display = 'block';
-                        classroom.classList.add('highlight');
-                        studentList.classList.add('highlight');
-                        deleteZone.classList.add('visible');
-                    });
-
-                    studentItem.addEventListener('dragend', function (e) {
-                        clearDragHighlights();
-                    });
+                    dragdrop.attachStudentItemDragstart(studentItem, student);
                 }
 
                 studentList.appendChild(studentItem);
@@ -1945,186 +1929,33 @@ let isTouchDevice = state.isTouchDevice;
             updateCheckinStats();
         }
 
-        function handleDragStart(e) {
-            const seat = e.target.closest('.seat');
-            if (!seat) return;
-
-            const studentId = seat.getAttribute('data-student');
-            if (!studentId) {
-                e.preventDefault();
-                return;
+        // ─────────── 拖放模块 (modules/dragdrop.js) ───────────
+        // 7 个原 IIFE 函数 + studentList/deleteZone/classroom 静态区域事件绑定
+        // + generateStudentList 中 student-item 的 batch dragstart 绑定
+        // 全部抽离到独立 ES module。
+        //
+        // 模块私有 closure 状态(draggedStudentId / draggedFromIndex / dragStartTime)
+        // 替代原 IIFE 顶层 let 别名,避免跨模块共享可变状态。
+        // 模块内部从 state.* 直读(path-A2 等价行为);写路径通过 commit() 派发 change。
+        const dragdrop = createDragdrop({
+            classroom,                              // #classroom DOM
+            studentList,                            // #studentList DOM
+            deleteZone,                             // #deleteZone DOM
+            dragHint,                               // #dragHint DOM
+            helpers: {
+                getStudentById
+            },
+            callbacks: {
+                onPushSnapshot: pushSnapshot,
+                onUpdateStudentAssignmentDisplay: updateStudentAssignmentDisplay,
+                onGenerateSeats: generateSeats
             }
-
-            dragStartTime = Date.now();
-            draggedStudentId = studentId;
-            draggedFromIndex = parseInt(seat.getAttribute('data-index'));
-            e.dataTransfer.setData('text/plain', studentId);
-            seat.classList.add('dragging');
-            dragHint.style.display = 'block';
-            classroom.classList.add('highlight');
-            studentList.classList.add('highlight');
-            deleteZone.classList.add('visible');
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-        }
-
-        function handleDragEnter(e) {
-            e.preventDefault();
-            const seat = e.target.closest('.seat');
-            if (seat) seat.classList.add('highlight');
-        }
-
-        function handleDragLeave(e) {
-            const seat = e.target.closest('.seat');
-            if (seat && !seat.contains(e.relatedTarget)) {
-                seat.classList.remove('highlight');
-            }
-        }
-
-        function clearDragHighlights() {
-            draggedStudentId = null;
-            draggedFromIndex = null;
-            dragHint.style.display = 'none';
-            classroom.classList.remove('highlight');
-            studentList.classList.remove('highlight');
-            deleteZone.classList.remove('highlight', 'visible');
-            document.querySelectorAll('.seat.highlight, .seat.dragging, .student-item.dragging').forEach(el => {
-                el.classList.remove('highlight', 'dragging');
-            });
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-
-            // 仅在有有效拖拽目标时才保存快照
-            const hasValidTarget = e.target.closest('#deleteZone') ||
-                                   e.target.closest('.student-list') ||
-                                   e.target.closest('.seat');
-            if (hasValidTarget && draggedStudentId) {
-                pushSnapshot();
-            }
-
-            // 删除区域
-            if (e.target.closest('#deleteZone')) {
-                const student = getStudentById(draggedStudentId);
-                const displayName = student ? student.name : '';
-                if (confirm('确定要删除学生 ' + displayName + ' 吗？')) {
-                    students = students.filter(s => s.id !== draggedStudentId);
-                    if (draggedFromIndex !== null) {
-                        currentSeats[draggedFromIndex] = null;
-                    }
-                    commit({ seats: currentSeats, students: students });
-                    updateStudentAssignmentDisplay();
-                    generateSeats();
-                }
-                clearDragHighlights();
-                return;
-            }
-
-            // 拖回学生名单区域
-            if (e.target.closest('.student-list')) {
-                if (draggedFromIndex !== null) {
-                    currentSeats[draggedFromIndex] = null;
-                    commit({ seats: currentSeats });
-                    generateSeats();
-                }
-                clearDragHighlights();
-                return;
-            }
-
-            // 拖到座位
-            const seat = e.target.closest('.seat');
-            if (!seat) {
-                clearDragHighlights();
-                return;
-            }
-            const seatIndex = parseInt(seat.getAttribute('data-index'));
-            if (Number.isNaN(seatIndex)) {
-                clearDragHighlights();
-                return;
-            }
-
-            // 从名单拖到座位
-            if (draggedStudentId && draggedFromIndex === null) {
-                if (currentSeats.includes(draggedStudentId)) {
-                    const student = getStudentById(draggedStudentId);
-                    alert('学生 ' + (student ? student.name : '') + ' 已经被安排座位了！');
-                    clearDragHighlights();
-                    return;
-                }
-                currentSeats[seatIndex] = draggedStudentId;
-                commit({ seats: currentSeats });
-            }
-            // 座位间交换
-            else if (draggedFromIndex !== null) {
-                const targetStudentId = currentSeats[seatIndex];
-                currentSeats[seatIndex] = draggedStudentId;
-                currentSeats[draggedFromIndex] = targetStudentId;
-                commit({ seats: currentSeats });
-            }
-
-            generateSeats();
-            clearDragHighlights();
-        }
-
-        function handleDragEnd(e) {
-            clearDragHighlights();
-        }
-
-        // 为学生名单区域添加拖放支持
-        if (!isTouchDevice) {
-            studentList.addEventListener('dragover', function (e) {
-                e.preventDefault();
-            });
-
-            studentList.addEventListener('dragenter', function (e) {
-                e.preventDefault();
-                this.classList.add('highlight');
-            });
-
-            studentList.addEventListener('dragleave', function (e) {
-                this.classList.remove('highlight');
-            });
-
-            studentList.addEventListener('drop', function (e) {
-                e.preventDefault();
-                this.classList.remove('highlight');
-                handleDrop(e); // 复用handleDrop函数
-            });
-
-            // 为删除区域添加拖放支持
-            deleteZone.addEventListener('dragover', function (e) {
-                e.preventDefault();
-                this.classList.add('highlight');
-            });
-
-            deleteZone.addEventListener('dragenter', function (e) {
-                e.preventDefault();
-                this.classList.add('highlight');
-            });
-
-            deleteZone.addEventListener('dragleave', function (e) {
-                this.classList.remove('highlight');
-            });
-
-            deleteZone.addEventListener('drop', function (e) {
-                e.preventDefault();
-                this.classList.remove('highlight');
-                handleDrop(e); // 复用handleDrop函数
-            });
-        }
-
-        // 为座位表区域添加拖放支持（事件委托）
-        if (!isTouchDevice) {
-            classroom.addEventListener('dragstart', handleDragStart);
-            classroom.addEventListener('dragover', handleDragOver);
-            classroom.addEventListener('dragenter', handleDragEnter);
-            classroom.addEventListener('dragleave', handleDragLeave);
-            classroom.addEventListener('drop', handleDrop);
-            classroom.addEventListener('dragend', handleDragEnd);
-        }
+        });
+        // 一次性绑定 studentList / deleteZone / classroom 静态区域事件
+        dragdrop.attachEventListeners();
+        // 顶层别名 — 保留主 IIFE 内既有调用点零修改(toggleCheckinMode 等)
+        const clearDragHighlights = dragdrop.clearDragHighlights;
+        const handleDrop = dragdrop.handleDrop;
 
         // 标题编辑后自动保存
         pageTitle.addEventListener('input', autoSave);
