@@ -261,13 +261,21 @@ let isTouchDevice = state.isTouchDevice;
 
         // ==================== 撤销/重做 ====================
 
+        // 深拷贝工具:优先 structuredClone(原生、快、支持更多类型),
+        // 老浏览器(Chrome <98 / Safari <15.4)回退 JSON 序列化。
+        // 快照数据均为纯 JSON 结构(students/groups/aisles),两种方式结果等价。
+        function deepClone(obj) {
+            if (typeof structuredClone === 'function') return structuredClone(obj);
+            return JSON.parse(JSON.stringify(obj));
+        }
+
         function pushSnapshot() {
             if (isUndoing) return;
             undoStack.push({
                 seats: [...currentSeats],
-                students: JSON.parse(JSON.stringify(students)),
-                groups: JSON.parse(JSON.stringify(groups)),
-                aisles: JSON.parse(JSON.stringify(aisles)),
+                students: deepClone(students),
+                groups: deepClone(groups),
+                aisles: deepClone(aisles),
                 rows: rows,
                 cols: cols
             });
@@ -281,17 +289,17 @@ let isTouchDevice = state.isTouchDevice;
             isUndoing = true;
             redoStack.push({
                 seats: [...currentSeats],
-                students: JSON.parse(JSON.stringify(students)),
-                groups: JSON.parse(JSON.stringify(groups)),
-                aisles: JSON.parse(JSON.stringify(aisles)),
+                students: deepClone(students),
+                groups: deepClone(groups),
+                aisles: deepClone(aisles),
                 rows: rows,
                 cols: cols
             });
             const snap = undoStack.pop();
             currentSeats = [...snap.seats];
-            students = JSON.parse(JSON.stringify(snap.students));
-            groups = JSON.parse(JSON.stringify(snap.groups));
-            aisles = JSON.parse(JSON.stringify(snap.aisles));
+            students = deepClone(snap.students);
+            groups = deepClone(snap.groups);
+            aisles = deepClone(snap.aisles);
             rows = snap.rows;
             cols = snap.cols;
             commit({ seats: currentSeats, students: students, groups: groups, aisles: aisles, rows: rows, cols: cols });
@@ -310,17 +318,17 @@ let isTouchDevice = state.isTouchDevice;
             isUndoing = true;
             undoStack.push({
                 seats: [...currentSeats],
-                students: JSON.parse(JSON.stringify(students)),
-                groups: JSON.parse(JSON.stringify(groups)),
-                aisles: JSON.parse(JSON.stringify(aisles)),
+                students: deepClone(students),
+                groups: deepClone(groups),
+                aisles: deepClone(aisles),
                 rows: rows,
                 cols: cols
             });
             const snap = redoStack.pop();
             currentSeats = [...snap.seats];
-            students = JSON.parse(JSON.stringify(snap.students));
-            groups = JSON.parse(JSON.stringify(snap.groups));
-            aisles = JSON.parse(JSON.stringify(snap.aisles));
+            students = deepClone(snap.students);
+            groups = deepClone(snap.groups);
+            aisles = deepClone(snap.aisles);
             rows = snap.rows;
             cols = snap.cols;
             commit({ seats: currentSeats, students: students, groups: groups, aisles: aisles, rows: rows, cols: cols });
@@ -791,6 +799,88 @@ let isTouchDevice = state.isTouchDevice;
         let activeTagPopup = null; // { studentId, popupEl }
 
         // 新增行标签 popup（操作临时标签数据，不关联 studentId）
+        // 共享 popup 骨架:DOM 创建 + 定位 + 回车添加 + 标签建议 + 阻止冒泡。
+        // 调用方只需传入标题、锚点、建议数据源,再自行绑定 添加/删除 事件(P1 去重,原先两函数 copy-paste ~100 行)。
+        function createTagPopupShell(titleHtml, anchorEl, suggestionSource) {
+            const container = ensureTagPopupContainer();
+            const popup = document.createElement('div');
+            popup.className = 'tag-popup';
+            popup.innerHTML =
+                '<div class="tag-popup-title">' + titleHtml + '</div>' +
+                '<div class="tag-chips-container"></div>' +
+                '<div class="tag-popup-row">' +
+                    '<input type="text" class="tag-popup-emoji" placeholder="🏷" maxlength="4" title="emoji图标">' +
+                    '<input type="text" class="tag-popup-input" placeholder="标签名称">' +
+                    '<button class="mini-btn primary tag-popup-add">添加</button>' +
+                '</div>' +
+                '<div class="tag-suggestions" style="display:none;"></div>';
+
+            container.appendChild(popup);
+
+            // 定位 popup:锚点右侧 8px,越界翻转到左侧
+            const rect = anchorEl.getBoundingClientRect();
+            const popupWidth = 280;
+            let left = rect.right + 8;
+            let top = rect.top;
+            if (left + popupWidth > window.innerWidth - 8) {
+                left = Math.max(8, rect.left - popupWidth - 8);
+            }
+            popup.style.left = left + 'px';
+            popup.style.top = top + 'px';
+
+            requestAnimationFrame(function () {
+                popup.classList.add('visible');
+            });
+
+            // 回车添加
+            popup.querySelector('.tag-popup-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    popup.querySelector('.tag-popup-add').click();
+                }
+            });
+
+            // 标签名称输入框 focus 时显示已有标签建议(数据源懒取,保证实时)
+            const labelInput = popup.querySelector('.tag-popup-input');
+            let suggestionHideTimer = null;
+            labelInput.addEventListener('focus', function () {
+                if (suggestionHideTimer) { clearTimeout(suggestionHideTimer); suggestionHideTimer = null; }
+                const suggestionsEl = popup.querySelector('.tag-suggestions');
+                const existingTags = collectExistingTags(suggestionSource);
+                if (existingTags.length === 0) { suggestionsEl.style.display = 'none'; return; }
+                suggestionsEl.innerHTML = existingTags.map(function (t) {
+                    return '<button type="button" class="tag-suggestion-item" data-emoji="' + escapeHtml(t.emoji || '') + '" data-label="' + escapeHtml(t.label) + '">' +
+                        '<span class="tag-suggestion-emoji">' + escapeHtml(t.emoji || '🏷') + '</span>' +
+                        '<span class="tag-suggestion-label">' + escapeHtml(t.label) + '</span>' +
+                    '</button>';
+                }).join('');
+                suggestionsEl.style.display = 'block';
+            });
+            labelInput.addEventListener('blur', function () {
+                // 延迟隐藏,让点击建议项能触发
+                suggestionHideTimer = setTimeout(function () {
+                    const el = popup.querySelector('.tag-suggestions');
+                    if (el) el.style.display = 'none';
+                }, 150);
+            });
+
+            // 点击建议项填充
+            popup.querySelector('.tag-suggestions').addEventListener('click', function (e) {
+                const sItem = e.target.closest('.tag-suggestion-item');
+                if (!sItem) return;
+                e.preventDefault();
+                popup.querySelector('.tag-popup-emoji').value = sItem.getAttribute('data-emoji') || '';
+                popup.querySelector('.tag-popup-input').value = sItem.getAttribute('data-label');
+                popup.querySelector('.tag-suggestions').style.display = 'none';
+            });
+
+            // 防止点击 popup 内部关闭
+            popup.addEventListener('click', function (e) {
+                e.stopPropagation();
+            });
+
+            return popup;
+        }
+
         function openNewStudentTagPopup(anchorEl) {
             if (activeTagPopup) closeTagPopup();
 
@@ -804,33 +894,10 @@ let isTouchDevice = state.isTouchDevice;
                 });
             });
 
-            const container = ensureTagPopupContainer();
-            const popup = document.createElement('div');
-            popup.className = 'tag-popup';
-            popup.innerHTML =
-                '<div class="tag-popup-title">管理标签 — 新增学生</div>' +
-                '<div class="tag-chips-container"></div>' +
-                '<div class="tag-popup-row">' +
-                    '<input type="text" class="tag-popup-emoji" placeholder="🏷" maxlength="4" title="emoji图标">' +
-                    '<input type="text" class="tag-popup-input" placeholder="标签名称">' +
-                    '<button class="mini-btn primary tag-popup-add">添加</button>' +
-                '</div>' +
-                '<div class="tag-suggestions" style="display:none;"></div>';
+            // 用一个伪对象让标签建议复用 collectExistingTags(tempTags 引用稳定,增删实时同步)
+            const tempStudent = { name: '新增学生', tags: tempTags };
+            const popup = createTagPopupShell('管理标签 — 新增学生', anchorEl, tempStudent);
 
-            container.appendChild(popup);
-
-            const rect = anchorEl.getBoundingClientRect();
-            const popupWidth = 280;
-            let left = rect.right + 8;
-            let top = rect.top;
-            if (left + popupWidth > window.innerWidth - 8) {
-                left = Math.max(8, rect.left - popupWidth - 8);
-            }
-            popup.style.left = left + 'px';
-            popup.style.top = top + 'px';
-
-            // 用一个伪对象让 renderTagPopup 复用
-            var tempStudent = { name: '新增学生', tags: tempTags };
             activeTagPopup = { studentId: '__new__', popupEl: popup, tempTags: tempTags, rowItem: item };
 
             function renderTemp() {
@@ -867,10 +934,6 @@ let isTouchDevice = state.isTouchDevice;
 
             renderTemp();
 
-            requestAnimationFrame(function () {
-                popup.classList.add('visible');
-            });
-
             // 添加标签
             popup.querySelector('.tag-popup-add').addEventListener('click', function () {
                 var emojiInput = popup.querySelector('.tag-popup-emoji');
@@ -892,48 +955,6 @@ let isTouchDevice = state.isTouchDevice;
                 var idx = parseInt(removeBtn.getAttribute('data-tag-idx'));
                 tempTags.splice(idx, 1);
                 renderTemp();
-            });
-
-            // 回车添加
-            popup.querySelector('.tag-popup-input').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') {
-                    popup.querySelector('.tag-popup-add').click();
-                }
-            });
-
-            // 标签建议
-            var labelInput = popup.querySelector('.tag-popup-input');
-            var suggestionHideTimer = null;
-            labelInput.addEventListener('focus', function () {
-                if (suggestionHideTimer) { clearTimeout(suggestionHideTimer); suggestionHideTimer = null; }
-                var suggestionsEl = popup.querySelector('.tag-suggestions');
-                var existingTags = collectExistingTags(tempStudent);
-                if (existingTags.length === 0) { suggestionsEl.style.display = 'none'; return; }
-                suggestionsEl.innerHTML = existingTags.map(function (t) {
-                    return '<button type="button" class="tag-suggestion-item" data-emoji="' + escapeHtml(t.emoji || '') + '" data-label="' + escapeHtml(t.label) + '">' +
-                        '<span class="tag-suggestion-emoji">' + escapeHtml(t.emoji || '🏷') + '</span>' +
-                        '<span class="tag-suggestion-label">' + escapeHtml(t.label) + '</span>' +
-                    '</button>';
-                }).join('');
-                suggestionsEl.style.display = 'block';
-            });
-            labelInput.addEventListener('blur', function () {
-                suggestionHideTimer = setTimeout(function () {
-                    var el = popup.querySelector('.tag-suggestions');
-                    if (el) el.style.display = 'none';
-                }, 150);
-            });
-            popup.querySelector('.tag-suggestions').addEventListener('click', function (e) {
-                var sItem = e.target.closest('.tag-suggestion-item');
-                if (!sItem) return;
-                e.preventDefault();
-                popup.querySelector('.tag-popup-emoji').value = sItem.getAttribute('data-emoji') || '';
-                popup.querySelector('.tag-popup-input').value = sItem.getAttribute('data-label');
-                popup.querySelector('.tag-suggestions').style.display = 'none';
-            });
-
-            popup.addEventListener('click', function (e) {
-                e.stopPropagation();
             });
         }
 
@@ -981,40 +1002,11 @@ let isTouchDevice = state.isTouchDevice;
             const student = getStudentById(studentId);
             if (!student) return;
 
-            const container = ensureTagPopupContainer();
-            const popup = document.createElement('div');
-            popup.className = 'tag-popup';
-            popup.innerHTML =
-                '<div class="tag-popup-title">管理标签 — ' + escapeHtml(student.name) + '</div>' +
-                '<div class="tag-chips-container"></div>' +
-                '<div class="tag-popup-row">' +
-                    '<input type="text" class="tag-popup-emoji" placeholder="🏷" maxlength="4" title="emoji图标">' +
-                    '<input type="text" class="tag-popup-input" placeholder="标签名称">' +
-                    '<button class="mini-btn primary tag-popup-add">添加</button>' +
-                '</div>' +
-                '<div class="tag-suggestions" style="display:none;"></div>';
-
-            container.appendChild(popup);
-
-            // 定位 popup
-            const rect = anchorEl.getBoundingClientRect();
-            const popupWidth = 280;
-            let left = rect.right + 8;
-            let top = rect.top;
-            if (left + popupWidth > window.innerWidth - 8) {
-                left = Math.max(8, rect.left - popupWidth - 8);
-            }
-            popup.style.left = left + 'px';
-            popup.style.top = top + 'px';
+            const popup = createTagPopupShell('管理标签 — ' + escapeHtml(student.name), anchorEl, student);
 
             activeTagPopup = { studentId: studentId, popupEl: popup };
 
             renderTagPopup(popup, student);
-
-            // 显示 popup
-            requestAnimationFrame(function () {
-                popup.classList.add('visible');
-            });
 
             // 添加标签
             popup.querySelector('.tag-popup-add').addEventListener('click', function () {
@@ -1049,60 +1041,6 @@ let isTouchDevice = state.isTouchDevice;
                 generateSeats();
                 updateStudentAssignmentDisplay();
                 autoSave();
-            });
-
-            // 回车添加
-            popup.querySelector('.tag-popup-input').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') {
-                    popup.querySelector('.tag-popup-add').click();
-                }
-            });
-
-            // 标签名称输入框 focus 时显示已有标签建议
-            const labelInput = popup.querySelector('.tag-popup-input');
-            let suggestionHideTimer = null;
-            labelInput.addEventListener('focus', function () {
-                if (suggestionHideTimer) {
-                    clearTimeout(suggestionHideTimer);
-                    suggestionHideTimer = null;
-                }
-                const suggestionsEl = popup.querySelector('.tag-suggestions');
-                const existingTags = collectExistingTags(student);
-                if (existingTags.length === 0) {
-                    suggestionsEl.style.display = 'none';
-                    return;
-                }
-                suggestionsEl.innerHTML = existingTags.map(function (t) {
-                    return '<button type="button" class="tag-suggestion-item" data-emoji="' + escapeHtml(t.emoji || '') + '" data-label="' + escapeHtml(t.label) + '">' +
-                        '<span class="tag-suggestion-emoji">' + escapeHtml(t.emoji || '🏷') + '</span>' +
-                        '<span class="tag-suggestion-label">' + escapeHtml(t.label) + '</span>' +
-                    '</button>';
-                }).join('');
-                suggestionsEl.style.display = 'block';
-            });
-            labelInput.addEventListener('blur', function () {
-                // 延迟隐藏，让点击建议项能触发
-                suggestionHideTimer = setTimeout(function () {
-                    const el = popup.querySelector('.tag-suggestions');
-                    if (el) el.style.display = 'none';
-                }, 150);
-            });
-
-            // 点击建议项填充
-            popup.querySelector('.tag-suggestions').addEventListener('click', function (e) {
-                const item = e.target.closest('.tag-suggestion-item');
-                if (!item) return;
-                e.preventDefault();
-                const emojiInput = popup.querySelector('.tag-popup-emoji');
-                const labelInput = popup.querySelector('.tag-popup-input');
-                emojiInput.value = item.getAttribute('data-emoji') || '';
-                labelInput.value = item.getAttribute('data-label');
-                popup.querySelector('.tag-suggestions').style.display = 'none';
-            });
-
-            // 防止点击 popup 内部关闭
-            popup.addEventListener('click', function (e) {
-                e.stopPropagation();
             });
         }
 
@@ -1574,7 +1512,8 @@ let isTouchDevice = state.isTouchDevice;
         // 解析性别文本
         function parseGenderText(text) {
             if (!text) return '';
-            const lower = text.trim().toLowerCase();
+            // 去除 VS16 变体选择符(♂️ = ♂ + U+FE0F)及首尾空白,保证 emoji 与裸符号互通
+            const lower = text.trim().toLowerCase().replace(/\uFE0F/g, '');
             if (lower === '男' || lower === 'male' || lower === 'm' || lower === '♂' || lower === 'boy' || lower === '1') return 'male';
             if (lower === '女' || lower === 'female' || lower === 'f' || lower === '♀' || lower === 'girl' || lower === '2') return 'female';
             return '';
