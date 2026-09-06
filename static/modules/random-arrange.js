@@ -138,9 +138,9 @@ export function createRandomArrange(deps) {
 
         if (mode === 'random') {
             // 完全随机:剩余学生打乱后填入剩余座位
+            // 注意:shuffle() 返回新数组(不原地修改),必须接住返回值
             const remainingSeats = neededIndices.filter(idx => !occupiedSeats.has(idx));
-            const remainingStudents = state.students.filter(s => !placedIds.has(s.id));
-            shuffle(remainingStudents);
+            const remainingStudents = shuffle(state.students.filter(s => !placedIds.has(s.id)));
             placeStudentsInSeats(remainingSeats, remainingStudents);
         } else {
 
@@ -191,9 +191,9 @@ export function createRandomArrange(deps) {
                 });
 
                 // 收集尚未放置的座位和学生
+                // 注意:shuffle() 返回新数组,必须接住返回值
                 const remainingSeats = neededIndices.filter(idx => !occupiedSeats.has(idx));
-                const remainingStudents = state.students.filter(s => !placedIds.has(s.id));
-                shuffle(remainingStudents);
+                const remainingStudents = shuffle(state.students.filter(s => !placedIds.has(s.id)));
                 placeStudentsInSeats(remainingSeats, remainingStudents);
 
             } else if (mode === 'samegender') {
@@ -238,9 +238,9 @@ export function createRandomArrange(deps) {
                 });
 
                 // 收集剩余座位和剩余学生
+                // 注意:shuffle() 返回新数组,必须接住返回值
                 const remainingSeats = neededIndices.filter(idx => !occupiedSeats.has(idx));
-                const remainingStudents = state.students.filter(s => !placedIds.has(s.id));
-                shuffle(remainingStudents);
+                const remainingStudents = shuffle(state.students.filter(s => !placedIds.has(s.id)));
                 placeStudentsInSeats(remainingSeats, remainingStudents);
             }
         } // end else (mixed / samegender)
