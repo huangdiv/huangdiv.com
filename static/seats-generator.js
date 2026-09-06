@@ -269,6 +269,27 @@ let isTouchDevice = state.isTouchDevice;
             return JSON.parse(JSON.stringify(obj));
         }
 
+        // ==================== UTF-8 ↔ Base64 ====================
+        // 替代 deprecated 的 btoa(unescape(encodeURIComponent(s))) / decodeURIComponent(escape(atob(s)))。
+        // 老式方案依赖 escape/unescape(已被 MDN 标记 deprecated 且部分浏览器将移除),
+        // 新方案用 TextEncoder/TextDecoder 原生处理 UTF-8,对 emoji/中文 安全。
+        function utf8ToBase64(str) {
+            const bytes = new TextEncoder().encode(str);
+            let bin = '';
+            // 分块拼接避免单次 apply 参数过多(>65535 个会 RangeError)
+            const CHUNK = 0x8000;
+            for (let i = 0; i < bytes.length; i += CHUNK) {
+                bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+            }
+            return btoa(bin);
+        }
+        function base64ToUtf8(b64) {
+            const bin = atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return new TextDecoder().decode(bytes);
+        }
+
         function pushSnapshot() {
             if (isUndoing) return;
             undoStack.push({
@@ -2421,7 +2442,7 @@ let isTouchDevice = state.isTouchDevice;
             const configs = getSavedConfigs();
             const activeName = getActiveConfigName();
             const content = JSON.stringify({ configs, activeName, current: getCurrentConfig(), savedAt: Date.now() }, null, 2);
-            const encodedContent = btoa(unescape(encodeURIComponent(content)));
+            const encodedContent = utf8ToBase64(content);
 
             githubApiRequest('GET', `/contents/${encodeGitHubPath(s.path)}`)
                 .then(res => res.json())
@@ -2462,7 +2483,7 @@ let isTouchDevice = state.isTouchDevice;
                 .then(res => res.json())
                 .then(data => {
                     if (!data.content) throw new Error('文件内容为空');
-                    const decoded = decodeURIComponent(escape(atob(data.content)));
+                    const decoded = base64ToUtf8(data.content);
                     return JSON.parse(decoded);
                 })
                 .then(data => {
