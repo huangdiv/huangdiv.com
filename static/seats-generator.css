@@ -2381,6 +2381,42 @@ button:disabled {
     color: var(--danger);
 }
 
+/* GitHub Token 行布局:input + 清除按钮(P0-c UX 强化)*/
+.github-token-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.github-token-row .webdav-input {
+    flex: 1;
+    margin-bottom: 0;
+}
+.github-token-clear {
+    flex-shrink: 0;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+}
+.github-token-clear:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.github-token-status {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 4px 0 8px;
+    min-height: 14px;
+    font-style: italic;
+}
+.github-token-status.has-token {
+    color: var(--success);
+    font-style: normal;
+}
+.github-token-status.no-token {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
 .file-info {
     font-size: 12px;
     color: var(--text-secondary);

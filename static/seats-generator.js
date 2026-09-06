@@ -2,6 +2,7 @@ import { state, bus, commit, subscribe, selectors } from './modules/state.js';
 import { createSeatGrid } from './modules/seat-grid.js';
 import { createDragdrop } from './modules/dragdrop.js';
 import { createRandomArrange } from './modules/random-arrange.js';
+import { migrateConfig as migrateConfigFn } from './modules/migrate.js';
 
     (function () {
         'use strict';
@@ -369,49 +370,10 @@ let isTouchDevice = state.isTouchDevice;
         }
 
         // ==================== 配置迁移（向后兼容） ====================
-
+        // 委托给 modules/migrate.js — 纯函数,无副作用,易单测
+        // 这里只做一个薄包装,因为 IIFE 内的 generateId 已闭包到 migrate 内部
         function migrateConfig(config) {
-            if (!config) return config;
-            // 处理极旧格式：students 是字符串数组
-            if (config.students && config.students.length > 0 && typeof config.students[0] === 'string') {
-                config.students = config.students.map(function (name) {
-                    return { id: generateId('s'), name: name, groupId: null, gender: '', tags: [] };
-                });
-            }
-            // 处理旧格式：students 对象没有 id 字段
-            if (config.students && config.students.length > 0 && !config.students[0].id) {
-                config.students.forEach(function (s) {
-                    if (!s.id) s.id = generateId('s');
-                });
-            }
-            // 如果 seats 中存的是姓名而非 ID，转换为 ID
-            if (config.seats && config.students && config.students.length > 0) {
-                const idSet = new Set(config.students.map(function (s) { return s.id; }));
-                const nameToId = new Map(config.students.map(function (s) { return [s.name, s.id]; }));
-                config.seats = config.seats.map(function (seatVal) {
-                    if (seatVal == null) return null;
-                    if (idSet.has(seatVal)) return seatVal; // 已经是 ID
-                    return nameToId.get(seatVal) || null;   // 旧格式姓名 → ID
-                });
-            }
-            // 为旧数据补充 checkedIn 字段
-            if (config.students && config.students.length > 0) {
-                config.students.forEach(function (s) {
-                    if (s.checkedIn == null) s.checkedIn = false;
-                    if (s.gender == null) s.gender = '';
-                    if (s.tags == null || !Array.isArray(s.tags)) s.tags = [];
-                });
-            }
-            // 为旧数据补充配对约束
-            if (!Array.isArray(config.forcedPairs)) config.forcedPairs = [];
-            if (!Array.isArray(config.avoidPairs)) config.avoidPairs = [];
-            // 补全 v1.3.0 新增的顶层字段默认值（P0-a 修复）
-            if (!Array.isArray(config.aisles)) config.aisles = [];
-            if (config.showStudentIcons === undefined) config.showStudentIcons = true;
-            if (!config.viewMode) config.viewMode = 'student';
-            if (typeof config.title !== 'string' || !config.title.trim()) config.title = '班级座位表';
-            config.version = APP_VERSION;
-            return config;
+            return migrateConfigFn(config);
         }
 
         // 添加走道按钮事件
@@ -2331,11 +2293,53 @@ let isTouchDevice = state.isTouchDevice;
         const githubRepo = document.getElementById('githubRepo');
         const githubPath = document.getElementById('githubPath');
         const githubToken = document.getElementById('githubToken');
+        const githubTokenClearBtn = document.getElementById('githubTokenClearBtn');
+        const githubTokenStatus = document.getElementById('githubTokenStatus');
         const githubStatus = document.getElementById('githubStatus');
         const githubSaveSettingsBtn = document.getElementById('githubSaveSettingsBtn');
         const githubTestBtn = document.getElementById('githubTestBtn');
         const githubSyncUpBtn = document.getElementById('githubSyncUpBtn');
         const githubSyncDownBtn = document.getElementById('githubSyncDownBtn');
+
+        // 显示当前会话中 Token 的状态(P0-c 安全 UX 强化)。
+        // 三种状态:
+        //   1. 未设置 — 输入框空 + sessionStorage 空
+        //   2. 已输入(未保存) — 输入框有值但 sessionStorage 还没存
+        //   3. 已保存 — sessionStorage 存了,关闭标签页后失效
+        // 不显示 Token 本身(密码框 + sessionStorage + type=password),只显示状态文字。
+        function updateGithubTokenStatus() {
+            const sessionToken = sessionStorage.getItem(GITHUB_TOKEN_KEY) || '';
+            const inputToken = githubToken.value || '';
+            const hasSession = sessionToken.length > 0;
+            const hasInput = inputToken.length > 0;
+            const inputMatchesSession = inputToken === sessionToken;
+
+            let text, cls;
+            if (!hasInput && !hasSession) {
+                text = 'Token 未设置(请填入 Personal Access Token 后点击「保存设置」)';
+                cls = 'no-token';
+            } else if (hasInput && !hasSession) {
+                text = 'Token 已输入但尚未保存(需点击「保存设置」才会持久化到本会话)';
+                cls = 'pending-token';
+            } else if (hasInput && hasSession && !inputMatchesSession) {
+                text = 'Token 已修改(需点击「保存设置」才能更新已保存的 Token)';
+                cls = 'pending-token';
+            } else {
+                text = 'Token 已保存(仅本会话,关闭标签页后失效)';
+                cls = 'has-token';
+            }
+            githubTokenStatus.textContent = text;
+            githubTokenStatus.className = 'github-token-status ' + cls;
+            // 清除按钮:有 sessionStorage 的 token 时才启用
+            githubTokenClearBtn.disabled = !hasSession;
+        }
+
+        function clearGithubToken() {
+            sessionStorage.removeItem(GITHUB_TOKEN_KEY);
+            githubToken.value = '';
+            updateGithubTokenStatus();
+            setGithubStatus('Token 已从本会话清除', 'success');
+        }
 
         (function loadGithubSettings() {
             try {
@@ -2345,11 +2349,19 @@ let isTouchDevice = state.isTouchDevice;
                     githubRepo.value = s.repo || '';
                     githubPath.value = s.path || 'data/seats-configs.json';
                 }
-                // Token 只存 sessionStorage（随标签页关闭清除，不持久落盘）— P0-d 安全修复
+                // Token 只存 sessionStorage(随标签页关闭清除,不持久落盘)— P0-d 安全修复
                 const token = sessionStorage.getItem(GITHUB_TOKEN_KEY);
                 if (token) githubToken.value = token;
-            } catch {}
+                updateGithubTokenStatus();
+            } catch {
+                updateGithubTokenStatus();
+            }
         })();
+
+        // 监听输入:用户改 token 立即更新状态指示
+        githubToken.addEventListener('input', updateGithubTokenStatus);
+        // 清除按钮:移除 sessionStorage 中的 token + 清空输入框
+        githubTokenClearBtn.addEventListener('click', clearGithubToken);
 
         function setGithubStatus(msg, type) {
             githubStatus.textContent = msg;
@@ -2418,12 +2430,13 @@ let isTouchDevice = state.isTouchDevice;
             if (!s.owner) { setGithubStatus('请填写 GitHub 用户名', 'error'); return; }
             if (!s.repo) { setGithubStatus('请填写仓库名', 'error'); return; }
             if (!s.token) { setGithubStatus('请填写 Personal Access Token', 'error'); return; }
-            
+
             // 非敏感字段存 localStorage；Token 只存 sessionStorage（P0-d 安全修复）
             localStorage.setItem(GITHUB_SETTINGS_KEY, JSON.stringify({
                 owner: s.owner, repo: s.repo, path: s.path
             }));
             sessionStorage.setItem(GITHUB_TOKEN_KEY, s.token);
+            updateGithubTokenStatus();
             setGithubStatus('设置已保存（Token 仅本会话有效），正在测试连接…', '');
             testGithubConnection();
         });
@@ -2501,7 +2514,7 @@ let isTouchDevice = state.isTouchDevice;
 
             setGithubStatus('正在下载…', '');
 
-            githubApiRequest('GET', `/contents/${s.path}`)
+            githubApiRequest('GET', `/contents/${encodeGitHubPath(s.path)}`)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.content) throw new Error('文件内容为空');

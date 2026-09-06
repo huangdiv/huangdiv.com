@@ -352,7 +352,11 @@
                             <input type="text" id="githubOwner" class="webdav-input" placeholder="GitHub 用户名 (如 username)">
                             <input type="text" id="githubRepo" class="webdav-input" placeholder="仓库名 (如 blog)">
                             <input type="text" id="githubPath" class="webdav-input" placeholder="文件路径 (如 data/seats-configs.json)" value="data/seats-configs.json">
-                            <input type="password" id="githubToken" class="webdav-input" placeholder="Personal Access Token">
+                            <div class="github-token-row">
+                                <input type="password" id="githubToken" class="webdav-input" placeholder="Personal Access Token" autocomplete="off">
+                                <button id="githubTokenClearBtn" type="button" class="io-btn ghost github-token-clear" title="清除当前会话保存的 Token">清除</button>
+                            </div>
+                            <div id="githubTokenStatus" class="github-token-status" aria-live="polite"></div>
                             <div class="io-btn-row">
                                 <button id="githubSaveSettingsBtn" class="io-btn ghost">保存设置</button>
                                 <button id="githubTestBtn" class="io-btn ghost">测试连接</button>
