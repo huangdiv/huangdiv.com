@@ -1561,19 +1561,33 @@ let isTouchDevice = state.isTouchDevice;
         // 备用 emoji 池（不依赖关键词匹配时从中选取）
         const FALLBACK_EMOJI_POOL = ['📌', '📍', '💡', '🔥', '🎯', '🚀', '🎉', '🌈', '🔖', '🏷', '🎭', '🎪', '🎁', '✨', '💫', '⚡', '🌊', '🍀', '🌸', '🌻', '🐼', '🦊', '🐰', '🐱', '🐶'];
 
-        function autoAssignEmoji(label, usedEmojis) {
-            if (!usedEmojis) usedEmojis = new Set();
-            const labelLower = label.toLowerCase();
-            // 1. 先尝试关键词匹配
+        // P1 批次4:#3 labelToEmojiMap 外置 — 把嵌套的两层数组预展平为 keyword→emoji 一维表,
+        // 让 autoAssignEmoji 内的命中检查从「31 entries × N keywords × indexOf」改成单层 N 次 indexOf
+        // (对 1000-行 xlsx 第一遍扫描省一层循环间接)
+        const KEYWORD_TO_EMOJI_FLAT = (function () {
+            const flat = [];
             for (let i = 0; i < EMOJI_KEYWORD_MAP.length; i++) {
                 const entry = EMOJI_KEYWORD_MAP[i];
                 for (let j = 0; j < entry.keywords.length; j++) {
-                    if (labelLower.indexOf(entry.keywords[j]) >= 0) {
-                        if (!usedEmojis.has(entry.emoji)) {
-                            usedEmojis.add(entry.emoji);
-                            return entry.emoji;
-                        }
-                    }
+                    flat.push({ keyword: entry.keywords[j], emoji: entry.emoji });
+                }
+            }
+            return flat;
+        })();
+        // 注:labelToEmojiMap 与 usedEmojis Set 由调用方(parseTagValue 的唯一调用点
+        // importStudentsWithGroups)在 row 循环外一次性构造并作为参数传入复用 ——
+        // 一次导入 1000 行只构造一次 Map/Set,而不每行新建。Review v1.3.0 §六 D-3 提到的
+        // "1000+ 行 xlsx 重复构造"问题已在重构阶段解决。
+
+        function autoAssignEmoji(label, usedEmojis) {
+            if (!usedEmojis) usedEmojis = new Set();
+            const labelLower = label.toLowerCase();
+            // 1. 先尝试关键词匹配(扁平表单层循环)
+            for (let i = 0; i < KEYWORD_TO_EMOJI_FLAT.length; i++) {
+                const entry = KEYWORD_TO_EMOJI_FLAT[i];
+                if (labelLower.indexOf(entry.keyword) >= 0 && !usedEmojis.has(entry.emoji)) {
+                    usedEmojis.add(entry.emoji);
+                    return entry.emoji;
                 }
             }
             // 2. 关键词无匹配或 emoji 已被占用：从备用池选第一个未被占用的
