@@ -27,10 +27,16 @@ export function createRandomArrange(deps) {
 
     // ─────────── 模块私有 helpers ───────────
 
-    // 获取所有同桌对(同 row、相邻 col、中间无走道)和单独座位
+    // 获取所有同桌对(同 row、相邻 col、中间无走道)、单独座位、以及同桌映射表 pairMap。
+    // 同时返回 pairMap 是为 #6 重构铺路:findPairMate 可以 O(1) 查到某座位的同桌,
+    // 不再每次 O(pairs.length) 线性扫描(原 findDeskMateSeat 是 O(pairs.length))。
+    // 为未来支持异形座位布局(纵向同桌 / 三人桌 / L 形桌)铺路:
+    //   只需扩展此函数内部 pairMap 填充策略(纵向填 mate、三人桌三向填),
+    //   findPairMate 与所有调用点零修改。
     function getDeskMatePairs() {
         const pairs = [];     // [[idx1, idx2], ...] 同桌对
         const singles = [];   // 无法配对的单独座位索引
+        const pairMap = new Array(state.rows * state.cols).fill(null); // idx → mateIdx
         for (let r = 0; r < state.rows; r++) {
             let c = 0;
             while (c < state.cols) {
@@ -39,8 +45,11 @@ export function createRandomArrange(deps) {
                     // 检查 c 和 c+1 之间是否有走道
                     const aisle = state.aisles.find(a => a.afterCol === c + 1);
                     if (!aisle) {
-                        // 无走道 → 同桌
-                        pairs.push([idx, idx + 1]);
+                        // 无走道 → 同桌(双向填 pairMap,支持反向查询)
+                        const mateIdx = idx + 1;
+                        pairMap[idx] = mateIdx;
+                        pairMap[mateIdx] = idx;
+                        pairs.push([idx, mateIdx]);
                         c += 2;
                         continue;
                     }
@@ -49,7 +58,14 @@ export function createRandomArrange(deps) {
                 c += 1;
             }
         }
-        return { pairs: pairs, singles: singles };
+        return { pairs: pairs, singles: singles, pairMap: pairMap };
+    }
+
+    // O(1) 找某座位的同桌座位;pairMap 必须由 getDeskMatePairs() 产生。
+    // 单同桌型(横向):返回唯一 mate;无同桌型(singles/走道分隔):返回 null。
+    function findPairMate(seatIdx, pairMap) {
+        if (!pairMap) return null;
+        return pairMap[seatIdx];
     }
 
     // 判断学生性别(无性别信息视为中性 wildcard)
@@ -61,12 +77,18 @@ export function createRandomArrange(deps) {
 
     // ─────────── 入口函数 ───────────
 
-    function randomSeatArrange(mode) {
+    function randomSeatArrange(mode, options) {
+        // #5 批次:options.maxAttempts 允许调用方覆盖默认尝试次数(从 localStorage 或 UI 读)。
+        options = options || {};
+        var maxAttempts = (typeof options.maxAttempts === 'number' && options.maxAttempts > 0)
+            ? Math.floor(options.maxAttempts)
+            : 200;
+
         if (state.students.length === 0) {
             alert('请先导入学生名单！');
-            return;
+            return { warnings: ['请先导入学生名单'] };
         }
-        if (!confirm('确定要执行「' + ({random:'完全随机', mixed:'男女同桌', samegender:'男女不同桌'}[mode]) + '」排座吗？')) return;
+        if (!confirm('确定要执行「' + ({random:'完全随机', mixed:'男女同桌', samegender:'男女不同桌'}[mode]) + '」排座吗？')) return { warnings: [] };
 
         // 保存旧座位映射(学生ID → 旧座位索引),用于后处理确保完全换座
         var prevSeatMap = {};
@@ -81,7 +103,7 @@ export function createRandomArrange(deps) {
         const seatCount = Math.min(state.students.length, totalSeats);
 
         // 获取同桌对结构(所有模式共用,random 模式也需要处理 forcedPairs)
-        const { pairs, singles } = getDeskMatePairs();
+        const { pairs, singles, pairMap } = getDeskMatePairs();
         const allSeatIndices = [];
         pairs.forEach(p => { allSeatIndices.push(p[0], p[1]); });
         singles.forEach(s => allSeatIndices.push(s));
@@ -271,9 +293,9 @@ export function createRandomArrange(deps) {
 
         // 检查两个学生交换后是否会产生回避配对同桌
         function swapCreatesAvoidPair(seatA, studentAId, seatB, studentBId) {
-            // 找出 seatA 的同桌座位
-            var mateA = findDeskMateSeat(seatA);
-            var mateB = findDeskMateSeat(seatB);
+            // 找出 seatA 的同桌座位(共享 pairMap,O(1) 查询)
+            var mateA = findPairMate(seatA, pairMap);
+            var mateB = findPairMate(seatB, pairMap);
             // 交换后:studentBId 在 seatA,studentAId 在 seatB
             // 检查 seatA 的同桌
             if (mateA != null && state.seats[mateA] && state.seats[mateA] !== studentAId && state.seats[mateA] !== studentBId) {
@@ -286,17 +308,7 @@ export function createRandomArrange(deps) {
             return false;
         }
 
-        // 找某座位的同桌座位
-        function findDeskMateSeat(seatIdx) {
-            for (var pi = 0; pi < pairs.length; pi++) {
-                if (pairs[pi][0] === seatIdx) return pairs[pi][1];
-                if (pairs[pi][1] === seatIdx) return pairs[pi][0];
-            }
-            return null;
-        }
-
         var conflicts = findConflicts();
-        var maxAttempts = 200;
         var attempts = 0;
 
         while (conflicts.length > 0 && attempts < maxAttempts) {
@@ -356,9 +368,28 @@ export function createRandomArrange(deps) {
 
         commit({ seats: state.seats });
         onGenerateSeats();
+
+        // ==================== 结果自检 (#4 批次:失败 toast) ====================
+        // 检测算法未达成目标的情况,通过 warnings 数组返回给调用方显示 toast,
+        // 避免静默返回部分结果(原行为是 200 次跑完即退出,无任何提示)。
+        var warnings = [];
+        if (conflicts.length > 0) {
+            // 仍有学生在原座位(可能是强制配对/无可交换目标,或是 maxAttempts 用尽)
+            warnings.push('未能完全保证换位:仍 ' + conflicts.length + ' 名学生在原座位(超过 ' + maxAttempts + ' 次尝试)');
+        }
+        // 检测是否有学生未入座(students > seats 极端场景)
+        var placedCount = state.seats.filter(function (s) { return s; }).length;
+        if (placedCount < state.students.length) {
+            warnings.push((state.students.length - placedCount) + ' 名学生未入座(座位不足)');
+        }
+        return { warnings: warnings };
     }
 
     return {
-        randomSeatArrange
+        randomSeatArrange,
+        // 导出 helper 供单元测试使用(#16 批次)
+        getDeskMatePairs,
+        findPairMate,
+        getGender
     };
 }

@@ -1161,6 +1161,16 @@ let isTouchDevice = state.isTouchDevice;
                         '<button class="mini-btn pair-avoid-add">添加</button>' +
                     '</div>' +
                     '<div class="pair-avoid-list"></div>' +
+                '</div>' +
+                // #5 批次:排座尝试次数上限 UI(配对设置弹窗里的「高级选项」)
+                '<div class="pair-popup-section">' +
+                    '<div class="pair-popup-section-title">排座选项</div>' +
+                    '<div class="pair-popup-row">' +
+                        '<label class="pair-popup-label">后处理尝试上限</label>' +
+                        '<input type="number" class="pair-max-attempts" min="50" max="2000" step="50" value="' +
+                            (parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10)) + '">' +
+                        '<span class="pair-popup-hint">次</span>' +
+                    '</div>' +
                 '</div>';
 
             container.appendChild(popup);
@@ -1239,6 +1249,18 @@ let isTouchDevice = state.isTouchDevice;
                 renderAll();
                 autoSave();
             });
+
+            // #5 批次:排座尝试次数 input 变更写回 localStorage
+            var maxAttemptsInput = popup.querySelector('.pair-max-attempts');
+            if (maxAttemptsInput) {
+                maxAttemptsInput.addEventListener('change', function () {
+                    var v = parseInt(this.value, 10);
+                    if (!isFinite(v) || v < 50) v = 50;
+                    if (v > 2000) v = 2000;
+                    this.value = v;
+                    localStorage.setItem('seatArrangeMaxAttempts', String(v));
+                });
+            }
 
             popup.addEventListener('click', function (e) {
                 e.stopPropagation();
@@ -3016,7 +3038,13 @@ let isTouchDevice = state.isTouchDevice;
                 }
                 // randomDropdown 动作
                 else if (action === 'random' || action === 'mixed' || action === 'samegender') {
-                    randomSeatArrange(action);
+                    // #5 批次:从 localStorage 读 maxAttempts 配置(配对设置弹窗可改,默认 200)
+                    const storedAttempts = parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10);
+                    const result = randomSeatArrange(action, { maxAttempts: storedAttempts });
+                    // #4 批次:失败 toast 提示(算法自检结果)
+                    if (result && result.warnings && result.warnings.length > 0) {
+                        showStatToast(result.warnings.join(' / '));
+                    }
                 }
                 return;
             }
