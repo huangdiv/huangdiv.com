@@ -2576,6 +2576,8 @@ button:disabled {
     font-size: 11px;
     line-height: 1;
     z-index: 1;
+    /* P1 UX #6:icon 反色容器 — 让 mix-blend-mode 只作用于本组,不污染外层 */
+    isolation: isolate;
 }
 
 .seat-icon {
@@ -2585,6 +2587,16 @@ button:disabled {
     cursor: default;
     opacity: 0.85;
     transition: opacity 0.15s;
+    /* P1 UX #6:按座位背景明暗自适应 — text-symbol(♂/♀)跟随 color,
+       emoji-symbol(🏷/📚 等)被 difference 反色为「与背景相对」的近似色,
+       在浅色背景上呈深色、深色背景上呈浅色,几乎任何分组颜色都看得清。
+       注意:必须配合父级 isolation:isolate 才不污染外层。 */
+    mix-blend-mode: difference;
+}
+
+/* P1 UX #6:无 groupColor 时(默认浅底)给 icon 一个细黑描边,emoji 在白底上也能见 */
+.seat:not([style*="background-color"]) .seat-icon {
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.8);
 }
 
 .seat-icon:hover {
@@ -3081,13 +3093,13 @@ button:disabled {
 }
 
 .tag-toggle-btn:focus-visible,
-.action-btn-dropdown:focus-visible .dropdown-caret {
+.action-btn-dropdown:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 1px;
     border-radius: 3px;
 }
 
-.action-btn-dropdown:focus-visible {
+.action-btn-dropdown:focus-visible .dropdown-caret {
     outline: none;
 }
 
@@ -3095,6 +3107,15 @@ button:disabled {
     outline: 2px solid var(--primary);
     outline-offset: 1px;
     border-radius: 2px;
+}
+
+/* P1 UX #3:菜单项处于键盘焦点时的可视环(下拉打开时第一项 auto-focus) */
+.print-dropdown-item:focus-visible,
+.print-dropdown-item:focus {
+    background: var(--primary-light);
+    color: var(--primary);
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--primary);
 }
 
 /* 弹窗内输入框:与 .tag-popup-emoji/.tag-popup-input 一致的主色边框高亮 */
@@ -3113,6 +3134,14 @@ button:disabled {
     font-size: 12px;
     color: var(--text-tertiary, #888);
     margin-left: 2px;
+}
+
+/* P1 UX #1:批量配对 hint 行(同组/跨组说明,放在行下方) */
+.pair-batch-hint {
+    font-size: 11px;
+    color: var(--text-secondary, #555);
+    line-height: 1.45;
+    padding: 4px 2px 2px;
 }
 .pair-popup .pair-max-attempts {
     width: 80px;

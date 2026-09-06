@@ -782,17 +782,78 @@ let isTouchDevice = state.isTouchDevice;
         let activeTagPopup = null; // { studentId, popupEl }
 
         // 新增行标签 popup（操作临时标签数据，不关联 studentId）
-        // 共享 popup 骨架:DOM 创建 + 定位 + 回车添加 + 标签建议 + 阻止冒泡。
-        // 调用方只需传入标题、锚点、建议数据源,再自行绑定 添加/删除 事件(P1 去重,原先两函数 copy-paste ~100 行)。
-        function createTagPopupShell(titleHtml, anchorEl, suggestionSource) {
+        // P1 UX #5:弹窗焦点陷阱 + Esc 关闭 helper — 任何 popup 关闭自己的回调可通过 onEscape 传入。
+        // focusable 选择器列表覆盖原生表单元素 + role=button 的可聚焦 div。
+        const FOCUSABLE_SELECTOR = [
+            'a[href]',
+            'button:not([disabled])',
+            'input:not([disabled])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])',
+            '[role="button"]',
+            '[role="menuitem"]'
+        ].join(',');
+        function installFocusTrap(popupEl, onEscape) {
+            const previouslyFocused = document.activeElement;
+            // 初始焦点:弹窗内第一个可聚焦元素;没有就聚焦弹窗本身
+            const initial = popupEl.querySelector(FOCUSABLE_SELECTOR);
+            if (initial) {
+                requestAnimationFrame(function () { initial.focus(); });
+            } else {
+                popupEl.setAttribute('tabindex', '-1');
+                popupEl.focus();
+            }
+            popupEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    if (typeof onEscape === 'function') onEscape();
+                    return;
+                }
+                if (e.key !== 'Tab') return;
+                const focusables = Array.from(popupEl.querySelectorAll(FOCUSABLE_SELECTOR))
+                    .filter(function (el) { return !el.disabled && el.offsetParent !== null; });
+                if (focusables.length === 0) {
+                    e.preventDefault();
+                    return;
+                }
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                const active = document.activeElement;
+                if (e.shiftKey) {
+                    if (active === first || !popupEl.contains(active)) {
+                        e.preventDefault();
+                        last.focus();
+                    }
+                } else {
+                    if (active === last || !popupEl.contains(active)) {
+                        e.preventDefault();
+                        first.focus();
+                    }
+                }
+            });
+            return {
+                restoreFocus: function () {
+                    if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+                        previouslyFocused.focus();
+                    }
+                }
+            };
+        }
+
+        // 共享 popup 骨架:DOM 创建 + 定位 + 回车添加 + 标签建议 + 阻止冒泡 + 焦点陷阱。
+        // 调用方只需传入标题、锚点、建议数据源 + 关闭回调,再自行绑定 添加/删除 事件(P1 去重,原先两函数 copy-paste ~100 行)。
+        function createTagPopupShell(titleHtml, anchorEl, suggestionSource, onClose) {
             const container = ensureTagPopupContainer();
             const popup = document.createElement('div');
             popup.className = 'tag-popup';
+            popup.setAttribute('role', 'dialog');
+            popup.setAttribute('aria-modal', 'true');
             popup.innerHTML =
                 '<div class="tag-popup-title">' + titleHtml + '</div>' +
                 '<div class="tag-chips-container"></div>' +
                 '<div class="tag-popup-row">' +
-                    '<input type="text" class="tag-popup-emoji" placeholder="🏷" maxlength="4" title="emoji图标">' +
+                    '<input type="text" class="tag-popup-emoji" placeholder="🏷" title="emoji图标(支持组合 emoji,可粘贴多位,限 4 个码点)">' +
                     '<input type="text" class="tag-popup-input" placeholder="标签名称">' +
                     '<button class="mini-btn primary tag-popup-add">添加</button>' +
                 '</div>' +
@@ -813,6 +874,17 @@ let isTouchDevice = state.isTouchDevice;
 
             requestAnimationFrame(function () {
                 popup.classList.add('visible');
+            });
+
+            // P1 UX #4:emoji input 不依赖 HTML maxlength(按 UTF-16 units 算会把 VS16/ZWJ 组合 emoji 截半),
+            // 改用 Array.from(str) 按码点计数后再裁切,保留组合 emoji 完整。
+            const EMOJI_MAX_CODEPOINTS = 4;
+            const emojiInput = popup.querySelector('.tag-popup-emoji');
+            emojiInput.addEventListener('input', function () {
+                const codepoints = Array.from(this.value);
+                if (codepoints.length > EMOJI_MAX_CODEPOINTS) {
+                    this.value = codepoints.slice(0, EMOJI_MAX_CODEPOINTS).join('');
+                }
             });
 
             // 回车添加
@@ -861,7 +933,12 @@ let isTouchDevice = state.isTouchDevice;
                 e.stopPropagation();
             });
 
-            return popup;
+            // P1 UX #5:焦点陷阱 + Esc 关闭弹窗(返回 focusTrap 以便外部恢复锚点焦点)
+            const focusTrap = installFocusTrap(popup, function () {
+                if (typeof onClose === 'function') onClose();
+            });
+
+            return Object.assign(popup, { _focusTrap: focusTrap });
         }
 
         function openNewStudentTagPopup(anchorEl) {
@@ -879,7 +956,7 @@ let isTouchDevice = state.isTouchDevice;
 
             // 用一个伪对象让标签建议复用 collectExistingTags(tempTags 引用稳定,增删实时同步)
             const tempStudent = { name: '新增学生', tags: tempTags };
-            const popup = createTagPopupShell('管理标签 — 新增学生', anchorEl, tempStudent);
+            const popup = createTagPopupShell('管理标签 — 新增学生', anchorEl, tempStudent, closeTagPopup);
 
             activeTagPopup = { studentId: '__new__', popupEl: popup, tempTags: tempTags, rowItem: item };
 
@@ -952,7 +1029,12 @@ let isTouchDevice = state.isTouchDevice;
 
         function closeTagPopup() {
             if (activeTagPopup) {
-                activeTagPopup.popupEl.classList.remove('visible');
+                const popupEl = activeTagPopup.popupEl;
+                const focusTrap = popupEl && popupEl._focusTrap;
+                if (focusTrap && typeof focusTrap.restoreFocus === 'function') {
+                    focusTrap.restoreFocus();
+                }
+                popupEl.classList.remove('visible');
                 setTimeout(function () {
                     if (activeTagPopup && activeTagPopup.popupEl.parentNode) {
                         activeTagPopup.popupEl.parentNode.removeChild(activeTagPopup.popupEl);
@@ -985,7 +1067,7 @@ let isTouchDevice = state.isTouchDevice;
             const student = getStudentById(studentId);
             if (!student) return;
 
-            const popup = createTagPopupShell('管理标签 — ' + escapeHtml(student.name), anchorEl, student);
+            const popup = createTagPopupShell('管理标签 — ' + escapeHtml(student.name), anchorEl, student, closeTagPopup);
 
             activeTagPopup = { studentId: studentId, popupEl: popup };
 
@@ -1099,13 +1181,30 @@ let isTouchDevice = state.isTouchDevice;
             var container = ensureTagPopupContainer();
             var popup = document.createElement('div');
             popup.className = 'pair-popup';
+            popup.setAttribute('role', 'dialog');
+            popup.setAttribute('aria-modal', 'true');
+            popup.setAttribute('aria-labelledby', 'pairPopupTitle');
 
             var studentOpts = students.length > 0
                 ? students.map(function (s) { return '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.name) + '</option>'; }).join('')
                 : '';
+            // P1 UX #1:同组/跨组批量配对 — 分组下拉构建一次复用
+            var groupOpts = groups.length > 0
+                ? groups.map(function (g) { return '<option value="' + escapeHtml(g.id) + '">' + escapeHtml(g.name) + '</option>'; }).join('')
+                : '';
 
             popup.innerHTML =
-                '<div class="pair-popup-title">配对设置</div>' +
+                '<div class="pair-popup-title" id="pairPopupTitle">配对设置</div>' +
+                // 批量配对 — P1 UX #1(同组同桌 / 跨组同桌 一键生成)
+                '<div class="pair-popup-section pair-batch-section">' +
+                    '<div class="pair-popup-section-title">批量配对</div>' +
+                    '<div class="pair-popup-row">' +
+                        '<select class="pair-batch-a"><option value="">-- 分组 A --</option>' + groupOpts + '</select>' +
+                        '<select class="pair-batch-b"><option value="">-- 分组 B --</option>' + groupOpts + '</select>' +
+                        '<button class="mini-btn pair-batch-go">生成</button>' +
+                    '</div>' +
+                    '<div class="pair-batch-hint">A = B:组内两两同桌;A ≠ B:轮询把 A 的学生配给 B</div>' +
+                '</div>' +
                 '<div class="pair-popup-section">' +
                     '<div class="pair-popup-section-title">强制同桌</div>' +
                     '<div class="pair-popup-row">' +
@@ -1168,6 +1267,71 @@ let isTouchDevice = state.isTouchDevice;
                 popup.classList.add('visible');
             });
 
+            // P1 UX #1:批量配对生成 — 同组两两配 / 跨组 round-robin
+            function generateBatchPairs() {
+                var aSel = popup.querySelector('.pair-batch-a');
+                var bSel = popup.querySelector('.pair-batch-b');
+                var aId = aSel.value;
+                var bId = bSel.value;
+                if (!aId || !bId) { alert('请选择分组 A 与 B'); return; }
+                var aStudents = students.filter(function (s) { return s.groupId === aId; });
+                var bStudents = students.filter(function (s) { return s.groupId === bId; });
+                if (aStudents.length === 0 || bStudents.length === 0) {
+                    alert('所选分组没有学生');
+                    return;
+                }
+                if (aId === bId && aStudents.length < 2) {
+                    alert('同组至少 2 人才能配对');
+                    return;
+                }
+                var aIds = aStudents.map(function (s) { return s.id; });
+                var bIds = bStudents.map(function (s) { return s.id; });
+                var existing = new Set();
+                forcedPairs.forEach(function (p) { existing.add(pairKey(p[0], p[1])); });
+                var added = 0;
+                if (aId === bId) {
+                    // 同组:(0,1) (2,3) ... 最后一个奇数位单人无配
+                    for (var i = 0; i + 1 < aIds.length; i += 2) {
+                        var k = pairKey(aIds[i], aIds[i + 1]);
+                        if (existing.has(k)) continue;
+                        existing.add(k);
+                        forcedPairs.push([aIds[i], aIds[i + 1]]);
+                        added++;
+                    }
+                } else {
+                    // 跨组:用 max(Na, Nb) 次 round-robin,任一侧已尽则回到 0
+                    var len = Math.max(aIds.length, bIds.length);
+                    for (var j = 0; j < len; j++) {
+                        var x = aIds[j % aIds.length];
+                        var y = bIds[j % bIds.length];
+                        var k2 = pairKey(x, y);
+                        if (existing.has(k2)) continue;
+                        existing.add(k2);
+                        forcedPairs.push([x, y]);
+                        added++;
+                    }
+                }
+                if (added > 0) {
+                    showStatToast && showStatToast('已添加 ' + added + ' 对强制配对');
+                    autoSave();
+                } else {
+                    alert('没有可添加的新配对(全部已存在或分组过小)');
+                }
+                aSel.value = '';
+                bSel.value = '';
+                renderAll();
+            }
+            var batchGoBtn = popup.querySelector('.pair-batch-go');
+            if (batchGoBtn) {
+                batchGoBtn.addEventListener('click', generateBatchPairs);
+                // Enter in either select triggers generation
+                popup.querySelector('.pair-batch-a').addEventListener('change', function () {
+                    // 同步 A 选到 B(若 B 为空),方便同组操作
+                    var bSel2 = popup.querySelector('.pair-batch-b');
+                    if (!bSel2.value) bSel2.value = this.value;
+                });
+            }
+
             // 添加强制配对
             popup.querySelector('.pair-forced-add').addEventListener('click', function () {
                 var a = popup.querySelector('.pair-forced-a').value;
@@ -1227,10 +1391,17 @@ let isTouchDevice = state.isTouchDevice;
             popup.addEventListener('click', function (e) {
                 e.stopPropagation();
             });
+
+            // P1 UX #5:焦点陷阱 + Esc 关闭;返回的 focusTrap 在 closePairPopup 时恢复锚点焦点
+            const pairFocusTrap = installFocusTrap(popup, closePairPopup);
+            activePairPopup.focusTrap = pairFocusTrap;
         }
 
         function closePairPopup() {
             if (activePairPopup) {
+                if (activePairPopup.focusTrap && typeof activePairPopup.focusTrap.restoreFocus === 'function') {
+                    activePairPopup.focusTrap.restoreFocus();
+                }
                 activePairPopup.popupEl.classList.remove('visible');
                 setTimeout(function () {
                     if (activePairPopup && activePairPopup.popupEl.parentNode) {
@@ -1527,12 +1698,15 @@ let isTouchDevice = state.isTouchDevice;
         // 根据标签文本自动选择一个 emoji（尽量与语义相关，且不与已有 emoji 重复）
         // 关键词 → emoji 映射（覆盖常见学校场景）
         const EMOJI_KEYWORD_MAP = [
-            { keywords: ['班长', '班主任', '干部', 'leader', 'chief'], emoji: '👑' },
-            { keywords: ['副班长', 'vice'], emoji: '🥈' },
-            { keywords: ['学习', '学霸', '成绩', '第一名', 'top', 'study'], emoji: '📚' },
+            { keywords: ['班长', '班主任', '班干部', 'leader', 'chief'], emoji: '👑', boundary: true },
+            { keywords: ['副班长', 'vice'], emoji: '🥈', boundary: true },
+            { keywords: ['学习委员', '学霸'], emoji: '📚', boundary: true },
+            { keywords: ['学习', '成绩', '第一名', 'top', 'study'], emoji: '📚' },
+            { keywords: ['体育委员'], emoji: '⚽', boundary: true },
             { keywords: ['体育', '运动', '跑步', '篮球', '足球', 'sport'], emoji: '⚽' },
+            { keywords: ['文艺委员'], emoji: '🎨', boundary: true },
             { keywords: ['艺术', '音乐', '唱歌', '舞蹈', 'art', 'music'], emoji: '🎨' },
-            { keywords: ['文艺', '艺术', '美术', '画', 'painting', 'draw'], emoji: '🖌' },
+            { keywords: ['文艺', '美术', '画', 'painting', 'draw'], emoji: '🖌' },
             { keywords: ['科学', '实验', 'science', 'lab'], emoji: '🔬' },
             { keywords: ['数学', 'math', '计算'], emoji: '➗' },
             { keywords: ['英语', 'english', '外语'], emoji: '🔤' },
@@ -1548,56 +1722,97 @@ let isTouchDevice = state.isTouchDevice;
             { keywords: ['优秀', '真棒', 'great', 'good'], emoji: '🌟' },
             { keywords: ['进步', 'improve', 'progress'], emoji: '📈' },
             { keywords: ['潜力', 'potential'], emoji: '💎' },
-            { keywords: ['需关注', 'attention', 'warning'], emoji: '⚠️' },
+            { keywords: ['需关注', 'attention', 'warning'], emoji: '⚠️', boundary: true },
             { keywords: ['国', 'china', '中国'], emoji: '🇨🇳' },
             { keywords: ['男', 'boy', 'male'], emoji: '♂️' },
             { keywords: ['女', 'girl', 'female'], emoji: '♀️' },
             { keywords: ['小组', 'group', 'team'], emoji: '👥' },
             { keywords: ['家长', 'parent', 'mom', 'dad'], emoji: '👨‍👩‍👧' },
-            { keywords: ['走读', 'day'], emoji: '🏠' },
-            { keywords: ['住宿', '寄宿', 'board'], emoji: '🏫' },
-            { keywords: ['生日', 'birthday'], emoji: '🎂' },
+            { keywords: ['走读', 'day'], emoji: '🏠', boundary: true },
+            { keywords: ['住宿', '寄宿', 'board'], emoji: '🏫', boundary: true },
+            { keywords: ['生日', 'birthday'], emoji: '🎂', boundary: true },
         ];
         // 备用 emoji 池（不依赖关键词匹配时从中选取）
         const FALLBACK_EMOJI_POOL = ['📌', '📍', '💡', '🔥', '🎯', '🚀', '🎉', '🌈', '🔖', '🏷', '🎭', '🎪', '🎁', '✨', '💫', '⚡', '🌊', '🍀', '🌸', '🌻', '🐼', '🦊', '🐰', '🐱', '🐶'];
 
-        // P1 批次4:#3 labelToEmojiMap 外置 — 把嵌套的两层数组预展平为 keyword→emoji 一维表,
-        // 让 autoAssignEmoji 内的命中检查从「31 entries × N keywords × indexOf」改成单层 N 次 indexOf
-        // (对 1000-行 xlsx 第一遍扫描省一层循环间接)
-        const KEYWORD_TO_EMOJI_FLAT = (function () {
+// P1 批次4:#3 labelToEmojiMap 外置 — 把嵌套的两层数组预展平为 keyword→emoji 一维表,
+// 让 autoAssignEmoji 内的命中检查从「31 entries × N keywords × indexOf」改成单层 N 次 indexOf
+// (对 1000-行 xlsx 第一遍扫描省一层循环间接)
+//
+// P1 UX #2:同一表多了 `boundary` 标记 — 整词优先匹配条目(keyword 必须出现在 label 中且其前后不接续字母/汉字)
+// 排序:先 boundary=true(整词优先);同优先级按 keyword.length DESC(更具体优先) ——
+const KEYWORD_TO_EMOJI_FLAT = (function () {
             const flat = [];
             for (let i = 0; i < EMOJI_KEYWORD_MAP.length; i++) {
                 const entry = EMOJI_KEYWORD_MAP[i];
                 for (let j = 0; j < entry.keywords.length; j++) {
-                    flat.push({ keyword: entry.keywords[j], emoji: entry.emoji });
+                    flat.push({
+                        keyword: entry.keywords[j],
+                        emoji: entry.emoji,
+                        boundary: !!entry.boundary
+                    });
                 }
             }
+            flat.sort(function (a, b) {
+                if (a.boundary !== b.boundary) return a.boundary ? -1 : 1;
+                return b.keyword.length - a.keyword.length;
+            });
             return flat;
         })();
-        // 注:labelToEmojiMap 与 usedEmojis Set 由调用方(parseTagValue 的唯一调用点
-        // importStudentsWithGroups)在 row 循环外一次性构造并作为参数传入复用 ——
-        // 一次导入 1000 行只构造一次 Map/Set,而不每行新建。Review v1.3.0 §六 D-3 提到的
-        // "1000+ 行 xlsx 重复构造"问题已在重构阶段解决。
+// 注:labelToEmojiMap 与 usedEmojis Set 由调用方(parseTagValue 的唯一调用点
+// importStudentsWithGroups)在 row 循环外一次性构造并作为参数传入复用 ——
+// 一次导入 1000 行只构造一次 Map/Set,而不每行新建。Review v1.3.0 §六 D-3 提到的
+// "1000+ 行 xlsx 重复构造"问题已在重构阶段解决。
+
+// P1 UX #2:整词匹配判断 — Chinese chars 视为 word chars,keyword 出现在 label 中且
+// 其前、后位置至少一侧不接续字母/汉字(可在 label 端点)。这避免了「学籍」误匹配「学」之类的
+// 子串包含场景(若 boundary 项是独立 entry);也避免「top」匹配「stoptop」之类的英文子串。
+function isWholeWordMatch(label, keyword) {
+            const lower = label.toLowerCase();
+            const wordCharRe = /[\u4e00-\u9fa5a-zA-Z0-9]/;
+            let idx = lower.indexOf(keyword);
+            while (idx >= 0) {
+                const before = idx === 0 ? '' : lower.charAt(idx - 1);
+                const afterIdx = idx + keyword.length;
+                const after = afterIdx >= lower.length ? '' : lower.charAt(afterIdx);
+                if (!wordCharRe.test(before) && !wordCharRe.test(after)) {
+                    return true;
+                }
+                idx = lower.indexOf(keyword, idx + 1);
+            }
+            return false;
+        }
 
         function autoAssignEmoji(label, usedEmojis) {
             if (!usedEmojis) usedEmojis = new Set();
             const labelLower = label.toLowerCase();
-            // 1. 先尝试关键词匹配(扁平表单层循环)
+            // 1. 整词优先 (boundary=true) — 避免「学籍」误匹配「学」类子串误判
             for (let i = 0; i < KEYWORD_TO_EMOJI_FLAT.length; i++) {
                 const entry = KEYWORD_TO_EMOJI_FLAT[i];
-                if (labelLower.indexOf(entry.keyword) >= 0 && !usedEmojis.has(entry.emoji)) {
-                    usedEmojis.add(entry.emoji);
-                    return entry.emoji;
-                }
+                if (!entry.boundary) continue;
+                if (labelLower.indexOf(entry.keyword) < 0) continue;
+                if (!isWholeWordMatch(label, entry.keyword)) continue;
+                if (usedEmojis.has(entry.emoji)) continue;
+                usedEmojis.add(entry.emoji);
+                return entry.emoji;
             }
-            // 2. 关键词无匹配或 emoji 已被占用：从备用池选第一个未被占用的
+            // 2. 子串兜底 — 与 P1 批次4 相同的扁平单层循环
+            for (let i = 0; i < KEYWORD_TO_EMOJI_FLAT.length; i++) {
+                const entry = KEYWORD_TO_EMOJI_FLAT[i];
+                if (entry.boundary) continue; // 整词不匹配的不再来兜底
+                if (labelLower.indexOf(entry.keyword) < 0) continue;
+                if (usedEmojis.has(entry.emoji)) continue;
+                usedEmojis.add(entry.emoji);
+                return entry.emoji;
+            }
+            // 3. 关键词无匹配或 emoji 已被占用：从备用池选第一个未被占用的
             for (let i = 0; i < FALLBACK_EMOJI_POOL.length; i++) {
                 if (!usedEmojis.has(FALLBACK_EMOJI_POOL[i])) {
                     usedEmojis.add(FALLBACK_EMOJI_POOL[i]);
                     return FALLBACK_EMOJI_POOL[i];
                 }
             }
-            // 3. 全部用完：返回🏷（极端情况）
+            // 4. 全部用完：返回🏷（极端情况）
             return '🏷';
         }
 
@@ -1979,14 +2194,80 @@ let isTouchDevice = state.isTouchDevice;
             });
         }
 
-        // 随机排座 — 下拉菜单切换
-        randomBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const dropdown = document.getElementById('randomDropdown');
-            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-        });
+        // P1 UX #3:统一封装下拉按钮 — 同步 ARIA + 键盘 Enter/↓/Space 触发 + 内部 ↑↓/Enter/Esc 导航。
+        // 取代原先 randomBtn/printBtn 的零散 click handler,既闭环 ARIA,又修下拉键盘可达性。
+        function setupActionDropdown(btn, dropdown, peerBtn, peerDropdown) {
+            let isOpen = false;
+            function setOpen(open) {
+                isOpen = open;
+                dropdown.style.display = open ? 'block' : 'none';
+                btn.setAttribute('aria-expanded', String(open));
+                if (open) {
+                    const firstItem = dropdown.querySelector('[role="menuitem"]');
+                    if (firstItem) firstItem.focus();
+                }
+            }
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                // 关闭另一个下拉(互斥)
+                if (peerDropdown && peerDropdown.style.display === 'block') {
+                    peerDropdown.style.display = 'none';
+                    if (peerBtn) peerBtn.setAttribute('aria-expanded', 'false');
+                }
+                setOpen(!isOpen);
+            });
+            // 键盘 Enter / ↓ / Space 在按钮上 → 展开并聚焦首项
+            btn.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!isOpen) setOpen(true);
+                } else if (e.key === 'Escape' && isOpen) {
+                    e.preventDefault();
+                    setOpen(false);
+                }
+            });
+            // 内部菜单项的键盘导航
+            dropdown.addEventListener('keydown', function (e) {
+                const items = Array.from(dropdown.querySelectorAll('[role="menuitem"]'));
+                const idx = items.indexOf(document.activeElement);
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = items[(idx + 1 + items.length) % items.length];
+                    if (next) next.focus();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prev = items[(idx - 1 + items.length) % items.length];
+                    if (prev) prev.focus();
+                } else if (e.key === 'Home') {
+                    e.preventDefault();
+                    if (items[0]) items[0].focus();
+                } else if (e.key === 'End') {
+                    e.preventDefault();
+                    const last = items[items.length - 1];
+                    if (last) last.focus();
+                } else if (e.key === 'Enter' || e.key === ' ') {
+                    if (idx >= 0) {
+                        e.preventDefault();
+                        items[idx].click();
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setOpen(false);
+                    btn.focus();
+                }
+            });
+            // 用于外部点击关闭时同步 ARIA:返回 helper
+            return {
+                get isOpen() { return isOpen; },
+                close: function () { if (isOpen) setOpen(false); }
+            };
+        }
+        const randomDropdown = document.getElementById('randomDropdown');
+        const printDropdown = document.getElementById('printDropdown');
+        const randomDropdownCtrl = setupActionDropdown(randomBtn, randomDropdown, printBtn, printDropdown);
+        const printDropdownCtrl = setupActionDropdown(printBtn, printDropdown, randomBtn, randomDropdown);
 
-        // 点击关闭 randomDropdown（事件委托，在 printBtn 的 document click handler 里统一处理）
+        // 点击关闭 randomDropdown / printDropdown（事件委托，在 printBtn 的 document click handler 里统一处理）
 
         // ─────────── 随机排座模块 (modules/random-arrange.js) ───────────
         // randomSeatArrange + 模块私有 helpers(getDeskMatePairs / getGender)
@@ -3038,20 +3319,18 @@ let isTouchDevice = state.isTouchDevice;
             return Math.min(scaleX, scaleY);
         }
 
-        printBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const dropdown = document.getElementById('printDropdown');
-            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-        });
+        // printBtn 的 click 由 setupActionDropdown 统一处理 (P1 UX #3)
 
         // 下拉菜单项点击
         document.addEventListener('click', function (e) {
             const item = e.target.closest('.print-dropdown-item');
             if (item) {
                 const action = item.getAttribute('data-action');
-                // 关闭所有下拉菜单
-                document.getElementById('printDropdown').style.display = 'none';
-                document.getElementById('randomDropdown').style.display = 'none';
+                // 关闭所有下拉菜单(同步 ARIA)
+                randomDropdownCtrl.close();
+                printDropdownCtrl.close();
+                randomDropdown.style.display = 'none';
+                printDropdown.style.display = 'none';
 
                 // printDropdown 动作
                 if (action === 'print') {
@@ -3075,14 +3354,16 @@ let isTouchDevice = state.isTouchDevice;
                 }
                 return;
             }
-            // 点击外部关闭所有下拉菜单
+            // 点击外部关闭所有下拉菜单(同步 ARIA 与 setupActionDropdown)
             const printDd = document.getElementById('printDropdown');
             const randDd = document.getElementById('randomDropdown');
             if (printDd && !printDd.contains(e.target) && !printBtn.contains(e.target)) {
                 printDd.style.display = 'none';
+                printBtn.setAttribute('aria-expanded', 'false');
             }
             if (randDd && !randDd.contains(e.target) && !randomBtn.contains(e.target)) {
                 randDd.style.display = 'none';
+                randomBtn.setAttribute('aria-expanded', 'false');
             }
         });
 

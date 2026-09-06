@@ -101,39 +101,39 @@
                     <span>签到模式</span>
                 </button>
                 <div class="action-btn-wrapper">
-                    <button id="randomBtn" class="action-btn action-btn-dropdown">
+                    <button id="randomBtn" class="action-btn action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="randomDropdown">
                         <span class="action-icon">⇄</span>
                         <span>随机排座</span>
-                        <span class="dropdown-caret">▾</span>
+                        <span class="dropdown-caret" aria-hidden="true">▾</span>
                     </button>
-                    <div id="randomDropdown" class="print-dropdown" style="display:none;">
-                        <div class="print-dropdown-item" role="button" tabindex="0" data-action="random">
-                            <span class="print-dropdown-icon">🎲</span>
+                    <div id="randomDropdown" class="print-dropdown" role="menu" style="display:none;">
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="random">
+                            <span class="print-dropdown-icon" aria-hidden="true">🎲</span>
                             <span>完全随机</span>
                         </div>
-                        <div class="print-dropdown-item" role="button" tabindex="0" data-action="mixed">
-                            <span class="print-dropdown-icon">👫</span>
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="mixed">
+                            <span class="print-dropdown-icon" aria-hidden="true">👫</span>
                             <span>男女同桌</span>
                         </div>
-                        <div class="print-dropdown-item" role="button" tabindex="0" data-action="samegender">
-                            <span class="print-dropdown-icon">👬</span>
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="samegender">
+                            <span class="print-dropdown-icon" aria-hidden="true">👬</span>
                             <span>男女不同桌</span>
                         </div>
                     </div>
                 </div>
                 <div class="action-btn-wrapper">
-                    <button id="printBtn" class="action-btn action-btn-dropdown">
+                    <button id="printBtn" class="action-btn action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="printDropdown">
                         <span class="action-icon">⎙</span>
                         <span>打印/PDF</span>
-                        <span class="dropdown-caret">▾</span>
+                        <span class="dropdown-caret" aria-hidden="true">▾</span>
                     </button>
-                    <div id="printDropdown" class="print-dropdown" style="display:none;">
-                        <div class="print-dropdown-item" role="button" tabindex="0" data-action="print">
-                            <span class="print-dropdown-icon">⎙</span>
+                    <div id="printDropdown" class="print-dropdown" role="menu" style="display:none;">
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="print">
+                            <span class="print-dropdown-icon" aria-hidden="true">⎙</span>
                             <span>打印 / 另存为PDF</span>
                         </div>
-                        <div class="print-dropdown-item" role="button" tabindex="0" data-action="exportImage">
-                            <span class="print-dropdown-icon">🖼</span>
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="exportImage">
+                            <span class="print-dropdown-icon" aria-hidden="true">🖼</span>
                             <span>导出为图片</span>
                         </div>
                     </div>
