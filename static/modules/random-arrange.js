@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { state, commit } from './state.js';
+import { MESSAGES } from './messages.js';
 
 export function createRandomArrange(deps) {
     const { helpers, callbacks } = deps;
@@ -85,10 +86,10 @@ export function createRandomArrange(deps) {
             : 200;
 
         if (state.students.length === 0) {
-            alert('请先导入学生名单！');
-            return { warnings: ['请先导入学生名单'] };
+            alert(MESSAGES.NO_STUDENTS_YET);
+            return { warnings: [MESSAGES.NO_STUDENTS_YET_WARN] };
         }
-        if (!confirm('确定要执行「' + ({random:'完全随机', mixed:'男女同桌', samegender:'男女不同桌'}[mode]) + '」排座吗？')) return { warnings: [] };
+        if (!confirm(MESSAGES.CONFIRM_RANDOM_MODE(mode))) return { warnings: [] };
 
         // 保存旧座位映射(学生ID → 旧座位索引),用于后处理确保完全换座
         var prevSeatMap = {};
@@ -375,12 +376,12 @@ export function createRandomArrange(deps) {
         var warnings = [];
         if (conflicts.length > 0) {
             // 仍有学生在原座位(可能是强制配对/无可交换目标,或是 maxAttempts 用尽)
-            warnings.push('未能完全保证换位:仍 ' + conflicts.length + ' 名学生在原座位(超过 ' + maxAttempts + ' 次尝试)');
+            warnings.push(MESSAGES.RANDOM_WARNING_INCOMPLETE_SWAP(conflicts.length, maxAttempts));
         }
         // 检测是否有学生未入座(students > seats 极端场景)
         var placedCount = state.seats.filter(function (s) { return s; }).length;
         if (placedCount < state.students.length) {
-            warnings.push((state.students.length - placedCount) + ' 名学生未入座(座位不足)');
+            warnings.push(MESSAGES.RANDOM_WARNING_NOT_SEATED(state.students.length - placedCount));
         }
         return { warnings: warnings };
     }

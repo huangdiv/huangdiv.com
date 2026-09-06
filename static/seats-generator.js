@@ -3,6 +3,7 @@ import { createSeatGrid } from './modules/seat-grid.js';
 import { createDragdrop } from './modules/dragdrop.js';
 import { createRandomArrange } from './modules/random-arrange.js';
 import { migrateConfig as migrateConfigFn } from './modules/migrate.js';
+import { MESSAGES } from './modules/messages.js';
 
     (function () {
         'use strict';
@@ -423,12 +424,12 @@ let isTouchDevice = state.isTouchDevice;
             const width = parseInt(document.getElementById('aisleWidth').value);
 
             if (afterCol < 1 || afterCol >= cols) {
-                alert('列数必须在1到' + (cols - 1) + '之间！');
+                alert(MESSAGES.AISLE_COL_RANGE(cols));
                 return;
             }
 
             if (aisles.some(a => a.afterCol === afterCol)) {
-                alert('该位置已存在走道！');
+                alert(MESSAGES.AISLE_EXISTS);
                 return;
             }
 
@@ -475,12 +476,12 @@ let isTouchDevice = state.isTouchDevice;
             const color = colorInput.value;
 
             if (!name) {
-                alert('请输入分组名称');
+                alert(MESSAGES.GROUP_NAME_REQUIRED);
                 return;
             }
 
             if (groups.some(g => g.name === name)) {
-                alert('分组名称已存在');
+                alert(MESSAGES.GROUP_NAME_EXISTS);
                 return;
             }
 
@@ -509,7 +510,7 @@ let isTouchDevice = state.isTouchDevice;
         }
 
         function deleteGroup(groupId) {
-            if (confirm('确定要删除这个分组吗？该分组的学生将变为未分组状态。')) {
+            if (confirm(MESSAGES.CONFIRM_DELETE_GROUP)) {
                 pushSnapshot('group');
                 students.forEach(s => {
                     if (s.groupId === groupId) s.groupId = null;
@@ -728,11 +729,11 @@ let isTouchDevice = state.isTouchDevice;
                 const gender = genderSelect ? genderSelect.value : '';
 
                 if (!name) {
-                    alert('请输入学生姓名');
+                    alert(MESSAGES.STUDENT_NAME_REQUIRED);
                     return;
                 }
                 if (students.some(s => s.name === name)) {
-                    alert('该学生已存在');
+                    alert(MESSAGES.STUDENT_NAME_EXISTS_NEW);
                     return;
                 }
 
@@ -780,7 +781,7 @@ let isTouchDevice = state.isTouchDevice;
             newName = newName.trim();
 
             if (!newName) {
-                alert('请输入学生姓名');
+                alert(MESSAGES.STUDENT_NAME_REQUIRED);
                 updateStudentAssignmentDisplay();
                 return;
             }
@@ -789,7 +790,7 @@ let isTouchDevice = state.isTouchDevice;
             if (!student) return;
 
             if (students.some(s => s.name === newName && s.id !== studentId)) {
-                alert('该姓名已存在');
+                alert(MESSAGES.STUDENT_NAME_EXISTS_EDIT);
                 updateStudentAssignmentDisplay();
                 return;
             }
@@ -804,7 +805,7 @@ let isTouchDevice = state.isTouchDevice;
         function removeStudent(studentId) {
             const student = getStudentById(studentId);
             if (!student) return;
-            if (confirm('确定要删除学生 ' + student.name + ' 吗？')) {
+            if (confirm(MESSAGES.CONFIRM_DELETE_STUDENT(student.name))) {
                 pushSnapshot('student');
                 // 如果该学生的标签弹窗打开着，先关闭
                 if (activeTagPopup && activeTagPopup.studentId === studentId) {
@@ -1314,15 +1315,15 @@ let isTouchDevice = state.isTouchDevice;
                 var bSel = popup.querySelector('.pair-batch-b');
                 var aId = aSel.value;
                 var bId = bSel.value;
-                if (!aId || !bId) { alert('请选择分组 A 与 B'); return; }
+                if (!aId || !bId) { alert(MESSAGES.PAIR_SELECT_GROUPS_AB); return; }
                 var aStudents = students.filter(function (s) { return s.groupId === aId; });
                 var bStudents = students.filter(function (s) { return s.groupId === bId; });
                 if (aStudents.length === 0 || bStudents.length === 0) {
-                    alert('所选分组没有学生');
+                    alert(MESSAGES.PAIR_GROUPS_EMPTY);
                     return;
                 }
                 if (aId === bId && aStudents.length < 2) {
-                    alert('同组至少 2 人才能配对');
+                    alert(MESSAGES.PAIR_SAME_GROUP_TOO_SMALL);
                     return;
                 }
                 var aIds = aStudents.map(function (s) { return s.id; });
@@ -1356,7 +1357,7 @@ let isTouchDevice = state.isTouchDevice;
                     showStatToast && showStatToast('已添加 ' + added + ' 对强制配对');
                     autoSave();
                 } else {
-                    alert('没有可添加的新配对(全部已存在或分组过小)');
+                    alert(MESSAGES.PAIR_NO_NEW_AVAILABLE);
                 }
                 aSel.value = '';
                 bSel.value = '';
@@ -1377,10 +1378,10 @@ let isTouchDevice = state.isTouchDevice;
             popup.querySelector('.pair-forced-add').addEventListener('click', function () {
                 var a = popup.querySelector('.pair-forced-a').value;
                 var b = popup.querySelector('.pair-forced-b').value;
-                if (!a || !b || a === b) { alert('请选择两位不同的学生'); return; }
+                if (!a || !b || a === b) { alert(MESSAGES.PAIR_SELECT_TWO_DIFFERENT); return; }
                 var key = pairKey(a, b);
                 if (forcedPairs.some(function (p) { return pairKey(p[0], p[1]) === key; })) {
-                    alert('该配对已存在'); return;
+                    alert(MESSAGES.PAIR_ALREADY_EXISTS); return;
                 }
                 forcedPairs.push([a, b]);
                 popup.querySelector('.pair-forced-a').value = '';
@@ -1393,10 +1394,10 @@ let isTouchDevice = state.isTouchDevice;
             popup.querySelector('.pair-avoid-add').addEventListener('click', function () {
                 var a = popup.querySelector('.pair-avoid-a').value;
                 var b = popup.querySelector('.pair-avoid-b').value;
-                if (!a || !b || a === b) { alert('请选择两位不同的学生'); return; }
+                if (!a || !b || a === b) { alert(MESSAGES.PAIR_SELECT_TWO_DIFFERENT); return; }
                 var key = pairKey(a, b);
                 if (avoidPairs.some(function (p) { return pairKey(p[0], p[1]) === key; })) {
-                    alert('该配对已存在'); return;
+                    alert(MESSAGES.PAIR_ALREADY_EXISTS); return;
                 }
                 avoidPairs.push([a, b]);
                 popup.querySelector('.pair-avoid-a').value = '';
@@ -2183,8 +2184,11 @@ function isWholeWordMatch(label, keyword) {
 
         // 导出座位表为图片
         function exportSeatImage() {
-            // 临时隐藏操作按钮和拖拽提示
-            const buttons = document.querySelectorAll('button');
+            // 临时隐藏班级座位内的按钮 + 拖拽提示(只动 #classroom 子树,绝不误伤 toolbar/popup)
+            // 修复 P2-1:document.querySelectorAll('button') 会选到页面所有按钮,
+            // 包括工具栏、弹窗、配置下拉等;它们不该被隐藏(导出图不含这些元素,
+            // 但短暂闪烁体验差;且 30+ 节点遍历比 49 节点慢)。
+            const buttons = classroom.querySelectorAll('button');
             buttons.forEach(btn => btn.style.visibility = 'hidden');
             dragHint.style.display = 'none';
 
@@ -2231,7 +2235,7 @@ function isWholeWordMatch(label, keyword) {
                 document.body.removeChild(exportWrapper);
                 console.error('导出图片失败:', err);
                 buttons.forEach(btn => btn.style.visibility = 'visible');
-                alert('导出图片失败，请重试！');
+                alert(MESSAGES.EXPORT_FAILED);
             });
         }
 
@@ -2330,7 +2334,7 @@ function isWholeWordMatch(label, keyword) {
 
         // 重置座位
         document.getElementById('resetBtn').addEventListener('click', function () {
-            if (confirm('确定要重置所有座位吗？')) {
+            if (confirm(MESSAGES.CONFIRM_RESET_SEATS)) {
                 pushSnapshot('reset');
                 currentSeats = Array(rows * cols).fill(null);
                 commit({ seats: currentSeats });
@@ -2369,14 +2373,14 @@ function isWholeWordMatch(label, keyword) {
             const newCols = parseInt(colsInput.value) || 7;
 
             if (newRows < 1 || newRows > 20 || newCols < 1 || newCols > 20) {
-                alert('行数和列数必须在1-20之间！');
+                alert(MESSAGES.ROW_COL_RANGE);
                 return;
             }
 
             // 检查是否存在因列数缩减而失效的走道
             const invalidAisles = aisles.filter(a => a.afterCol >= newCols);
             if (invalidAisles.length > 0) {
-                if (!confirm(`列数缩减将导致 ${invalidAisles.length} 个走道被移除（位于第 ${invalidAisles.map(a => a.afterCol).join('、')} 列后），是否继续？`)) {
+                if (!confirm(MESSAGES.CONFIRM_REDUCE_AISLES(invalidAisles.length, invalidAisles.map(a => a.afterCol)))) {
                     return;
                 }
                 aisles = aisles.filter(a => a.afterCol < newCols);
@@ -2417,7 +2421,7 @@ function isWholeWordMatch(label, keyword) {
 
         // 清除所有数据
         clearStorageBtn.addEventListener('click', function () {
-            if (confirm('确定要清除所有数据吗？此操作不可撤销！')) {
+            if (confirm(MESSAGES.CONFIRM_CLEAR_ALL)) {
                 localStorage.removeItem('classroomConfig');
                 localStorage.removeItem(CONFIGS_KEY);
                 localStorage.removeItem(ACTIVE_CONFIG_KEY);
@@ -2443,7 +2447,7 @@ function isWholeWordMatch(label, keyword) {
                 updateStudentAssignmentDisplay();
                 generateSeats();
                 renderConfigList();
-                alert('所有数据已清除！');
+                alert(MESSAGES.ALL_DATA_CLEARED);
             }
         });
 
@@ -2507,7 +2511,7 @@ function isWholeWordMatch(label, keyword) {
 
             if (delEl) {
                 const name = delEl.getAttribute('data-del');
-                if (!confirm('确定删除配置「' + name + '」吗？')) return;
+                if (!confirm(MESSAGES.CONFIRM_DELETE_CONFIG(name))) return;
                 const configs = getSavedConfigs();
                 delete configs[name];
                 setSavedConfigs(configs);
@@ -2524,7 +2528,7 @@ function isWholeWordMatch(label, keyword) {
             const newName = prompt('请输入新名称：', oldName);
             if (!newName || newName === oldName) return;
             const configs = getSavedConfigs();
-            if (configs[newName]) { alert('该名称已存在！'); return; }
+            if (configs[newName]) { alert(MESSAGES.CONFIG_NAME_EXISTS); return; }
             configs[newName] = configs[oldName];
             delete configs[oldName];
             setSavedConfigs(configs);
@@ -2875,12 +2879,7 @@ function isWholeWordMatch(label, keyword) {
 
                     let cloudWins = true; // 无冲突时默认云端为准（保持原有行为）
                     if (collisions.length > 0) {
-                        cloudWins = confirm(
-                            '检测到 ' + collisions.length + ' 个配置在云端与本地同名但内容不同：\n' +
-                            collisions.join('、') + '\n\n' +
-                            '点「确定」：用云端版本覆盖这些同名配置（本地修改将被覆盖）\n' +
-                            '点「取消」：保留本地版本，仅合并云端独有的新配置'
-                        );
+                        cloudWins = confirm(MESSAGES.CONFIRM_CLOUD_WINS(collisions.length, collisions));
                     }
 
                     const merged = {};
@@ -3177,7 +3176,7 @@ function isWholeWordMatch(label, keyword) {
                     updateGroupDisplay();
                     updateStudentAssignmentDisplay();
                     localStorage.removeItem('classroomConfig');
-                    alert('检测到本地存储数据损坏，已重置为默认配置。');
+                    alert(MESSAGES.STORAGE_CORRUPT);
                 }
             } else {
                 // 新用户首次进入：无配置文件、无分组、无学生，渲染新增分组与新增学生输入行
@@ -3262,10 +3261,10 @@ function isWholeWordMatch(label, keyword) {
                         forcedPairs: forcedPairs, avoidPairs: avoidPairs
                     });
                     generateSeats();
-                    alert('配置导入成功！');
+                    alert(MESSAGES.IMPORT_SUCCESS);
                 } catch (error) {
                     console.error('导入配置失败:', error);
-                    alert('导入配置失败: ' + error.message);
+                    alert(MESSAGES.IMPORT_FAILED(error.message));
                 }
             };
             reader.readAsText(file);
@@ -3524,7 +3523,7 @@ function isWholeWordMatch(label, keyword) {
                 const studentId = seat.getAttribute('data-student');
                 if (studentId) {
                     const student = getStudentById(studentId);
-                    if (student && confirm('确定要删除学生 ' + student.name + ' 吗？')) {
+                    if (student && confirm(MESSAGES.CONFIRM_DELETE_STUDENT(student.name))) {
                         pushSnapshot('student');
                         currentSeats = currentSeats.map(id => id === studentId ? null : id);
                         students = students.filter(s => s.id !== studentId);
@@ -3631,7 +3630,7 @@ function isWholeWordMatch(label, keyword) {
                     const studentId = tapSelectedStudentId || (tapSelectedSeatIndex !== null ? currentSeats[tapSelectedSeatIndex] : null);
                     if (studentId) {
                         const student = getStudentById(studentId);
-                        if (student && confirm('确定要删除学生 ' + student.name + ' 吗？')) {
+                        if (student && confirm(MESSAGES.CONFIRM_DELETE_STUDENT(student.name))) {
                             pushSnapshot('student');
                             currentSeats = currentSeats.map(id => id === studentId ? null : id);
                             students = students.filter(s => s.id !== studentId);
@@ -3754,12 +3753,12 @@ function isWholeWordMatch(label, keyword) {
 
         batchAssignBtn.addEventListener('click', function () {
             if (batchSelectedIds.size === 0) {
-                alert('请先选择学生');
+                alert(MESSAGES.BATCH_SELECT_STUDENTS_FIRST);
                 return;
             }
             const groupId = batchGroupSelect.value;
             if (!groupId) {
-                alert('请选择要分配的分组');
+                alert(MESSAGES.BATCH_SELECT_GROUP_FIRST);
                 return;
             }
             pushSnapshot('batch');
@@ -3775,10 +3774,10 @@ function isWholeWordMatch(label, keyword) {
 
         batchDeleteBtn.addEventListener('click', function () {
             if (batchSelectedIds.size === 0) {
-                alert('请先选择学生');
+                alert(MESSAGES.BATCH_SELECT_STUDENTS_FIRST);
                 return;
             }
-            if (confirm('确定要删除选中的 ' + batchSelectedIds.size + ' 名学生吗？')) {
+            if (confirm(MESSAGES.CONFIRM_BATCH_DELETE(batchSelectedIds.size))) {
                 pushSnapshot('batch');
                 const idSet = new Set(batchSelectedIds);
                 currentSeats = currentSeats.map(id => idSet.has(id) ? null : id);
@@ -3797,7 +3796,7 @@ function isWholeWordMatch(label, keyword) {
         quickRandomBtn.addEventListener('click', function () {
             const unassigned = getUnassignedStudents();
             if (unassigned.length === 0) {
-                alert('所有学生都已安排座位');
+                alert(MESSAGES.ALL_STUDENTS_SEATED);
                 return;
             }
             const emptyIndices = [];
@@ -3805,10 +3804,10 @@ function isWholeWordMatch(label, keyword) {
                 if (currentSeats[i] === null) emptyIndices.push(i);
             }
             if (emptyIndices.length === 0) {
-                alert('没有空座位可分配');
+                alert(MESSAGES.NO_EMPTY_SEATS);
                 return;
             }
-            if (confirm('确定要将 ' + unassigned.length + ' 名未安排的学生随机入座吗？')) {
+            if (confirm(MESSAGES.CONFIRM_QUICK_RANDOM(unassigned.length))) {
                 pushSnapshot('batch');
                 const shuffled = shuffle(unassigned.map(s => s.id));
                 const assigned = Math.min(shuffled.length, emptyIndices.length);

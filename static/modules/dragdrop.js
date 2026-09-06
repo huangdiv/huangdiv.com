@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { state, commit } from './state.js';
+import { MESSAGES } from './messages.js';
 
 export function createDragdrop(deps) {
     const {
@@ -122,7 +123,7 @@ export function createDragdrop(deps) {
         if (e.target.closest('#deleteZone')) {
             const student = getStudentById(draggedStudentId);
             const displayName = student ? student.name : '';
-            if (confirm('确定要删除学生 ' + displayName + ' 吗？')) {
+            if (confirm(MESSAGES.CONFIRM_DELETE_STUDENT(displayName))) {
                 state.students = state.students.filter(s => s.id !== draggedStudentId);
                 if (draggedFromIndex !== null) {
                     state.seats[draggedFromIndex] = null;
@@ -162,7 +163,7 @@ export function createDragdrop(deps) {
         if (draggedStudentId && draggedFromIndex === null) {
             if (state.seats.includes(draggedStudentId)) {
                 const student = getStudentById(draggedStudentId);
-                alert('学生 ' + (student ? student.name : '') + ' 已经被安排座位了！');
+                alert(MESSAGES.STUDENT_ALREADY_SEATED(student ? student.name : ''));
                 clearDragHighlights();
                 return;
             }
