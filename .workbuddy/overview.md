@@ -409,3 +409,52 @@ A. 空 cfg → 全默认 / B. string[] students → 转对象 / C. id 缺失/重
 
 ### review v1.3.0 剩余 2 项未做
 - **P2**(2):`querySelectorAll` 误伤 / i18n
+
+### 推送完成
+- commit `12f34a0`:`ux(p1): 批次6 撤销栈 smart-merge(200ms 同 opType 自动合并)`
+- push 任务 `2pfU3c` 6m8s:`b826649..12f34a0 → master`
+- 三方 ref 对齐(HEAD/master/origin/master/workbuddy/master-93f997c3):`12f34a0ca711367b0513adba7d1daf4ba2707787`
+- 嵌套 ref bug 第 7 次:printf 写主仓 ref,惯例流程
+
+---
+
+## 批次7 — P2 用户文案集中层 + 导出作用域(本轮完成)
+
+依据 review v1.3.0 §六 剩余 2 项 P2:
+- §H P2 #5:`exportSeatImage()` 内 `document.querySelectorAll('button')` 范围误伤 toolbar/popup
+- §F P2 #3/#4:全部 alert/confirm 字符串散落 IIFE 难以 i18n
+
+### 模块 `static/modules/messages.js`(96 行,新)
+- 39 个键集中所有用户可见文案
+- 函数式参数化(`CONFIRM_DELETE_STUDENT(name)`、`CONFIRM_CLOUD_WINS(count, names)` 等),比 `{name}` 占位符更类型安全 — 传 undefined 立即暴露
+- 字符串字面量保留 byte-for-byte,既有 unit 断言无需改
+- 额外 `NO_STUDENTS_YET_WARN`(去掉末尾感叹号)供 warnings 数组用,避免 `.replace(/！$/, '')` 脆弱切片
+
+### 主 IIFE 修改(`static/seats-generator.js`,+38 / -53)
+- `import { MESSAGES } from './modules/messages.js';`
+- `exportSeatImage()`:`document.querySelectorAll('button')` → `classroom.querySelectorAll('button')`(P2-1 修)
+- 替换 13 alert + 11 confirm 硬编码(走道/分组/学生/配对/导出/重置/行列/清除/配置/云同步/导入/批量/快速随机)
+
+### 模块修改
+- `dragdrop.js`(+5):`import MESSAGES` + 删除/已入座两处
+- `random-arrange.js`(+11):`import MESSAGES` + 0学生/确认/警告三处(含 2 warnings.push)
+
+### 验证
+- `node --check` 4 JS 文件: ALL_SYNTAX_OK
+- 单元:`unit_random_arrange` 20/20 + `unit_migrate` 35/35 + `unit_messages`(新)18/18
+- 烟测:`smoke_test_batch4/5/6` 回归 + `smoke_test_batch7_p2_i18n`(新)4 静态 + 4 浏览器场景
+- 浏览器端:MESSAGES 39 键运行时可访问 + `resetBtn` confirm 文案未变 + STUDENT_NAME_EXISTS_NEW / STORAGE_CORRUPT / IMPORT_SUCCESS / IMPORT_FAILED 路径正确
+- 致命 0 / 总计 0
+
+### 净 diff
+- 6 文件 / +634 / -53
+- 新文件:`messages.js`(96 行)、`unit_messages.mjs`(233 行)、`smoke_test_batch7_p2_i18n.py`(251 行)
+
+### review v1.3.0 全部完成
+本批次覆盖剩余 P2 全部 2 项 + P2-1 副作用 querySelectorAll 误伤修复。
+**review v1.3.0 全清单已闭合**,后续若需继续走 review v1.4+ / 累积技术债 / 新功能,请给出方向。
+
+### 推送
+- commit `3a2181c`:`ux(p2): 批次7 用户文案集中层(i18n 雏形)+ exportSeatImage 作用域`
+- 嵌套 ref bug 第 8 次复发:`mkdir -p + printf` 写主仓 loose ref
+- push 后台跑(task_id `Wh3QQQ`,wincred 凭据慢推送,耐心等)
