@@ -270,6 +270,20 @@ let isTouchDevice = state.isTouchDevice;
             return JSON.parse(JSON.stringify(obj));
         }
 
+        // P1 (1) 撤销栈 smart-merge:
+        //   同一类操作(opType)在 SMART_MERGE_MS 内的连续动作视为一次「心智动作」,不重复入栈。
+        //   例如连续拖 5 个学生到新座位 → 1 次 undo 即可全部还原。
+        //   阈值从最初的 200ms 起,可通过 localStorage「undoMergeMs」调。
+        const SMART_MERGE_DEFAULT_MS = 200;
+        function getSmartMergeMs() {
+            var v = parseInt(localStorage.getItem('undoMergeMs') || '', 10);
+            if (!isFinite(v) || v < 0) v = SMART_MERGE_DEFAULT_MS;
+            if (v > 5000) v = 5000;  // 上限 5s,防止 UI 误设
+            return v;
+        }
+        let lastSnapOpType = null;     // 上一次入栈的 opType(字符串或 null)
+        let lastSnapTime = 0;          // 上一次入栈的 Date.now()
+
         // ==================== UTF-8 ↔ Base64 ====================
         // 替代 deprecated 的 btoa(unescape(encodeURIComponent(s))) / decodeURIComponent(escape(atob(s)))。
         // 老式方案依赖 escape/unescape(已被 MDN 标记 deprecated 且部分浏览器将移除),
@@ -291,17 +305,37 @@ let isTouchDevice = state.isTouchDevice;
             return new TextDecoder().decode(bytes);
         }
 
-        function pushSnapshot() {
+        function pushSnapshot(opType) {
             if (isUndoing) return;
+            const now = Date.now();
+            const mergeMs = getSmartMergeMs();
+            // merge 条件:同 opType + 在窗口内 + 栈非空 + 合并阈值 > 0
+            const canMerge = opType
+                && lastSnapOpType === opType
+                && (now - lastSnapTime) < mergeMs
+                && mergeMs > 0
+                && undoStack.length > 0;
+            if (canMerge) {
+                // 不入栈 — 顶部快照保留为「该心智动作开始前」的状态,1 次 undo 即可回退整批
+                // 仍视为一次新操作:清空 redoStack;同时刷新 top 的 ts,延续合并窗口
+                undoStack[undoStack.length - 1].ts = now;
+                redoStack.length = 0;
+                updateUndoRedoButtons();
+                return;
+            }
             undoStack.push({
                 seats: [...currentSeats],
                 students: deepClone(students),
                 groups: deepClone(groups),
                 aisles: deepClone(aisles),
                 rows: rows,
-                cols: cols
+                cols: cols,
+                opType: opType || null,
+                ts: now
             });
             if (undoStack.length > MAX_UNDO) undoStack.shift();
+            lastSnapOpType = opType || null;
+            lastSnapTime = now;
             redoStack.length = 0;
             updateUndoRedoButtons();
         }
@@ -331,6 +365,10 @@ let isTouchDevice = state.isTouchDevice;
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
             generateSeats();
+            // P1 (1) smart-merge:undo 之后是「用户尝试新方向」,必须打破合并窗口,
+            // 否则后续 push 会被并入「已撤销」的那个动作的顶部
+            lastSnapOpType = null;
+            lastSnapTime = 0;
             isUndoing = false;
             updateUndoRedoButtons();
         }
@@ -360,6 +398,9 @@ let isTouchDevice = state.isTouchDevice;
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
             generateSeats();
+            // P1 (1) smart-merge:redo 同样打破合并窗口(与 undo 对称)
+            lastSnapOpType = null;
+            lastSnapTime = 0;
             isUndoing = false;
             updateUndoRedoButtons();
         }
@@ -469,7 +510,7 @@ let isTouchDevice = state.isTouchDevice;
 
         function deleteGroup(groupId) {
             if (confirm('确定要删除这个分组吗？该分组的学生将变为未分组状态。')) {
-                pushSnapshot();
+                pushSnapshot('group');
                 students.forEach(s => {
                     if (s.groupId === groupId) s.groupId = null;
                 });
@@ -764,7 +805,7 @@ let isTouchDevice = state.isTouchDevice;
             const student = getStudentById(studentId);
             if (!student) return;
             if (confirm('确定要删除学生 ' + student.name + ' 吗？')) {
-                pushSnapshot();
+                pushSnapshot('student');
                 // 如果该学生的标签弹窗打开着，先关闭
                 if (activeTagPopup && activeTagPopup.studentId === studentId) {
                     closeTagPopup();
@@ -1083,7 +1124,7 @@ let isTouchDevice = state.isTouchDevice;
                     labelInput.focus();
                     return;
                 }
-                pushSnapshot();
+                pushSnapshot('tag');
                 if (!student.tags) student.tags = [];
                 student.tags.push({ emoji: emoji, label: label });
                 emojiInput.value = '';
@@ -1100,7 +1141,7 @@ let isTouchDevice = state.isTouchDevice;
                 const removeBtn = e.target.closest('.tag-chip-remove');
                 if (!removeBtn) return;
                 const idx = parseInt(removeBtn.getAttribute('data-tag-idx'));
-                pushSnapshot();
+                pushSnapshot('tag');
                 student.tags.splice(idx, 1);
                 renderTagPopup(popup, student);
                 generateSeats();
@@ -1929,7 +1970,7 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
 
-            pushSnapshot();
+            pushSnapshot('import');
             students = newStudents;
             groupsToUpdate.forEach(item => {
                 item.group.color = item.color;
@@ -2043,7 +2084,7 @@ function isWholeWordMatch(label, keyword) {
             const student = getStudentById(studentId);
             if (!student) return;
 
-            pushSnapshot();
+            pushSnapshot('checkin');
             student.checkedIn = !student.checkedIn;
             generateSeats();
         }
@@ -2290,7 +2331,7 @@ function isWholeWordMatch(label, keyword) {
         // 重置座位
         document.getElementById('resetBtn').addEventListener('click', function () {
             if (confirm('确定要重置所有座位吗？')) {
-                pushSnapshot();
+                pushSnapshot('reset');
                 currentSeats = Array(rows * cols).fill(null);
                 commit({ seats: currentSeats });
                 generateSeats();
@@ -3432,7 +3473,7 @@ function isWholeWordMatch(label, keyword) {
                 if (tapSelectedSeatIndex !== null) {
                     const selectedStudentId = currentSeats[tapSelectedSeatIndex];
                     if (selectedStudentId) {
-                        pushSnapshot();
+                        pushSnapshot('seat');
                         currentSeats[tapSelectedSeatIndex] = null;
                         clearTapSelection();
                         generateSeats();
@@ -3449,7 +3490,7 @@ function isWholeWordMatch(label, keyword) {
 
             // 如果已有选中的座位，将学生放入该座位
             if (tapSelectedSeatIndex !== null) {
-                pushSnapshot();
+                pushSnapshot('seat');
                 const existingIdx = currentSeats.indexOf(studentId);
                 if (existingIdx >= 0) currentSeats[existingIdx] = null;
                 const targetId = currentSeats[tapSelectedSeatIndex];
@@ -3484,7 +3525,7 @@ function isWholeWordMatch(label, keyword) {
                 if (studentId) {
                     const student = getStudentById(studentId);
                     if (student && confirm('确定要删除学生 ' + student.name + ' 吗？')) {
-                        pushSnapshot();
+                        pushSnapshot('student');
                         currentSeats = currentSeats.map(id => id === studentId ? null : id);
                         students = students.filter(s => s.id !== studentId);
                         commit({ seats: currentSeats, students: students });
@@ -3516,7 +3557,7 @@ function isWholeWordMatch(label, keyword) {
 
             // 如果有选中的学生（来自学生名单），将其放入此座位
             if (tapSelectedStudentId !== null) {
-                pushSnapshot();
+                pushSnapshot('seat');
                 const existingIdx = currentSeats.indexOf(tapSelectedStudentId);
                 if (existingIdx >= 0) currentSeats[existingIdx] = null;
                 const targetId = currentSeats[seatIndex];
@@ -3537,7 +3578,7 @@ function isWholeWordMatch(label, keyword) {
                     return;
                 }
 
-                pushSnapshot();
+                pushSnapshot('seat');
 
                 // 获取选中座位上的学生
                 const selectedStudentId = currentSeats[tapSelectedSeatIndex];
@@ -3591,7 +3632,7 @@ function isWholeWordMatch(label, keyword) {
                     if (studentId) {
                         const student = getStudentById(studentId);
                         if (student && confirm('确定要删除学生 ' + student.name + ' 吗？')) {
-                            pushSnapshot();
+                            pushSnapshot('student');
                             currentSeats = currentSeats.map(id => id === studentId ? null : id);
                             students = students.filter(s => s.id !== studentId);
                             commit({ seats: currentSeats, students: students });
@@ -3721,7 +3762,7 @@ function isWholeWordMatch(label, keyword) {
                 alert('请选择要分配的分组');
                 return;
             }
-            pushSnapshot();
+            pushSnapshot('batch');
             batchSelectedIds.forEach(id => {
                 const student = getStudentById(id);
                 if (student) student.groupId = groupId;
@@ -3738,7 +3779,7 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
             if (confirm('确定要删除选中的 ' + batchSelectedIds.size + ' 名学生吗？')) {
-                pushSnapshot();
+                pushSnapshot('batch');
                 const idSet = new Set(batchSelectedIds);
                 currentSeats = currentSeats.map(id => idSet.has(id) ? null : id);
                 students = students.filter(s => !idSet.has(s.id));
@@ -3768,7 +3809,7 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
             if (confirm('确定要将 ' + unassigned.length + ' 名未安排的学生随机入座吗？')) {
-                pushSnapshot();
+                pushSnapshot('batch');
                 const shuffled = shuffle(unassigned.map(s => s.id));
                 const assigned = Math.min(shuffled.length, emptyIndices.length);
                 for (let i = 0; i < assigned; i++) {
@@ -4041,5 +4082,19 @@ function isWholeWordMatch(label, keyword) {
         // 执行初始化
         initialize();
         initStatBlockActions();
+
+        // P1 (1) 测试桩 — 仅在 URL 带 ?debug=1 时暴露,允许冒烟测试读 undo 栈
+        // 生产构建无 query 参数,此分支 dead-code,体积开销为 0 字节。
+        if (typeof location !== 'undefined' && /[?&]debug=1\b/.test(location.search)) {
+            window.__undoTest = {
+                pushSnapshot: pushSnapshot,
+                undo: undo,
+                redo: redo,
+                getUndoStackLength: function () { return undoStack.length; },
+                getRedoStackLength: function () { return redoStack.length; },
+                getLastSnapOpType: function () { return lastSnapOpType; },
+                getSmartMergeMs: getSmartMergeMs
+            };
+        }
 
     })();

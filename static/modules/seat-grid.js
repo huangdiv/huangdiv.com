@@ -233,13 +233,13 @@ export function createSeatGrid(deps) {
         });
         banner.querySelector('#resetCheckinBtn').addEventListener('click', function (e) {
             e.stopPropagation();
-            onPushSnapshot();
+            onPushSnapshot('checkin');
             state.students.forEach(s => s.checkedIn = false);
             generateSeats();
         });
         banner.querySelector('#allCheckinBtn').addEventListener('click', function (e) {
             e.stopPropagation();
-            onPushSnapshot();
+            onPushSnapshot('checkin');
             state.students.forEach(s => s.checkedIn = true);
             generateSeats();
         });

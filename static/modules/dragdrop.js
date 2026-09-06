@@ -115,7 +115,7 @@ export function createDragdrop(deps) {
                                e.target.closest('.student-list') ||
                                e.target.closest('.seat');
         if (hasValidTarget && draggedStudentId) {
-            onPushSnapshot();
+            onPushSnapshot('drag');
         }
 
         // 删除区域

@@ -96,7 +96,7 @@ export function createRandomArrange(deps) {
             if (state.seats[i]) prevSeatMap[state.seats[i]] = i;
         }
 
-        onPushSnapshot();
+        onPushSnapshot('random');
         state.seats = Array(state.rows * state.cols).fill(null);
 
         const totalSeats = state.rows * state.cols;

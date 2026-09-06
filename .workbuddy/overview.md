@@ -349,3 +349,63 @@ A. 空 cfg → 全默认 / B. string[] students → 转对象 / C. id 缺失/重
 - **P1 UX**(6):配对批量生成 / emoji 整词优先 / 下拉菜单键盘 / emoji maxlength VS16 / 标签焦点陷阱 / 座位图标背景反色
 - **P1**(1):撤销栈 smart-merge
 - **P2**(2):`querySelectorAll` 误伤 / i18n
+
+---
+
+## 批次5 — P1 UX 6 项(commit `b826649`,已推送)
+
+依据 review v1.3.0 §六 E/F 全部 6 项 P1 UX 改进,主文件 3688 → 3740(+52),CSS +41,新增 smoke_test_batch5 21565 字节,嵌套 ref bug 第 7 次复现(已熟练 printf 修复)。
+
+| UX # | 模块 | 改动 | 验证 |
+|------|------|------|------|
+| #1 批量配对 | pair popup | 同组 i+=2 配对 / 跨组 round-robin max(Na, Nb) | batch5 场景 1/2 全过 |
+| #2 emoji 整词 | `EMOJI_KEYWORD_MAP` | `boundary: true` + `isWholeWordMatch` 两阶段(整词 → 兜底) | batch5 场景 3 全过 |
+| #3 下拉键盘 | 新 `setupActionDropdown` helper | Enter/↓/Space 按钮 + ↑↓/Home/End/Esc 菜单 + 修 CSS `outline: none` bug | batch5 场景 4 全过 |
+| #4 emoji maxlength VS16 | `createTagPopupShell` | 摘 HTML maxlength,`Array.from(str)` 按码点截到 4(保 VS16/ZWJ) | batch5 场景 5 全过 |
+| #5 焦点陷阱 | 新 `installFocusTrap` helper | Tab 末→首循环 + Esc + `restoreFocus()` + role=dialog / aria-modal | batch5 场景 6 全过 |
+| #6 座位图标反色 | CSS | `.seat-icons` isolation:isolate + `.seat-icon` mix-blend-mode:difference + text-shadow 兜底 | batch5 场景 7 全过 |
+
+---
+
+## 批次6 — P1 (1) 撤销栈 smart-merge(本轮完成,待推送)
+
+依据 review v1.3.0 §六 E P1 UX 6 项之外的 P1 (1):连续同类型操作(默认 200ms 窗口)合并为单 undo 帧。
+
+### 关键设计
+- 闭包变量 `lastSnapOpType` / `lastSnapTime` 追踪上一次入栈的 opType + 时间戳
+- merge 条件:`opType && lastSnapOpType === opType && (now - lastSnapTime) < mergeMs && mergeMs > 0 && undoStack.length > 0`
+- 命中 merge:只刷新 `top.ts` + 清 redoStack,**不入栈**(top 保留「心智动作开始前」状态,1 次 undo 即回退整批)
+- `undo()` / `redo()` restore 后重置 lastSnap — 防止新 push 与已撤销帧合并
+- IIFE 末尾 `window.__undoTest` 桩,**仅** URL 带 `?debug=1` 时挂载
+
+### 15 处 push 全部打标
+| opType | 调用点 |
+|--------|--------|
+| `'seat'` | 触屏 tap 模式 4 处 + dragdrop 的 `'drag'`(共 5) |
+| `'student'` | `removeStudent` + 座位 × 按钮 + deleteZone(共 3) |
+| `'tag'` | tag add / remove(共 2) |
+| `'group'` | `deleteGroup`(1) |
+| `'checkin'` | `toggleStudentCheckin` + 签到 banner 2 按钮(共 3) |
+| `'import'` / `'random'` / `'batch'` / `'reset'` | 各自单一调用点 |
+
+### 跨模块 callback
+- `dragdrop.js`:`onPushSnapshot()` → `onPushSnapshot('drag')`
+- `random-arrange.js`:`onPushSnapshot()` → `onPushSnapshot('random')`
+- `seat-grid.js`:banner 2 按钮 → `onPushSnapshot('checkin')`
+- 主 IIFE 注入 `callbacks.onPushSnapshot: pushSnapshot` 无需改 — 自动透传 opType
+
+### 验证
+- `node --check` 4 JS 文件全过
+- unit_random_arrange 20/20 + unit_migrate 35/35
+- `smoke_test_batch6_p1_undo_merge.py` 7 场景全过(合并 / 超窗口 / 不同 opType / undo 打破 / redo 打破 / undoMergeMs=0 / UI 路径)
+- `smoke_test_batch4_p1_perf` 4 场景 + `smoke_test_batch5_p1_ux` 7 场景回归全过
+- 0 致命 console.error
+
+### 净 diff
+- 4 文件 / +77 / -22
+- 主 seats-generator.js +57 / -11
+- 3 模块各 1 行 callback 改 opType
+- 新 smoke_test_batch6 207 行
+
+### review v1.3.0 剩余 2 项未做
+- **P2**(2):`querySelectorAll` 误伤 / i18n
