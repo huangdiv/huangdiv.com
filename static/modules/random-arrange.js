@@ -98,7 +98,21 @@ export function createRandomArrange(deps) {
         }
 
         onPushSnapshot('random');
-        state.seats = Array(state.rows * state.cols).fill(null);
+        // 就地清空座位表,保持数组引用不变。
+        //
+        // 关键:主 IIFE 的顶层 `let currentSeats` 与本数组是别名关系
+        // (seats-generator.js 顶部 `let currentSeats = state.seats`)。
+        // 若在此重新赋值 Array(...) 会断开别名,而渲染读 state.seats、
+        // 自动保存 getCurrentConfig() 读 currentSeats —— 结果是界面显示
+        // 新座位、localStorage 却仍写入排座前的旧数组,刷新后回到旧座位
+        // (表现="随机排座后自动保存失效")。
+        // 仅当长度确实变化(行列数被改过)时才重建,此时靠随后的 commit
+        // 让主 IIFE 的别名回同步逻辑拉齐。
+        if (state.seats.length !== state.rows * state.cols) {
+            state.seats = Array(state.rows * state.cols).fill(null);
+        } else {
+            state.seats.fill(null);
+        }
 
         const totalSeats = state.rows * state.cols;
         const seatCount = Math.min(state.students.length, totalSeats);

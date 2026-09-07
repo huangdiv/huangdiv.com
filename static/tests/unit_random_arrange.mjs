@@ -126,7 +126,6 @@ function resetState(opts = {}) {
         seats: null,
         viewMode: 'student',
         isCheckinMode: false,
-        isBatchMode: false,
         showStudentIcons: true,
         title: '班级座位表'
     });

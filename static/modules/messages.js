@@ -77,6 +77,8 @@ export const MESSAGES = {
     CONFIRM_BATCH_DELETE: (count) => `确定要删除选中的 ${count} 名学生吗？`,
     ALL_STUDENTS_SEATED: '所有学生都已安排座位',
     NO_EMPTY_SEATS: '没有空座位可分配',
+    GROUP_MODE_NO_SELECTION: '请先在座位表中点击选择学生',
+    GROUP_MODE_NEW_NAME: '请输入新分组名称：',
     CONFIRM_QUICK_RANDOM: (count) => `确定要将 ${count} 名未安排的学生随机入座吗？`,
 
     // —— 随机排座 ——

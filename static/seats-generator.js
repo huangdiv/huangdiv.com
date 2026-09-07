@@ -28,7 +28,6 @@ import { MESSAGES } from './modules/messages.js';
 //   3) path-A2(下一轮):全部写点接入 commit,完成 bus 驱动
 //
 // 如果不需要双轨可彻底切换,改写点并 add commit 是必经之路。
-const batchSelectedIds = state.batchSelectedIds;  // Set 引用稳定,用 const 安全
 let students = state.students;
 let groups = state.groups;
 let aisles = state.aisles;
@@ -39,7 +38,8 @@ let rows = state.rows;
 let cols = state.cols;
 let isTeacherView = state.viewMode === 'teacher';
 let isCheckinMode = state.isCheckinMode;
-let isBatchMode = state.isBatchMode;
+let isGroupMode = state.isGroupMode;   // 分组模式:座位表多选学生 → 批量分配到分组
+const groupModeSelectedIds = new Set();  // 分组模式:当前选中的学生 id 集合(座位表多选)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
 
@@ -93,14 +93,13 @@ let isTouchDevice = state.isTouchDevice;
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
         const printBtn = document.getElementById('printBtn');
-        const batchModeBtn = document.getElementById('batchModeBtn');
-        const batchToolbar = document.getElementById('batchToolbar');
-        const batchGroupSelect = document.getElementById('batchGroupSelect');
-        const batchAssignBtn = document.getElementById('batchAssignBtn');
-        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
-        const batchSelectAllBtn = document.getElementById('batchSelectAllBtn');
-        const batchCancelBtn = document.getElementById('batchCancelBtn');
-        const batchCountEl = document.getElementById('batchCount');
+        const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+        const modeSwitchDropdown = document.getElementById('modeSwitchDropdown');
+        const groupModeToolbar = document.getElementById('groupModeToolbar');
+        const groupModeCount = document.getElementById('groupModeCount');
+        const groupModeList = document.getElementById('groupModeList');
+        const groupModeNewBtn = document.getElementById('groupModeNewBtn');
+        const groupModeExitBtn = document.getElementById('groupModeExitBtn');
         const quickRandomBtn = document.getElementById('quickRandomBtn');
         const pairSettingsBtn = document.getElementById('pairSettingsBtn');
         const mobileBanner = document.getElementById('mobileBanner');
@@ -138,10 +137,6 @@ let isTouchDevice = state.isTouchDevice;
         // let isTouchDevice = false;  // 见顶部 path-A1 别名
         let tapSelectedStudentId = null;   // 选中的学生 ID(来自学生列表)
         let tapSelectedSeatIndex = null;    // 选中的座位索引(来自座位表)
-
-        // 批量操作状态
-        // let isBatchMode = false;        // 见顶部 path-A1 别名
-        // const batchSelectedIds = new Set();  // 见顶部 path-A1 别名
 
         // 签到模式状态
         // let isCheckinMode = false;  // 见顶部 path-A1 别名
@@ -245,6 +240,8 @@ let isTouchDevice = state.isTouchDevice;
                 showStudentIcons: showStudentIcons,
                 forcedPairs: forcedPairs,
                 avoidPairs: avoidPairs,
+                isCheckinMode: isCheckinMode,
+                isGroupMode: isGroupMode,
                 version: APP_VERSION
             };
         }
@@ -260,6 +257,22 @@ let isTouchDevice = state.isTouchDevice;
                 }
             }, 500);
         }
+
+        // 集中式自动保存:订阅 state 中心的 'change' 事件,任何一次 commit() 都触发
+        // 防抖 autoSave。这样手动调座(拖放 / 触屏点选移动 / 任意写点)只要走 commit
+        // 就会被持久化,无需在每个调用点手动补 autoSave()(也避免漏改点的回归)。
+        // autoSave 内部已用 isInitialized 守卫,初始化期间的 commit 不会提前写入。
+        subscribe(function () {
+            // 别名回同步:state 是唯一真源。渲染(seat-grid)读 state.seats,
+            // 而自动保存 getCurrentConfig() 读顶层 currentSeats(历史遗留别名,
+            // 全文件 60+ 处引用,暂不整体迁移)。任何一次重新赋值 state.seats
+            // 的写点都会打断别名,导致"界面已变、保存仍是旧值"。
+            // 这里在每次 commit 后统一拉齐,保证任意路径的修改都能被持久化。
+            if (state.seats !== currentSeats) {
+                currentSeats = state.seats;
+            }
+            autoSave();
+        });
 
         // ==================== 撤销/重做 ====================
 
@@ -615,12 +628,7 @@ let isTouchDevice = state.isTouchDevice;
             } else {
                 const studentsHtml = students.map(student => {
                     let classes = 'student-group-item';
-                    if (isBatchMode && batchSelectedIds.has(student.id)) {
-                        classes += ' batch-selected';
-                    }
-                    const checkbox = isBatchMode
-                        ? '<input type="checkbox" class="batch-checkbox" ' + (batchSelectedIds.has(student.id) ? 'checked' : '') + '>'
-                        : '';
+                    const checkbox = '';
                     // 性别选项（带选中状态）
                     const genderOpts = [
                         { value: '', label: '—' },
@@ -2055,15 +2063,29 @@ function isWholeWordMatch(label, keyword) {
         const updateStatistics = seatGrid.updateStatistics;
         const updateCheckinStats = seatGrid.updateCheckinStats;
 
+        // 退出分组模式(进入其他模式 / 退出时调用)
+        function exitGroupMode() {
+            if (!isGroupMode) return;
+            isGroupMode = false;
+            state.isGroupMode = false;
+            commit({ isGroupMode: false });
+            classroom.classList.remove('group-mode');
+            if (groupModeToolbar) groupModeToolbar.style.display = 'none';
+            groupModeSelectedIds.clear();
+            clearGroupModeSelection();
+            updateModeSwitchButton();
+        }
+
+        // 进入/退出签到模式(与分组模式互斥)
         function toggleCheckinMode() {
-            if (typeof clearTapSelection === 'function') {
-                clearTapSelection();
-            }
+            if (typeof clearTapSelection === 'function') clearTapSelection();
             clearDragHighlights();
+            // 与分组模式互斥:进入签到前先退出分组模式
+            if (!isCheckinMode && isGroupMode) exitGroupMode();
             isCheckinMode = !isCheckinMode;
             state.isCheckinMode = isCheckinMode;
             commit({ isCheckinMode: isCheckinMode });
-            updateCheckinModeButton();
+            updateModeSwitchButton();
             if (isCheckinMode) {
                 classroom.classList.add('checkin-mode');
                 document.getElementById('normalStatsRow').style.display = 'none';
@@ -2075,8 +2097,91 @@ function isWholeWordMatch(label, keyword) {
             }
             generateSeats();
             updateCheckinStats();
-            if (typeof updateMobileBanner === 'function') {
-                updateMobileBanner();
+            if (typeof updateMobileBanner === 'function') updateMobileBanner();
+        }
+
+        // 进入/退出分组模式(座位表多选学生 → 批量分配到分组;与签到模式互斥)
+        function toggleGroupMode() {
+            if (typeof clearTapSelection === 'function') clearTapSelection();
+            clearDragHighlights();
+            // 与签到模式互斥:进入分组前先退出签到
+            if (!isGroupMode && isCheckinMode) {
+                isCheckinMode = false;
+                state.isCheckinMode = false;
+                commit({ isCheckinMode: false });
+                classroom.classList.remove('checkin-mode');
+                document.getElementById('normalStatsRow').style.display = 'flex';
+                document.getElementById('checkinStatsRow').style.display = 'none';
+                updateCheckinStats();
+            }
+            isGroupMode = !isGroupMode;
+            state.isGroupMode = isGroupMode;
+            commit({ isGroupMode: isGroupMode });
+            updateModeSwitchButton();
+            if (isGroupMode) {
+                classroom.classList.add('group-mode');
+                if (groupModeToolbar) groupModeToolbar.style.display = 'flex';
+                renderGroupModeList();
+                updateGroupModeCount();
+            } else {
+                classroom.classList.remove('group-mode');
+                if (groupModeToolbar) groupModeToolbar.style.display = 'none';
+                groupModeSelectedIds.clear();
+                clearGroupModeSelection();
+            }
+            generateSeats();
+            if (typeof updateMobileBanner === 'function') updateMobileBanner();
+        }
+
+        // 从预设调色板取一个分组颜色(按现有分组数循环)
+        function pickGroupColor() {
+            const palette = ['#FF9F9F', '#9FCFFF', '#9FFFBE', '#FFE59F', '#E59FFF', '#9FFFF0', '#FFB39F', '#C9F59F'];
+            return palette[groups.length % palette.length];
+        }
+
+        // 渲染分组模式工具栏中的分组按钮(点击即把选中的座位学生分配到该组)
+        function renderGroupModeList() {
+            if (!groupModeList) return;
+            if (groups.length === 0) {
+                groupModeList.innerHTML = '<span class="group-mode-empty">暂无分组</span>';
+                return;
+            }
+            groupModeList.innerHTML = groups.map(function (g) {
+                return '<button type="button" class="group-mode-group-btn" data-group-id="' +
+                    escapeHtml(g.id) + '"' +
+                    (g.color ? ' style="background:' + escapeHtml(g.color) + '"' : '') + '>' +
+                    escapeHtml(g.name) + '</button>';
+            }).join('');
+        }
+
+        // 清除座位表上的选中高亮
+        function clearGroupModeSelection() {
+            document.querySelectorAll('.seat.group-selected').forEach(function (el) {
+                el.classList.remove('group-selected');
+            });
+            updateGroupModeCount();
+        }
+
+        // 把当前选中的座位学生统一分配到指定分组(并清空选择)
+        function assignSelectedToGroup(groupId) {
+            if (groupModeSelectedIds.size === 0) return;
+            pushSnapshot('group');
+            groupModeSelectedIds.forEach(function (id) {
+                const student = getStudentById(id);
+                if (student) student.groupId = groupId;
+            });
+            groupModeSelectedIds.clear();
+            clearGroupModeSelection();
+            generateSeats();
+            updateStudentAssignmentDisplay();
+            generateStudentList();
+            updateGroupDisplay();
+            autoSave();
+        }
+
+        function updateGroupModeCount() {
+            if (groupModeCount) {
+                groupModeCount.textContent = '已选 ' + groupModeSelectedIds.size + ' 名学生';
             }
         }
 
@@ -2310,6 +2415,7 @@ function isWholeWordMatch(label, keyword) {
         const randomDropdown = document.getElementById('randomDropdown');
         const printDropdown = document.getElementById('printDropdown');
         const randomDropdownCtrl = setupActionDropdown(randomBtn, randomDropdown, printBtn, printDropdown);
+        const modeSwitchDropdownCtrl = setupActionDropdown(modeSwitchBtn, modeSwitchDropdown, null, null);
         const printDropdownCtrl = setupActionDropdown(printBtn, printDropdown, randomBtn, randomDropdown);
 
         // 点击关闭 randomDropdown / printDropdown（事件委托，在 printBtn 的 document click handler 里统一处理）
@@ -2427,13 +2533,17 @@ function isWholeWordMatch(label, keyword) {
                 localStorage.removeItem(ACTIVE_CONFIG_KEY);
                 students = [];
                 groups = [];
-                rows = 7;
-                cols = 7;
-                rowsInput.value = 7;
-                colsInput.value = 7;
+                rows = 8;
+                cols = 8;
+                rowsInput.value = 8;
+                colsInput.value = 8;
                 currentSeats = Array(rows * cols).fill(null);
                 isTeacherView = false;
-                aisles = [];
+                aisles = [
+                    { afterCol: 2, width: 30 },
+                    { afterCol: 4, width: 30 },
+                    { afterCol: 6, width: 30 }
+                ];
                 showStudentIcons = true;
                 state.viewMode = 'student';
                 commit({
@@ -3133,14 +3243,16 @@ function isWholeWordMatch(label, keyword) {
 
                     students = config.students || [];
                     groups = config.groups || [];
-                    rows = config.rows || 7;
-                    cols = config.cols || 7;
+                    rows = config.rows || 8;
+                    cols = config.cols || 8;
                     currentSeats = config.seats || Array(rows * cols).fill(null);
                     isTeacherView = config.viewMode === 'teacher';
                     aisles = config.aisles || [];
                     showStudentIcons = config.showStudentIcons !== false;
                     forcedPairs = config.forcedPairs || [];
                     avoidPairs = config.avoidPairs || [];
+                    isCheckinMode = !!config.isCheckinMode;
+                    isGroupMode = !!config.isGroupMode;
                     if (config.title) pageTitle.textContent = config.title;
 
                     // 调整座位数组长度以匹配当前行列
@@ -3161,11 +3273,15 @@ function isWholeWordMatch(label, keyword) {
                     console.error('加载本地存储配置失败，使用默认配置:', error);
                     students = [];
                     groups = [];
-                    rows = 7;
-                    cols = 7;
+                    rows = 8;
+                    cols = 8;
                     currentSeats = Array(rows * cols).fill(null);
                     isTeacherView = false;
-                    aisles = [];
+                    aisles = [
+                        { afterCol: 2, width: 30 },
+                        { afterCol: 4, width: 30 },
+                        { afterCol: 6, width: 30 }
+                    ];
                     showStudentIcons = true;
                     forcedPairs = [];
                     avoidPairs = [];
@@ -3180,6 +3296,9 @@ function isWholeWordMatch(label, keyword) {
                 }
             } else {
                 // 新用户首次进入：无配置文件、无分组、无学生，渲染新增分组与新增学生输入行
+                // 默认 8×8 + 第 2/4/6 列后 30px 走道(state.js 初始值),同步到输入框显示
+                rowsInput.value = rows;
+                colsInput.value = cols;
                 updateAisleDisplay();
                 updateGroupDisplay();
                 updateStudentAssignmentDisplay();
@@ -3190,8 +3309,25 @@ function isWholeWordMatch(label, keyword) {
                 students: students, groups: groups, rows: rows, cols: cols,
                 seats: currentSeats, aisles: aisles, viewMode: state.viewMode,
                 showStudentIcons: showStudentIcons,
-                forcedPairs: forcedPairs, avoidPairs: avoidPairs
+                forcedPairs: forcedPairs, avoidPairs: avoidPairs,
+                isCheckinMode: isCheckinMode, isGroupMode: isGroupMode
             });
+
+            // 恢复模式 UI(签到 / 分组互斥,分组优先)
+            if (isGroupMode) {
+                classroom.classList.add('group-mode');
+                if (groupModeToolbar) groupModeToolbar.style.display = 'flex';
+                renderGroupModeList();
+                updateGroupModeCount();
+            } else if (isCheckinMode) {
+                classroom.classList.add('checkin-mode');
+                const ns = document.getElementById('normalStatsRow');
+                const cs = document.getElementById('checkinStatsRow');
+                if (ns) ns.style.display = 'none';
+                if (cs) cs.style.display = 'flex';
+            }
+            updateModeSwitchButton();
+
             generateSeats();
             isInitialized = true;
         }
@@ -3238,6 +3374,8 @@ function isWholeWordMatch(label, keyword) {
                     showStudentIcons = config.showStudentIcons !== false;
                     forcedPairs = config.forcedPairs || [];
                     avoidPairs = config.avoidPairs || [];
+                    isCheckinMode = !!config.isCheckinMode;
+                    isGroupMode = !!config.isGroupMode;
                     if (config.title) pageTitle.textContent = config.title;
 
                     const targetLen = rows * cols;
@@ -3369,8 +3507,10 @@ function isWholeWordMatch(label, keyword) {
                 // 关闭所有下拉菜单(同步 ARIA)
                 randomDropdownCtrl.close();
                 printDropdownCtrl.close();
+                modeSwitchDropdownCtrl.close();
                 randomDropdown.style.display = 'none';
                 printDropdown.style.display = 'none';
+                modeSwitchDropdown.style.display = 'none';
 
                 // printDropdown 动作
                 if (action === 'print') {
@@ -3392,11 +3532,18 @@ function isWholeWordMatch(label, keyword) {
                         showStatToast(result.warnings.join(' / '));
                     }
                 }
+                // 切换模式菜单动作
+                else if (action === 'checkin') {
+                    toggleCheckinMode();
+                } else if (action === 'group') {
+                    toggleGroupMode();
+                }
                 return;
             }
             // 点击外部关闭所有下拉菜单(同步 ARIA 与 setupActionDropdown)
             const printDd = document.getElementById('printDropdown');
             const randDd = document.getElementById('randomDropdown');
+            const modeDd = document.getElementById('modeSwitchDropdown');
             if (printDd && !printDd.contains(e.target) && !printBtn.contains(e.target)) {
                 printDd.style.display = 'none';
                 printBtn.setAttribute('aria-expanded', 'false');
@@ -3404,6 +3551,10 @@ function isWholeWordMatch(label, keyword) {
             if (randDd && !randDd.contains(e.target) && !randomBtn.contains(e.target)) {
                 randDd.style.display = 'none';
                 randomBtn.setAttribute('aria-expanded', 'false');
+            }
+            if (modeDd && !modeDd.contains(e.target) && !modeSwitchBtn.contains(e.target)) {
+                modeDd.style.display = 'none';
+                modeSwitchBtn.setAttribute('aria-expanded', 'false');
             }
         });
 
@@ -3546,6 +3697,22 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
 
+            // 分组模式：点击有学生的座位 → 切换选中(高亮),可多选;再点分组即可批量分配
+            if (isGroupMode && seat) {
+                const studentId = seat.getAttribute('data-student');
+                if (studentId) {
+                    if (groupModeSelectedIds.has(studentId)) {
+                        groupModeSelectedIds.delete(studentId);
+                        seat.classList.remove('group-selected');
+                    } else {
+                        groupModeSelectedIds.add(studentId);
+                        seat.classList.add('group-selected');
+                    }
+                    updateGroupModeCount();
+                }
+                return;
+            }
+
             if (!isTouchDevice) return;
             if (!seat) return;
 
@@ -3565,6 +3732,7 @@ function isWholeWordMatch(label, keyword) {
                 }
                 currentSeats[seatIndex] = tapSelectedStudentId;
                 clearTapSelection();
+                commit({ seats: currentSeats });
                 generateSeats();
                 return;
             }
@@ -3605,6 +3773,7 @@ function isWholeWordMatch(label, keyword) {
                 }
 
                 clearTapSelection();
+                commit({ seats: currentSeats });
                 generateSeats();
                 return;
             }
@@ -3648,149 +3817,8 @@ function isWholeWordMatch(label, keyword) {
             }
         });
 
-        // ==================== 批量操作 ====================
-
-        function updateBatchGroupOptions() {
-            batchGroupSelect.innerHTML = '<option value="">选择分组...</option>' +
-                groups.map(g =>
-                    '<option value="' + escapeHtml(g.id) + '">' + escapeHtml(g.name) + '</option>'
-                ).join('');
-        }
-
-        function updateBatchCount() {
-            batchCountEl.textContent = '已选 ' + batchSelectedIds.size;
-        }
-
-        function enterBatchMode() {
-            isBatchMode = true;
-            state.isBatchMode = true;
-            commit({ isBatchMode: true });
-            batchToolbar.classList.add('visible');
-            batchModeBtn.textContent = '退出批量';
-            updateBatchGroupOptions();
-            updateStudentAssignmentDisplay();
-            updateBatchCount();
-        }
-
-        function exitBatchMode() {
-            isBatchMode = false;
-            state.isBatchMode = false;
-            commit({ isBatchMode: false });
-            batchToolbar.classList.remove('visible');
-            batchModeBtn.textContent = '批量操作';
-            batchSelectedIds.clear();
-            updateStudentAssignmentDisplay();
-            updateBatchCount();
-        }
-
-        batchModeBtn.addEventListener('click', function () {
-            if (isBatchMode) exitBatchMode();
-            else enterBatchMode();
-        });
-
-        batchCancelBtn.addEventListener('click', exitBatchMode);
-
-        // 点击学生项（批量模式下的多选，作用于分配学生区域）
-        studentGroupSelector.addEventListener('click', function (e) {
-            if (!isBatchMode) return;
-            const item = e.target.closest('.student-group-item');
-            if (!item) return;
-            const studentId = item.getAttribute('data-student-id');
-            if (!studentId) return;
-            // 如果点的是输入框、下拉框或新增行，不处理
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') return;
-
-            if (batchSelectedIds.has(studentId)) {
-                batchSelectedIds.delete(studentId);
-                item.classList.remove('batch-selected');
-            } else {
-                batchSelectedIds.add(studentId);
-                item.classList.add('batch-selected');
-            }
-            // 同步 checkbox
-            const cb = item.querySelector('.batch-checkbox');
-            if (cb) cb.checked = batchSelectedIds.has(studentId);
-            updateBatchCount();
-        });
-
-        // checkbox 直接点击（作用于分配学生区域）
-        studentGroupSelector.addEventListener('change', function (e) {
-            if (!isBatchMode) return;
-            if (!e.target.classList.contains('batch-checkbox')) return;
-            const item = e.target.closest('.student-group-item');
-            const studentId = item.getAttribute('data-student-id');
-            if (e.target.checked) {
-                batchSelectedIds.add(studentId);
-                item.classList.add('batch-selected');
-            } else {
-                batchSelectedIds.delete(studentId);
-                item.classList.remove('batch-selected');
-            }
-            updateBatchCount();
-        });
-
-        batchSelectAllBtn.addEventListener('click', function () {
-            if (batchSelectedIds.size === students.length) {
-                batchSelectedIds.clear();
-            } else {
-                students.forEach(s => batchSelectedIds.add(s.id));
-            }
-            // 更新 UI
-            studentGroupSelector.querySelectorAll('.student-group-item').forEach(item => {
-                const id = item.getAttribute('data-student-id');
-                if (!id) return;
-                const cb = item.querySelector('.batch-checkbox');
-                if (batchSelectedIds.has(id)) {
-                    item.classList.add('batch-selected');
-                    if (cb) cb.checked = true;
-                } else {
-                    item.classList.remove('batch-selected');
-                    if (cb) cb.checked = false;
-                }
-            });
-            updateBatchCount();
-        });
-
-        batchAssignBtn.addEventListener('click', function () {
-            if (batchSelectedIds.size === 0) {
-                alert(MESSAGES.BATCH_SELECT_STUDENTS_FIRST);
-                return;
-            }
-            const groupId = batchGroupSelect.value;
-            if (!groupId) {
-                alert(MESSAGES.BATCH_SELECT_GROUP_FIRST);
-                return;
-            }
-            pushSnapshot('batch');
-            batchSelectedIds.forEach(id => {
-                const student = getStudentById(id);
-                if (student) student.groupId = groupId;
-            });
-            generateSeats();
-            updateStudentAssignmentDisplay();
-            generateStudentList();
-            autoSave();
-        });
-
-        batchDeleteBtn.addEventListener('click', function () {
-            if (batchSelectedIds.size === 0) {
-                alert(MESSAGES.BATCH_SELECT_STUDENTS_FIRST);
-                return;
-            }
-            if (confirm(MESSAGES.CONFIRM_BATCH_DELETE(batchSelectedIds.size))) {
-                pushSnapshot('batch');
-                const idSet = new Set(batchSelectedIds);
-                currentSeats = currentSeats.map(id => idSet.has(id) ? null : id);
-                students = students.filter(s => !idSet.has(s.id));
-                batchSelectedIds.clear();
-                commit({ seats: currentSeats, students: students, batchSelectedIds: batchSelectedIds });
-                exitBatchMode();
-                generateSeats();
-                updateStudentAssignmentDisplay();
-                generateStudentList();
-                autoSave();
-            }
-        });
+        // （批量分配功能已移除：改为「切换模式 ▾ → 分组模式」，
+        //   在座位表上点击多选学生后，点分组按钮即可批量分配到该组，或「＋新建分组并分配」）
 
         // 快速随机入座：将所有未安排座位的学生随机分配到空座位
         quickRandomBtn.addEventListener('click', function () {
@@ -3820,11 +3848,44 @@ function isWholeWordMatch(label, keyword) {
             }
         });
 
-        // 签到模式按钮
-        const checkinModeBtn = document.getElementById('checkinModeBtn');
-        if (checkinModeBtn) {
-            checkinModeBtn.addEventListener('click', toggleCheckinMode);
-        }
+        // 分组模式工具栏：新建分组并分配 / 退出
+        groupModeNewBtn.addEventListener('click', function () {
+            if (groupModeSelectedIds.size === 0) {
+                alert(MESSAGES.GROUP_MODE_NO_SELECTION || '请先在座位表中点击选择学生');
+                return;
+            }
+            const name = prompt(MESSAGES.GROUP_MODE_NEW_NAME || '请输入新分组名称：');
+            if (!name) return;
+            const trimmed = name.trim();
+            if (!trimmed) return;
+            if (groups.some(g => g.name === trimmed)) {
+                alert(MESSAGES.GROUP_NAME_EXISTS);
+                return;
+            }
+            const newGroup = { id: generateId('g'), name: trimmed, color: pickGroupColor() };
+            groups.push(newGroup);
+            commit({ groups: groups });
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
+            renderGroupModeList();
+            // 把当前选中的座位学生分配到新分组
+            assignSelectedToGroup(newGroup.id);
+        });
+
+        groupModeExitBtn.addEventListener('click', toggleGroupMode);
+
+        // 分组模式工具栏：点击分组按钮 → 把选中的座位学生批量分配到该组
+        groupModeList.addEventListener('click', function (e) {
+            const btn = e.target.closest('.group-mode-group-btn');
+            if (!btn) return;
+            const groupId = btn.getAttribute('data-group-id');
+            if (!groupId) return;
+            if (groupModeSelectedIds.size === 0) {
+                alert(MESSAGES.GROUP_MODE_NO_SELECTION || '请先在座位表中点击选择学生');
+                return;
+            }
+            assignSelectedToGroup(groupId);
+        });
 
         // 折叠面板交互
         document.querySelectorAll('.collapse-header').forEach(function (header) {
@@ -3838,21 +3899,14 @@ function isWholeWordMatch(label, keyword) {
             });
         });
 
-        // 签到模式按钮的 active 状态同步
-        function updateCheckinModeButton() {
-            const btn = document.getElementById('checkinModeBtn');
-            if (!btn) return;
-            const icon = btn.querySelector('.action-icon');
-            const text = btn.querySelector('span:last-child');
-            if (isCheckinMode) {
-                btn.classList.add('active');
-                if (icon) icon.textContent = '✕';
-                if (text) text.textContent = '退出签到';
-            } else {
-                btn.classList.remove('active');
-                if (icon) icon.textContent = '✓';
-                if (text) text.textContent = '签到模式';
-            }
+        // 切换模式下拉菜单项 active 状态同步(签到 / 分组互斥高亮)
+        function updateModeSwitchButton() {
+            const dd = modeSwitchDropdown;
+            if (!dd) return;
+            const checkinItem = dd.querySelector('[data-action="checkin"]');
+            const groupItem = dd.querySelector('[data-action="group"]');
+            if (checkinItem) checkinItem.classList.toggle('active', !!isCheckinMode);
+            if (groupItem) groupItem.classList.toggle('active', !!isGroupMode);
         }
 
         // ==================== 统计项点击：复制姓名 / 下载 Excel ====================

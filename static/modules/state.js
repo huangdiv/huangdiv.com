@@ -31,20 +31,23 @@ export const state = {
     // —— 数据(与顶层 let 镜像) ——
     students: [],
     groups: [],
-    aisles: [],
+    aisles: [
+        { afterCol: 2, width: 30 },
+        { afterCol: 4, width: 30 },
+        { afterCol: 6, width: 30 }
+    ],
     forcedPairs: [],   // [[idA, idB], ...]
     avoidPairs: [],    // [[idA, idB], ...]
-    batchSelectedIds: new Set(),
 
     // —— 座位表几何 ——
-    rows: 7,
-    cols: 7,
+    rows: 8,
+    cols: 8,
     seats: null,        // 长度 rows*cols,占座时为 studentId
 
     // —— 视图与模式 ——
     viewMode: 'student',     // 'student' | 'teacher'
     isCheckinMode: false,
-    isBatchMode: false,
+    isGroupMode: false,     // 分组模式:座位表多选学生 → 批量分配到分组
     showStudentIcons: true,
     isTouchDevice: false,
 

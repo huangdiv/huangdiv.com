@@ -23,8 +23,8 @@
 // =====================================================================
 
 // === 常量 ===
-export const DEFAULT_ROWS = 7;
-export const DEFAULT_COLS = 7;
+export const DEFAULT_ROWS = 8;
+export const DEFAULT_COLS = 8;
 export const APP_VERSION = '1.3.1';
 
 // === 工具 ===

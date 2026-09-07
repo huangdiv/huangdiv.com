@@ -1675,74 +1675,69 @@ h1:focus {
     display: block;
 }
 
-/* ==================== 批量操作样式 ==================== */
-.batch-toolbar {
-    display: none;
-    background: #e3f2fd;
-    border-radius: 5px;
-    padding: 8px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-    gap: 5px;
+/* ==================== 分组模式样式 ==================== */
+.group-mode-toolbar {
+    display: none;  /* 由 JS 切换为 flex(内联 style 覆盖) */
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
 }
 
-.batch-toolbar.visible {
-    display: flex;
+.group-mode-title {
+    font-weight: 600;
+    color: #2e7d32;
 }
 
-.batch-toolbar select {
-    flex: 1;
-    min-width: 80px;
-    padding: 4px;
-    font-size: 13px;
-}
-
-.batch-toolbar button {
-    min-width: 50px;
-    padding: 4px 8px;
-    font-size: 13px;
-}
-
-.batch-count {
+.group-mode-count {
     font-size: 12px;
-    color: #666;
-    margin-right: 5px;
+    color: #555;
     white-space: nowrap;
 }
 
-.student-item .batch-checkbox {
-    display: none;
-    margin-right: 6px;
-    width: auto;
-    vertical-align: middle;
+.group-mode-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.student-item.batch-mode .batch-checkbox {
-    display: inline-block;
+.group-mode-group-btn {
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #1a1a1a;
 }
 
-.student-item.batch-mode {
+.group-mode-group-btn:hover {
+    filter: brightness(0.95);
+}
+
+.group-mode-empty {
+    font-size: 12px;
+    color: #888;
+}
+
+/* 分组模式：座位表中被选中的学生高亮 */
+.classroom.group-mode .seat {
     cursor: pointer;
 }
 
-.student-item.batch-selected {
-    background-color: #bbdefb !important;
+.seat.group-selected {
+    outline: 3px solid #2e7d32;
+    outline-offset: -3px;
+    box-shadow: 0 0 0 2px #a5d6a7 inset;
 }
 
-/* 分配学生区域的批量样式 */
-.student-group-item .batch-checkbox {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    cursor: pointer;
-    vertical-align: middle;
-}
-
-.student-group-item.batch-selected {
-    background-color: #bbdefb !important;
-    border-color: #2196f3 !important;
+/* 下拉菜单项激活态(签到 / 分组模式高亮) */
+.print-dropdown-item.active {
+    background: #e3f2fd;
+    font-weight: 600;
 }
 
 /* ==================== 撤销/重做按钮样式 ==================== */

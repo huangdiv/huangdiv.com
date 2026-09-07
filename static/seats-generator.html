@@ -96,10 +96,23 @@
 
             <!-- 快捷操作 -->
             <div class="quick-actions">
-                <button id="checkinModeBtn" class="action-btn action-btn-primary">
-                    <span class="action-icon">✓</span>
-                    <span>签到模式</span>
-                </button>
+                <div class="action-btn-wrapper">
+                    <button id="modeSwitchBtn" class="action-btn action-btn-primary action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="modeSwitchDropdown">
+                        <span class="action-icon">🔀</span>
+                        <span>切换模式</span>
+                        <span class="dropdown-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div id="modeSwitchDropdown" class="print-dropdown" role="menu" style="display:none;">
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="checkin">
+                            <span class="print-dropdown-icon" aria-hidden="true">✓</span>
+                            <span>签到模式</span>
+                        </div>
+                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="group">
+                            <span class="print-dropdown-icon" aria-hidden="true">👥</span>
+                            <span>分组模式</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="action-btn-wrapper">
                     <button id="randomBtn" class="action-btn action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="randomDropdown">
                         <span class="action-icon">⇄</span>
@@ -149,6 +162,15 @@
                 <button id="pairSettingsBtn" class="sub-btn">配对设置</button>
             </div>
 
+            <!-- 分组模式工具栏（默认隐藏，进入分组模式时显示） -->
+            <div class="group-mode-toolbar no-print" id="groupModeToolbar" style="display:none;">
+                <span class="group-mode-title">分组模式</span>
+                <span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>
+                <div class="group-mode-list" id="groupModeList"></div>
+                <button id="groupModeNewBtn" class="mini-btn">＋新建分组并分配</button>
+                <button id="groupModeExitBtn" class="mini-btn">退出</button>
+            </div>
+
             <!-- 折叠面板：座位设置 -->
             <div class="collapse-panel collapsed">
                 <button class="collapse-header" data-target="seatSettings">
@@ -159,11 +181,11 @@
                     <div class="form-row">
                         <div class="form-item">
                             <label>行数</label>
-                            <input type="number" id="rowsInput" min="1" max="20" value="7">
+                            <input type="number" id="rowsInput" min="1" max="20" value="8">
                         </div>
                         <div class="form-item">
                             <label>列数</label>
-                            <input type="number" id="colsInput" min="1" max="20" value="7">
+                            <input type="number" id="colsInput" min="1" max="20" value="8">
                         </div>
                         <button id="applyConfigBtn" class="form-btn">应用</button>
                     </div>
@@ -214,17 +236,6 @@
                         <div class="student-assignment" id="studentAssignment">
                             <div class="section-head">
                                 <span>分配学生到分组</span>
-                                <button id="batchModeBtn" class="mini-btn no-print">批量操作</button>
-                            </div>
-                            <div class="batch-toolbar" id="batchToolbar">
-                                <span class="batch-count" id="batchCount">已选 0</span>
-                                <select id="batchGroupSelect" class="batch-select"></select>
-                                <button id="batchAssignBtn" class="mini-btn">分配分组</button>
-                                <div class="batch-spacer"></div>
-                                <button id="batchSelectAllBtn" class="mini-btn">全选</button>
-                                <button id="batchCancelBtn" class="mini-btn">取消</button>
-                                <div class="batch-divider"></div>
-                                <button id="batchDeleteBtn" class="mini-btn danger">删除</button>
                             </div>
                             <div class="student-group-selector" id="studentGroupSelector">
                             </div>
