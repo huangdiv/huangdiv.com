@@ -635,7 +635,7 @@ h1:focus {
     top: 100%;
     right: 0;
     min-width: 160px;
-    z-index: 100;
+    z-index: 4000;
     margin-top: 4px;
     background: var(--surface);
     border: 1px solid var(--border);

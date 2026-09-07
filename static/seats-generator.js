@@ -2348,11 +2348,28 @@ function isWholeWordMatch(label, keyword) {
         // 取代原先 randomBtn/printBtn 的零散 click handler,既闭环 ARIA,又修下拉键盘可达性。
         function setupActionDropdown(btn, dropdown, peerBtn, peerDropdown) {
             let isOpen = false;
+            // 将下拉改为 fixed 定位并按视口钳制,避免被 .controls 的 overflow:hidden 裁剪,
+            // 也保证任何按钮(最左/最右)的下拉都不会超出屏幕。
+            function positionDropdown() {
+                const b = btn.getBoundingClientRect();
+                const ddW = dropdown.offsetWidth;
+                const ddH = dropdown.offsetHeight;
+                let left = b.right - ddW;            // 自然对齐:下拉右缘对齐按钮右缘
+                if (left < 8) left = b.left;         // 左缘越界则改左对齐
+                left = Math.max(8, Math.min(left, window.innerWidth - ddW - 8));
+                let top = b.bottom + 6;              // 自然对齐:下拉在按钮下方
+                top = Math.max(8, Math.min(top, window.innerHeight - ddH - 8));
+                dropdown.style.position = 'fixed';
+                dropdown.style.left = left + 'px';
+                dropdown.style.top = top + 'px';
+                dropdown.style.right = 'auto';
+            }
             function setOpen(open) {
                 isOpen = open;
                 dropdown.style.display = open ? 'block' : 'none';
                 btn.setAttribute('aria-expanded', String(open));
                 if (open) {
+                    positionDropdown();
                     const firstItem = dropdown.querySelector('[role="menuitem"]');
                     if (firstItem) firstItem.focus();
                 }
