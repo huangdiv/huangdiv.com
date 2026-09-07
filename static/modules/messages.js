@@ -94,5 +94,16 @@ export const MESSAGES = {
     },
     RANDOM_WARNING_INCOMPLETE_SWAP: (count, attempts) =>
         `未能完全保证换位:仍 ${count} 名学生在原座位(超过 ${attempts} 次尝试)`,
-    RANDOM_WARNING_NOT_SEATED: (count) => `${count} 名学生未入座(座位不足)`
+    RANDOM_WARNING_NOT_SEATED: (count) => `${count} 名学生未入座(座位不足)`,
+
+    // —— 分组轮换 ——
+    ROTATE_NO_GROUPS: '请先创建至少 2 个分组,再进行分组轮换！',
+    ROTATE_NO_GROUPS_WARN: '至少需要 2 个分组才能轮换',
+    ROTATE_NO_SEATED: '当前没有已安排座位的分组学生,无法轮换！',
+    ROTATE_NO_SEATED_WARN: '没有已入座的分组学生',
+    CONFIRM_ROTATE: (offset, n) =>
+        `确定要将各分组轮换到往下第 ${offset} 组吗？(共 ${n} 个分组)`,
+    ROTATE_DONE: (offset, moved) =>
+        `分组轮换完成(步长 +${offset},移动 ${moved} 人)`,
+    ROTATE_BAD_OFFSET: (n) => `轮换步长需为 1 ~ ${n - 1} 之间的整数`
 };

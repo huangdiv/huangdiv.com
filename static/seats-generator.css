@@ -673,6 +673,19 @@ h1:focus {
     font-size: 14px;
 }
 
+/* 下拉项右侧徽标(如「分组轮换 +2」) */
+.dropdown-item-badge {
+    margin-left: auto;
+    padding: 1px 6px;
+    border-radius: 9px;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .print-dropdown-divider {
     height: 1px;
     margin: 4px 8px;
@@ -3241,4 +3254,77 @@ button:disabled {
 .pair-popup .pair-max-attempts:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 1px;
+}
+
+/* ── 轮换设置弹窗 ── */
+.rotate-popup .rotate-offset-input {
+    width: 70px;
+    padding: 4px 8px;
+    border: 1px solid var(--border, #ccc);
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: center;
+}
+
+.rotate-popup .rotate-offset-input:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+}
+
+.rotate-popup-hint {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-tertiary, #999);
+}
+
+.rotate-map-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.rotate-map-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    background: var(--bg-secondary, #f7f7f7);
+    font-size: 12px;
+}
+
+.rotate-map-src {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.rotate-map-arrow {
+    color: var(--text-tertiary, #999);
+}
+
+.rotate-map-dst {
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.rotate-map-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-tertiary, #999);
+    font-variant-numeric: tabular-nums;
+}
+
+.rotate-empty {
+    padding: 8px;
+    font-size: 12px;
+    color: var(--text-tertiary, #999);
+    text-align: center;
+}
+
+.rotate-popup-actions {
+    justify-content: flex-end;
+    margin-top: 4px;
 }

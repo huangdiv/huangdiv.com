@@ -40,8 +40,18 @@ let isTeacherView = state.viewMode === 'teacher';
 let isCheckinMode = state.isCheckinMode;
 let isGroupMode = state.isGroupMode;   // 分组模式:座位表多选学生 → 批量分配到分组
 const groupModeSelectedIds = new Set();  // 分组模式:当前选中的学生 id 集合(座位表多选)
+let groupRotateOffset = 1;             // 分组轮换步长(默认 +1:轮换到下一组)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
+
+// 轮换步长归一:必须是 >= 1 的整数;超过分组数时收敛到最大有效值(组数-1)。
+// 分组数变化(新建/删除分组)后旧配置可能越界,统一走这里修正。
+function normalizeRotateOffset(value) {
+    var n = Math.floor(Number(value));
+    if (!isFinite(n) || n < 1) return 1;
+    if (groups.length > 1 && n > groups.length - 1) return groups.length - 1;
+    return n;
+}
 
         // DOM 引用
         const classroom = document.getElementById('classroom');
@@ -238,6 +248,7 @@ let isTouchDevice = state.isTouchDevice;
                 avoidPairs: avoidPairs,
                 isCheckinMode: isCheckinMode,
                 isGroupMode: isGroupMode,
+                groupRotateOffset: groupRotateOffset,
                 version: APP_VERSION
             };
         }
@@ -562,6 +573,14 @@ let isTouchDevice = state.isTouchDevice;
                 ).join('') + newRow;
             }
             studentAssignment.style.display = 'block';
+
+            // 分组数变化后,旧的轮换步长可能越界(例如 4 组时的 +3 在删到 2 组后失效)
+            const normalized = normalizeRotateOffset(groupRotateOffset);
+            if (normalized !== groupRotateOffset) {
+                groupRotateOffset = normalized;
+                autoSave();
+            }
+            updateRotateOffsetBadge();
         }
 
         // 分组列表事件委托
@@ -1463,8 +1482,154 @@ let isTouchDevice = state.isTouchDevice;
 
         // 配对设置现在通过「随机排座」下拉内的 data-action="pairSettings" 菜单项打开/关闭
 
+        // ==================== 轮换设置弹窗 ====================
+
+        let activeRotatePopup = null;
+
+        // 轮换预览:按当前步长给出「源组 → 目标组」的映射表
+        function buildRotatePreviewMap(offset) {
+            const n = groups.length;
+            if (n < 2) return '<div class="rotate-empty">请先创建至少 2 个分组</div>';
+            return groups.map(function (g, i) {
+                const t = groups[(i + offset) % n];
+                const cnt = students.filter(function (s) { return s.groupId === g.id; }).length;
+                return '<div class="rotate-map-row">' +
+                    '<span class="rotate-map-src">' + escapeHtml(g.name) + '</span>' +
+                    '<span class="rotate-map-arrow">→</span>' +
+                    '<span class="rotate-map-dst">' + escapeHtml(t.name) + '</span>' +
+                    '<span class="rotate-map-count">' + cnt + ' 人</span>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function updateRotateOffsetBadge() {
+            const badge = document.getElementById('rotateOffsetBadge');
+            if (badge) badge.textContent = '+' + groupRotateOffset;
+        }
+
+        function openRotatePopup(anchorEl) {
+            if (activeRotatePopup) closeRotatePopup();
+            if (activePairPopup) closePairPopup();
+
+            const container = ensureTagPopupContainer();
+            const popup = document.createElement('div');
+            popup.className = 'pair-popup rotate-popup';
+            popup.setAttribute('role', 'dialog');
+            popup.setAttribute('aria-modal', 'true');
+            popup.setAttribute('aria-labelledby', 'rotatePopupTitle');
+
+            const maxOffset = Math.max(1, groups.length - 1);
+            popup.innerHTML =
+                '<div class="pair-popup-title" id="rotatePopupTitle">轮换设置</div>' +
+                '<div class="pair-popup-section">' +
+                    '<div class="pair-popup-section-title">轮换步长</div>' +
+                    '<div class="pair-popup-row">' +
+                        '<label class="pair-popup-label">轮换到往下第</label>' +
+                        '<input type="number" class="rotate-offset-input" min="1" max="' + maxOffset +
+                            '" step="1" value="' + groupRotateOffset + '">' +
+                        '<span class="pair-popup-hint">组</span>' +
+                    '</div>' +
+                    '<div class="rotate-popup-hint">按分组建立顺序循环;人数不等时按较少一方的人数轮换</div>' +
+                '</div>' +
+                '<div class="pair-popup-section">' +
+                    '<div class="pair-popup-section-title">轮换预览</div>' +
+                    '<div class="rotate-map-list"></div>' +
+                '</div>' +
+                '<div class="pair-popup-row rotate-popup-actions">' +
+                    '<button class="mini-btn rotate-apply">立即轮换</button>' +
+                    '<button class="mini-btn rotate-close">关闭</button>' +
+                '</div>';
+
+            container.appendChild(popup);
+
+            const rect = anchorEl.getBoundingClientRect();
+            const popupWidth = 320;
+            let left = rect.left;
+            let top = rect.bottom + 4;
+            if (left + popupWidth > window.innerWidth - 8) {
+                left = Math.max(8, window.innerWidth - popupWidth - 8);
+            }
+            if (top + 320 > window.innerHeight) {
+                top = Math.max(8, rect.top - 320);
+            }
+            popup.style.left = left + 'px';
+            popup.style.top = top + 'px';
+
+            activeRotatePopup = { popupEl: popup };
+
+            const input = popup.querySelector('.rotate-offset-input');
+            const mapList = popup.querySelector('.rotate-map-list');
+
+            function renderPreview() {
+                mapList.innerHTML = buildRotatePreviewMap(groupRotateOffset);
+            }
+            renderPreview();
+
+            // 输入即生效(步长是纯配置项,不改动座位),同步徽标与预览
+            input.addEventListener('input', function () {
+                const v = normalizeRotateOffset(input.value);
+                groupRotateOffset = v;
+                input.value = v;
+                updateRotateOffsetBadge();
+                renderPreview();
+                autoSave();
+            });
+
+            popup.querySelector('.rotate-close').addEventListener('click', closeRotatePopup);
+            popup.querySelector('.rotate-apply').addEventListener('click', function () {
+                closeRotatePopup();
+                runGroupRotation();
+            });
+
+            popup.addEventListener('click', function (e) {
+                e.stopPropagation();
+            });
+
+            requestAnimationFrame(function () {
+                popup.classList.add('visible');
+            });
+
+            const trap = installFocusTrap(popup, closeRotatePopup);
+            activeRotatePopup.focusTrap = trap;
+        }
+
+        function closeRotatePopup() {
+            if (activeRotatePopup) {
+                if (activeRotatePopup.focusTrap && typeof activeRotatePopup.focusTrap.restoreFocus === 'function') {
+                    activeRotatePopup.focusTrap.restoreFocus();
+                }
+                activeRotatePopup.popupEl.classList.remove('visible');
+                setTimeout(function () {
+                    if (activeRotatePopup && activeRotatePopup.popupEl.parentNode) {
+                        activeRotatePopup.popupEl.parentNode.removeChild(activeRotatePopup.popupEl);
+                    }
+                    activeRotatePopup = null;
+                }, 150);
+            }
+        }
+
+        // 执行一次分组轮换(下拉项 / 弹窗「立即轮换」共用)
+        function runGroupRotation() {
+            groupRotateOffset = normalizeRotateOffset(groupRotateOffset);
+            updateRotateOffsetBadge();
+            const result = rotateGroupSeats(groupRotateOffset) || {};
+            if (result.warnings && result.warnings.length > 0) {
+                showStatToast(result.warnings.join(' / '));
+            } else if (result.moved > 0) {
+                showStatToast(MESSAGES.ROTATE_DONE(groupRotateOffset, result.moved));
+            }
+        }
+
+        // ==================== 轮换设置结束 ====================
+
         // 点击 popup 外部关闭
         document.addEventListener('click', function (e) {
+            if (activeRotatePopup) {
+                if (!activeRotatePopup.popupEl.contains(e.target) &&
+                    !e.target.closest('[data-action="rotateSettings"]')) {
+                    closeRotatePopup();
+                }
+            }
             if (!activePairPopup) return;
             if (activePairPopup.popupEl.contains(e.target)) return;
             if (e.target.closest('[data-action="pairSettings"]')) return;
@@ -1473,6 +1638,9 @@ let isTouchDevice = state.isTouchDevice;
 
         // Esc 关闭
         document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && activeRotatePopup) {
+                closeRotatePopup();
+            }
             if (e.key === 'Escape' && activePairPopup) {
                 closePairPopup();
             }
@@ -2471,6 +2639,7 @@ function isWholeWordMatch(label, keyword) {
         });
         // 顶层别名 — 保留既有调用点零修改
         const randomSeatArrange = randomArrange.randomSeatArrange;
+        const rotateGroupSeats = randomArrange.rotateGroupSeats;
 
         // 重置座位
         document.getElementById('resetBtn').addEventListener('click', function () {
@@ -3287,6 +3456,7 @@ function isWholeWordMatch(label, keyword) {
                     avoidPairs = config.avoidPairs || [];
                     isCheckinMode = !!config.isCheckinMode;
                     isGroupMode = !!config.isGroupMode;
+                    groupRotateOffset = normalizeRotateOffset(config.groupRotateOffset);
                     if (config.title) pageTitle.textContent = config.title;
 
                     // 调整座位数组长度以匹配当前行列
@@ -3358,6 +3528,7 @@ function isWholeWordMatch(label, keyword) {
                 if (cs) cs.style.display = 'flex';
             }
             updateModeSwitchButton();
+            updateRotateOffsetBadge();
 
             generateSeats();
             // 分组 banner 由 generateSeats 重建,内容需在重建后回填
@@ -3412,6 +3583,7 @@ function isWholeWordMatch(label, keyword) {
                     avoidPairs = config.avoidPairs || [];
                     isCheckinMode = !!config.isCheckinMode;
                     isGroupMode = !!config.isGroupMode;
+                    groupRotateOffset = normalizeRotateOffset(config.groupRotateOffset);
                     if (config.title) pageTitle.textContent = config.title;
 
                     const targetLen = rows * cols;
@@ -3564,6 +3736,20 @@ function isWholeWordMatch(label, keyword) {
                     // #4 批次:失败 toast 提示(算法自检结果)
                     if (result && result.warnings && result.warnings.length > 0) {
                         showStatToast(result.warnings.join(' / '));
+                    }
+                }
+                // 随机排座下拉里的「分组轮换」菜单项
+                else if (action === 'rotateGroups') {
+                    runGroupRotation();
+                }
+                // 随机排座下拉里的「轮换设置」菜单项
+                else if (action === 'rotateSettings') {
+                    if (activeRotatePopup) {
+                        closeRotatePopup();
+                    } else {
+                        // 同配对设置:焦点先还给触发按钮,避免焦点陷阱恢复落空
+                        randomBtn.focus();
+                        openRotatePopup(randomBtn);
                     }
                 }
                 // 随机排座下拉里的「配对设置」菜单项

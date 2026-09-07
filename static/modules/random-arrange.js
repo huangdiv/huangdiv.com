@@ -400,8 +400,159 @@ export function createRandomArrange(deps) {
         return { warnings: warnings };
     }
 
+    // ─────────── 分组轮换 ───────────
+    //
+    // 语义:以「分组建立顺序」为环,步长 offset(默认 +1)。分组 i 的学生轮换到
+    // 分组 (i + offset) % n 当前所占的座位上。
+    //
+    // 两组成员人数不等时:本次实际轮换人数 m = min(源组人数, 目标组座位数),
+    // 从源组随机挑 m 人、落进目标组随机 m 个座位。
+    //
+    // 硬约束(全程保持):
+    //   1. 只重排「已入座且有所属分组」的学生;无分组的学生原地不动
+    //   2. 总体占座数不增不减(纯置换)——用 newSeats 先腾空再回填,
+    //      并做占座数自检
+    //   3. 分组的 id / name / color 完全不变,变的是各组座位区里坐了谁
+    //
+    // leftover 兜底:由于 Σ|pool| = Σ|bucket| = N 且 i → (i+offset)%n 是索引置换,
+    // 恒有 Σ未安置学生 == Σ空余座位。回填顺序:
+    //   阶段 B1 — 优先让 leftover 学生回到「自己组」的空余座位(尽量保持聚类)
+    //   阶段 B2 — 仍有剩余则洗牌后填满所有空余座位(保证硬约束 2)
+    function rotateGroupSeats(offset, options) {
+        options = options || {};
+        var warnings = [];
+        var n = state.groups.length;
+
+        if (n < 2) {
+            alert(MESSAGES.ROTATE_NO_GROUPS);
+            return { warnings: [MESSAGES.ROTATE_NO_GROUPS_WARN], moved: 0 };
+        }
+
+        // 步长归一化:允许 > n 或 <= 0 的输入,统一折回 1..n-1
+        offset = Math.floor(Number(offset) || 1);
+        if (offset < 1 || offset > n - 1) {
+            offset = ((offset % n) + n) % n;
+            if (offset === 0) offset = 1;
+        }
+
+        // 学生 → 分组下标
+        var groupIndex = new Map();
+        state.groups.forEach(function (g, i) { groupIndex.set(g.id, i); });
+        var studentGroup = new Map();
+        state.students.forEach(function (s) {
+            if (s.groupId && groupIndex.has(s.groupId)) studentGroup.set(s.id, groupIndex.get(s.groupId));
+        });
+
+        // pool[i]  — 分组 i 当前占据的座位下标
+        // bucket[i] — 分组 i 当前已入座的学生 id
+        var pool = [];
+        var bucket = [];
+        for (var i = 0; i < n; i++) { pool.push([]); bucket.push([]); }
+
+        var groupedSeatIdxs = [];
+        for (var idx = 0; idx < state.seats.length; idx++) {
+            var sid = state.seats[idx];
+            if (!sid) continue;
+            var gi = studentGroup.get(sid);
+            if (gi === undefined) continue;         // 无分组 → 原地不动
+            groupedSeatIdxs.push(idx);
+            pool[gi].push(idx);
+            bucket[gi].push(sid);
+        }
+
+        var seatedGrouped = groupedSeatIdxs.length;
+        if (seatedGrouped === 0) {
+            alert(MESSAGES.ROTATE_NO_SEATED);
+            return { warnings: [MESSAGES.ROTATE_NO_SEATED_WARN], moved: 0 };
+        }
+
+        if (!confirm(MESSAGES.CONFIRM_ROTATE(offset, n))) return { warnings: [], moved: 0 };
+
+        onPushSnapshot('rotate');
+
+        // newSeats:先复制(保留无分组学生的原位),再把分组学生的座位腾空
+        // 轮换前的占座总数,用于事后自检(不能新增 / 不能缩减)
+        var originalPlaced = state.seats.filter(function (x) { return x; }).length;
+
+        // newSeats:先复制(保留无分组学生的原位),再把分组学生的座位腾空
+        var newSeats = state.seats.slice();
+        groupedSeatIdxs.forEach(function (k) { newSeats[k] = null; });
+
+        // 剩余可用座位/未安置学生,按组分桶
+        var freeSeats = pool.map(function (p) { return shuffle(p.slice()); });
+        var pending = bucket.map(function (b) { return shuffle(b.slice()); });
+        var moved = 0;
+
+        // ── 阶段 A:分组 i 的学生 → 分组 (i+offset)%n 的座位 ──
+        for (var s = 0; s < n; s++) {
+            var d = (s + offset) % n;
+            var m = Math.min(pending[s].length, freeSeats[d].length);
+            for (var k2 = 0; k2 < m; k2++) {
+                newSeats[freeSeats[d][k2]] = pending[s][k2];
+                moved++;
+            }
+            pending[s] = pending[s].slice(m);
+            freeSeats[d] = freeSeats[d].slice(m);
+        }
+
+        // ── 阶段 B1:leftover 优先回到自己组的空余座位 ──
+        for (var b1 = 0; b1 < n; b1++) {
+            var mb = Math.min(pending[b1].length, freeSeats[b1].length);
+            for (var k3 = 0; k3 < mb; k3++) {
+                newSeats[freeSeats[b1][k3]] = pending[b1][k3];
+                moved++;
+            }
+            pending[b1] = pending[b1].slice(mb);
+            freeSeats[b1] = freeSeats[b1].slice(mb);
+        }
+
+        // ── 阶段 B2:剩余学生洗牌填满剩余空位(保证占座总数不变) ──
+        var restStudents = [];
+        var restSeats = [];
+        for (var b2 = 0; b2 < n; b2++) {
+            restStudents = restStudents.concat(pending[b2]);
+            restSeats = restSeats.concat(freeSeats[b2]);
+        }
+        if (restStudents.length !== restSeats.length) {
+            // 理论上不会发生(索引置换保证两侧相等);真出现说明状态被外部改动,
+            // 直接中止以免写出座位丢失/重复的坏数据
+            console.error('[rotateGroupSeats] 学生/座位不匹配', restStudents.length, restSeats.length);
+            return { warnings: ['轮换中止:数据不一致'], moved: 0 };
+        }
+        restStudents = shuffle(restStudents);
+        for (var k4 = 0; k4 < restStudents.length; k4++) {
+            newSeats[restSeats[k4]] = restStudents[k4];
+            moved++;
+        }
+
+        // 就地写回,保持 state.seats 引用不变(避免打断主 IIFE 的 currentSeats 别名)
+        for (var w = 0; w < newSeats.length; w++) {
+            state.seats[w] = newSeats[w];
+        }
+
+        // 自检:占座总数必须与轮换前完全一致(不能新增、不能缩减)
+        var afterPlaced = state.seats.filter(function (x) { return x; }).length;
+        if (afterPlaced !== originalPlaced) {
+            warnings.push('占座总数异常(' + originalPlaced + ' → ' + afterPlaced + ')');
+        }
+        // 自检:每个学生最多占一个座位(无重复)
+        var seen = new Set();
+        var dup = 0;
+        for (var q = 0; q < state.seats.length; q++) {
+            if (!state.seats[q]) continue;
+            if (seen.has(state.seats[q])) dup++;
+            seen.add(state.seats[q]);
+        }
+        if (dup > 0) warnings.push('出现重复占座(' + dup + '处)');
+
+        commit({ seats: state.seats });
+        onGenerateSeats();
+        return { warnings: warnings, moved: moved };
+    }
+
     return {
         randomSeatArrange,
+        rotateGroupSeats,
         // 导出 helper 供单元测试使用(#16 批次)
         getDeskMatePairs,
         findPairMate,
