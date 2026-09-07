@@ -111,75 +111,72 @@ export function createDragdrop(deps) {
     function handleDrop(e) {
         e.preventDefault();
 
-        // 仅在有有效拖拽目标时才保存快照
-        const hasValidTarget = e.target.closest('#deleteZone') ||
-                               e.target.closest('.student-list') ||
-                               e.target.closest('.seat');
-        if (hasValidTarget && draggedStudentId) {
-            onPushSnapshot('drag');
-        }
-
-        // 删除区域
-        if (e.target.closest('#deleteZone')) {
-            const student = getStudentById(draggedStudentId);
-            const displayName = student ? student.name : '';
-            if (confirm(MESSAGES.CONFIRM_DELETE_STUDENT(displayName))) {
-                state.students = state.students.filter(s => s.id !== draggedStudentId);
-                if (draggedFromIndex !== null) {
-                    state.seats[draggedFromIndex] = null;
-                }
-                commit({ seats: state.seats, students: state.students });
-                onUpdateStudentAssignmentDisplay();
-                onGenerateSeats();
+        // 用 try/finally 兜底:无论正常完成还是中途抛异常(例如 pushSnapshot 深拷贝
+        // state 失败、commit 渲染失败等),都要保证拖拽高亮与拖拽状态被清除,
+        // 否则会留下 .highlight/.dragging 残留,表现为"松开鼠标后界面保持不动"。
+        try {
+            // 仅在有有效拖拽目标时才保存快照
+            const hasValidTarget = e.target.closest('#deleteZone') ||
+                                   e.target.closest('.student-list') ||
+                                   e.target.closest('.seat');
+            if (hasValidTarget && draggedStudentId) {
+                onPushSnapshot('drag');
             }
-            clearDragHighlights();
-            return;
-        }
 
-        // 拖回学生名单区域
-        if (e.target.closest('.student-list')) {
-            if (draggedFromIndex !== null) {
-                state.seats[draggedFromIndex] = null;
-                commit({ seats: state.seats });
-                onGenerateSeats();
-            }
-            clearDragHighlights();
-            return;
-        }
-
-        // 拖到座位
-        const seat = e.target.closest('.seat');
-        if (!seat) {
-            clearDragHighlights();
-            return;
-        }
-        const seatIndex = parseInt(seat.getAttribute('data-index'));
-        if (Number.isNaN(seatIndex)) {
-            clearDragHighlights();
-            return;
-        }
-
-        // 从名单拖到座位
-        if (draggedStudentId && draggedFromIndex === null) {
-            if (state.seats.includes(draggedStudentId)) {
+            // 删除区域
+            if (e.target.closest('#deleteZone')) {
                 const student = getStudentById(draggedStudentId);
-                alert(MESSAGES.STUDENT_ALREADY_SEATED(student ? student.name : ''));
-                clearDragHighlights();
+                const displayName = student ? student.name : '';
+                if (confirm(MESSAGES.CONFIRM_DELETE_STUDENT(displayName))) {
+                    state.students = state.students.filter(s => s.id !== draggedStudentId);
+                    if (draggedFromIndex !== null) {
+                        state.seats[draggedFromIndex] = null;
+                    }
+                    commit({ seats: state.seats, students: state.students });
+                    onUpdateStudentAssignmentDisplay();
+                    onGenerateSeats();
+                }
                 return;
             }
-            state.seats[seatIndex] = draggedStudentId;
-            commit({ seats: state.seats });
-        }
-        // 座位间交换
-        else if (draggedFromIndex !== null) {
-            const targetStudentId = state.seats[seatIndex];
-            state.seats[seatIndex] = draggedStudentId;
-            state.seats[draggedFromIndex] = targetStudentId;
-            commit({ seats: state.seats });
-        }
 
-        onGenerateSeats();
-        clearDragHighlights();
+            // 拖回学生名单区域
+            if (e.target.closest('.student-list')) {
+                if (draggedFromIndex !== null) {
+                    state.seats[draggedFromIndex] = null;
+                    commit({ seats: state.seats });
+                    onGenerateSeats();
+                }
+                return;
+            }
+
+            // 拖到座位
+            const seat = e.target.closest('.seat');
+            if (!seat) return;
+            const seatIndex = parseInt(seat.getAttribute('data-index'));
+            if (Number.isNaN(seatIndex)) return;
+
+            // 从名单拖到座位
+            if (draggedStudentId && draggedFromIndex === null) {
+                if (state.seats.includes(draggedStudentId)) {
+                    const student = getStudentById(draggedStudentId);
+                    alert(MESSAGES.STUDENT_ALREADY_SEATED(student ? student.name : ''));
+                    return;
+                }
+                state.seats[seatIndex] = draggedStudentId;
+                commit({ seats: state.seats });
+            }
+            // 座位间交换
+            else if (draggedFromIndex !== null) {
+                const targetStudentId = state.seats[seatIndex];
+                state.seats[seatIndex] = draggedStudentId;
+                state.seats[draggedFromIndex] = targetStudentId;
+                commit({ seats: state.seats });
+            }
+
+            onGenerateSeats();
+        } finally {
+            clearDragHighlights();
+        }
     }
 
     function handleDragEnd(e) {
