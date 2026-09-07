@@ -94,12 +94,8 @@ let isTouchDevice = state.isTouchDevice;
         const redoBtn = document.getElementById('redoBtn');
         const printBtn = document.getElementById('printBtn');
         const modeSwitchBtn = document.getElementById('modeSwitchBtn');
-        const modeSwitchDropdown = document.getElementById('modeSwitchDropdown');
-        const groupModeToolbar = document.getElementById('groupModeToolbar');
-        const groupModeCount = document.getElementById('groupModeCount');
-        const groupModeList = document.getElementById('groupModeList');
-        const groupModeNewBtn = document.getElementById('groupModeNewBtn');
-        const groupModeExitBtn = document.getElementById('groupModeExitBtn');
+        const modeSwitchIcon = document.getElementById('modeSwitchIcon');
+        const modeSwitchLabel = document.getElementById('modeSwitchLabel');
         const quickRandomBtn = document.getElementById('quickRandomBtn');
         const randomBtn = document.getElementById('randomBtn');
         const mobileBanner = document.getElementById('mobileBanner');
@@ -2065,10 +2061,20 @@ function isWholeWordMatch(label, keyword) {
             state.isGroupMode = false;
             commit({ isGroupMode: false });
             classroom.classList.remove('group-mode');
-            if (groupModeToolbar) groupModeToolbar.style.display = 'none';
             groupModeSelectedIds.clear();
             clearGroupModeSelection();
             updateModeSwitchButton();
+        }
+
+        // 「切换模式」按钮:点击在 普通 → 签到 → 分组 → 普通 三态间轮换
+        function cycleMode() {
+            if (isCheckinMode) {
+                toggleGroupMode();      // 签到 → 分组(内部先退出签到)
+            } else if (isGroupMode) {
+                toggleGroupMode();      // 分组 → 普通
+            } else {
+                toggleCheckinMode();    // 普通 → 签到
+            }
         }
 
         // 进入/退出签到模式(与分组模式互斥)
@@ -2115,16 +2121,17 @@ function isWholeWordMatch(label, keyword) {
             updateModeSwitchButton();
             if (isGroupMode) {
                 classroom.classList.add('group-mode');
-                if (groupModeToolbar) groupModeToolbar.style.display = 'flex';
-                renderGroupModeList();
-                updateGroupModeCount();
             } else {
                 classroom.classList.remove('group-mode');
-                if (groupModeToolbar) groupModeToolbar.style.display = 'none';
                 groupModeSelectedIds.clear();
                 clearGroupModeSelection();
             }
             generateSeats();
+            // 分组 banner 由 generateSeats 重建,内容需在重建后回填
+            if (isGroupMode) {
+                renderGroupModeList();
+                updateGroupModeCount();
+            }
             if (typeof updateMobileBanner === 'function') updateMobileBanner();
         }
 
@@ -2136,12 +2143,14 @@ function isWholeWordMatch(label, keyword) {
 
         // 渲染分组模式工具栏中的分组按钮(点击即把选中的座位学生分配到该组)
         function renderGroupModeList() {
-            if (!groupModeList) return;
+            // banner 会随座位表重建 ⇒ 每次按 id 现取,不用缓存引用
+            const list = document.getElementById('groupModeList');
+            if (!list) return;
             if (groups.length === 0) {
-                groupModeList.innerHTML = '<span class="group-mode-empty">暂无分组</span>';
+                list.innerHTML = '<span class="group-mode-empty">暂无分组</span>';
                 return;
             }
-            groupModeList.innerHTML = groups.map(function (g) {
+            list.innerHTML = groups.map(function (g) {
                 return '<button type="button" class="group-mode-group-btn" data-group-id="' +
                     escapeHtml(g.id) + '"' +
                     (g.color ? ' style="background:' + escapeHtml(g.color) + '"' : '') + '>' +
@@ -2175,8 +2184,9 @@ function isWholeWordMatch(label, keyword) {
         }
 
         function updateGroupModeCount() {
-            if (groupModeCount) {
-                groupModeCount.textContent = '已选 ' + groupModeSelectedIds.size + ' 名学生';
+            const el = document.getElementById('groupModeCount');
+            if (el) {
+                el.textContent = '已选 ' + groupModeSelectedIds.size + ' 名学生';
             }
         }
 
@@ -2427,7 +2437,8 @@ function isWholeWordMatch(label, keyword) {
         const randomDropdown = document.getElementById('randomDropdown');
         const printDropdown = document.getElementById('printDropdown');
         const randomDropdownCtrl = setupActionDropdown(randomBtn, randomDropdown, printBtn, printDropdown);
-        const modeSwitchDropdownCtrl = setupActionDropdown(modeSwitchBtn, modeSwitchDropdown, null, null);
+        // 「切换模式」:点击即轮换 普通 → 签到 → 分组 → 普通(不再是下拉)
+        modeSwitchBtn.addEventListener('click', cycleMode);
         const printDropdownCtrl = setupActionDropdown(printBtn, printDropdown, randomBtn, randomDropdown);
 
         // 点击关闭 randomDropdown / printDropdown（事件委托，在 printBtn 的 document click handler 里统一处理）
@@ -3328,9 +3339,6 @@ function isWholeWordMatch(label, keyword) {
             // 恢复模式 UI(签到 / 分组互斥,分组优先)
             if (isGroupMode) {
                 classroom.classList.add('group-mode');
-                if (groupModeToolbar) groupModeToolbar.style.display = 'flex';
-                renderGroupModeList();
-                updateGroupModeCount();
             } else if (isCheckinMode) {
                 classroom.classList.add('checkin-mode');
                 const ns = document.getElementById('normalStatsRow');
@@ -3341,6 +3349,11 @@ function isWholeWordMatch(label, keyword) {
             updateModeSwitchButton();
 
             generateSeats();
+            // 分组 banner 由 generateSeats 重建,内容需在重建后回填
+            if (isGroupMode) {
+                renderGroupModeList();
+                updateGroupModeCount();
+            }
             isInitialized = true;
         }
 
@@ -3519,10 +3532,8 @@ function isWholeWordMatch(label, keyword) {
                 // 关闭所有下拉菜单(同步 ARIA)
                 randomDropdownCtrl.close();
                 printDropdownCtrl.close();
-                modeSwitchDropdownCtrl.close();
                 randomDropdown.style.display = 'none';
                 printDropdown.style.display = 'none';
-                modeSwitchDropdown.style.display = 'none';
 
                 // printDropdown 动作
                 if (action === 'print') {
@@ -3544,17 +3555,14 @@ function isWholeWordMatch(label, keyword) {
                         showStatToast(result.warnings.join(' / '));
                     }
                 }
-                // 切换模式菜单动作
-                else if (action === 'checkin') {
-                    toggleCheckinMode();
-                } else if (action === 'group') {
-                    toggleGroupMode();
-                }
                 // 随机排座下拉里的「配对设置」菜单项
                 else if (action === 'pairSettings') {
                     if (activePairPopup) {
                         closePairPopup();
                     } else {
+                        // 焦点先还给触发按钮:焦点陷阱会把「打开瞬间的 activeElement」
+                        // 记为恢复目标,菜单项随下拉隐藏后无法聚焦,会导致恢复落空
+                        randomBtn.focus();
                         openPairPopup(randomBtn);
                     }
                 }
@@ -3563,7 +3571,6 @@ function isWholeWordMatch(label, keyword) {
             // 点击外部关闭所有下拉菜单(同步 ARIA 与 setupActionDropdown)
             const printDd = document.getElementById('printDropdown');
             const randDd = document.getElementById('randomDropdown');
-            const modeDd = document.getElementById('modeSwitchDropdown');
             if (printDd && !printDd.contains(e.target) && !printBtn.contains(e.target)) {
                 printDd.style.display = 'none';
                 printBtn.setAttribute('aria-expanded', 'false');
@@ -3571,10 +3578,6 @@ function isWholeWordMatch(label, keyword) {
             if (randDd && !randDd.contains(e.target) && !randomBtn.contains(e.target)) {
                 randDd.style.display = 'none';
                 randomBtn.setAttribute('aria-expanded', 'false');
-            }
-            if (modeDd && !modeDd.contains(e.target) && !modeSwitchBtn.contains(e.target)) {
-                modeDd.style.display = 'none';
-                modeSwitchBtn.setAttribute('aria-expanded', 'false');
             }
         });
 
@@ -3868,8 +3871,8 @@ function isWholeWordMatch(label, keyword) {
             }
         });
 
-        // 分组模式工具栏：新建分组并分配 / 退出
-        groupModeNewBtn.addEventListener('click', function () {
+        // 分组模式 banner：新建分组并把当前选中学生分配进去
+        function createGroupAndAssign() {
             if (groupModeSelectedIds.size === 0) {
                 alert(MESSAGES.GROUP_MODE_NO_SELECTION || '请先在座位表中点击选择学生');
                 return;
@@ -3890,21 +3893,29 @@ function isWholeWordMatch(label, keyword) {
             renderGroupModeList();
             // 把当前选中的座位学生分配到新分组
             assignSelectedToGroup(newGroup.id);
-        });
+        }
 
-        groupModeExitBtn.addEventListener('click', toggleGroupMode);
-
-        // 分组模式工具栏：点击分组按钮 → 把选中的座位学生批量分配到该组
-        groupModeList.addEventListener('click', function (e) {
-            const btn = e.target.closest('.group-mode-group-btn');
-            if (!btn) return;
-            const groupId = btn.getAttribute('data-group-id');
-            if (!groupId) return;
-            if (groupModeSelectedIds.size === 0) {
-                alert(MESSAGES.GROUP_MODE_NO_SELECTION || '请先在座位表中点击选择学生');
+        // 分组 banner 内按钮走事件委托(banner 会随座位表重建,直接绑 listener 会失效)
+        classroom.addEventListener('click', function (e) {
+            if (e.target.closest('#groupModeExitBtn')) {
+                toggleGroupMode();          // × 关闭 ⇒ 退出分组模式(回到普通)
                 return;
             }
-            assignSelectedToGroup(groupId);
+            if (e.target.closest('#groupModeNewBtn')) {
+                createGroupAndAssign();
+                return;
+            }
+            const gBtn = e.target.closest('.group-mode-group-btn');
+            if (gBtn) {
+                const groupId = gBtn.getAttribute('data-group-id');
+                if (!groupId) return;
+                if (groupModeSelectedIds.size === 0) {
+                    alert(MESSAGES.GROUP_MODE_NO_SELECTION || '请先在座位表中点击选择学生');
+                    return;
+                }
+                assignSelectedToGroup(groupId);
+                return;
+            }
         });
 
         // 折叠面板交互
@@ -3919,14 +3930,23 @@ function isWholeWordMatch(label, keyword) {
             });
         });
 
-        // 切换模式下拉菜单项 active 状态同步(签到 / 分组互斥高亮)
+        // 「切换模式」按钮:显示当前模式(普通 / 签到 / 分组),非普通模式高亮
         function updateModeSwitchButton() {
-            const dd = modeSwitchDropdown;
-            if (!dd) return;
-            const checkinItem = dd.querySelector('[data-action="checkin"]');
-            const groupItem = dd.querySelector('[data-action="group"]');
-            if (checkinItem) checkinItem.classList.toggle('active', !!isCheckinMode);
-            if (groupItem) groupItem.classList.toggle('active', !!isGroupMode);
+            let icon = '▦';
+            let label = '普通模式';
+            if (isCheckinMode) {
+                icon = '✓';
+                label = '签到模式';
+            } else if (isGroupMode) {
+                icon = '👥';
+                label = '分组模式';
+            }
+            if (modeSwitchIcon) modeSwitchIcon.textContent = icon;
+            if (modeSwitchLabel) modeSwitchLabel.textContent = label;
+            if (modeSwitchBtn) {
+                modeSwitchBtn.classList.toggle('action-btn-primary', !!(isCheckinMode || isGroupMode));
+                modeSwitchBtn.title = '当前：' + label + '，点击切换到下一模式（普通 → 签到 → 分组）';
+            }
         }
 
         // ==================== 统计项点击：复制姓名 / 下载 Excel ====================

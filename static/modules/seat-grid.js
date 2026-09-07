@@ -53,10 +53,10 @@ export function createSeatGrid(deps) {
     const seatNodes = [];
     const seatStateCache = [];
     let lastStructureKey = '';
-    // 上次 DOM 中插入的「讲台 + 走道 + 签到 banner」附加元素的占位信息:
+    // 上次 DOM 中插入的「讲台 + 走道 + 模式 banner」附加元素的占位信息:
     //   - 教师视角 / 学生视角 讲台分别只能存在一个
-    //   - 签到 banner 仅在 isCheckinMode 时存在,渲染一次即可
-    let checkinBannerNode = null;
+    //   - 模式 banner(签到 / 分组)互斥,仅在当前模式存在,渲染一次即可
+    let modeBannerNode = null;
 
     // ─────────── 4 个导出函数 ───────────
 
@@ -90,6 +90,7 @@ export function createSeatGrid(deps) {
         // 行 × 列  — 座位总数变,必须重建(append 顺序)
         // view 视角 — 学生视角从左到右、教师视角从右到左,节点顺序镜像
         // isCheckinMode — 增加签到 banner + 切走道 padding
+        // isGroupMode   — 增加分组 banner(与签到互斥)
         // aislesSig — 走道在网格模板列中的位置 / 宽度;位置变化 ⇒ 节点顺序变
         // showStudentIcons — 仅节点 innerHTML 内容差异,理论上可走 diff;
         //                    但归到结构键统一处理更简单,且切换频率极低,代价可忽略
@@ -102,7 +103,7 @@ export function createSeatGrid(deps) {
             state.rows,
             state.cols,
             getView() ? 'T' : 'S',
-            state.isCheckinMode ? 'C' : '',
+            state.isCheckinMode ? 'C' : (state.isGroupMode ? 'G' : ''),
             state.showStudentIcons ? 'I' : '',
             aislesSig
         ].join('|');
@@ -113,12 +114,15 @@ export function createSeatGrid(deps) {
         classroom.innerHTML = '';
         seatNodes.length = 0;
         seatStateCache.length = 0;
-        checkinBannerNode = null;
+        modeBannerNode = null;
 
-        // 签到模式 banner 置于顶端
+        // 模式 banner 置于顶端(签到 / 分组互斥)
         if (state.isCheckinMode) {
-            checkinBannerNode = buildCheckinBanner();
-            classroom.appendChild(checkinBannerNode);
+            modeBannerNode = buildCheckinBanner();
+            classroom.appendChild(modeBannerNode);
+        } else if (state.isGroupMode) {
+            modeBannerNode = buildGroupBanner();
+            classroom.appendChild(modeBannerNode);
         }
 
         // 学生视角讲台置于开头(座位前)
@@ -220,14 +224,14 @@ export function createSeatGrid(deps) {
 
     function buildCheckinBanner() {
         const banner = document.createElement('div');
-        banner.className = 'checkin-banner visible';
+        banner.className = 'mode-banner checkin-banner visible';
         banner.innerHTML =
-            '<span class="checkin-banner-icon">✓</span>' +
+            '<span class="mode-banner-icon">✓</span>' +
             '<span>签到模式 — 点击座位签到/取消签到</span>' +
-            '<button class="checkin-banner-btn" id="resetCheckinBtn">重新签到</button>' +
-            '<button class="checkin-banner-btn" id="allCheckinBtn">全部签到</button>' +
-            '<button class="checkin-banner-close">×</button>';
-        banner.querySelector('.checkin-banner-close').addEventListener('click', function (e) {
+            '<button class="mode-banner-btn" id="resetCheckinBtn">重新签到</button>' +
+            '<button class="mode-banner-btn" id="allCheckinBtn">全部签到</button>' +
+            '<button class="mode-banner-close">×</button>';
+        banner.querySelector('.mode-banner-close').addEventListener('click', function (e) {
             e.stopPropagation();
             if (state.isCheckinMode) onToggleCheckinMode();
         });
@@ -243,6 +247,22 @@ export function createSeatGrid(deps) {
             state.students.forEach(s => s.checkedIn = true);
             generateSeats();
         });
+        return banner;
+    }
+
+    // 分组模式 banner — 与签到 banner 同款(顶部横幅 + 图标 + 按钮 + 关闭),
+    // 风格统一;内容壳子在此构建,分组列表/选中计数由主 IIFE 的
+    // renderGroupModeList() / updateGroupModeCount() 按 id 回填。
+    function buildGroupBanner() {
+        const banner = document.createElement('div');
+        banner.className = 'mode-banner group-banner visible';
+        banner.innerHTML =
+            '<span class="mode-banner-icon">👥</span>' +
+            '<span>分组模式 — 点击座位多选学生,再点分组按钮分配</span>' +
+            '<span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>' +
+            '<div class="group-mode-list" id="groupModeList"></div>' +
+            '<button class="mode-banner-btn" id="groupModeNewBtn">＋新建分组并分配</button>' +
+            '<button class="mode-banner-close" id="groupModeExitBtn">×</button>';
         return banner;
     }
 

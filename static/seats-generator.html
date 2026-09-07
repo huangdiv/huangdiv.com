@@ -97,21 +97,10 @@
             <!-- 快捷操作 -->
             <div class="quick-actions">
                 <div class="action-btn-wrapper">
-                    <button id="modeSwitchBtn" class="action-btn action-btn-primary action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="modeSwitchDropdown">
-                        <span class="action-icon">🔀</span>
-                        <span>切换模式</span>
-                        <span class="dropdown-caret" aria-hidden="true">▾</span>
+                    <button id="modeSwitchBtn" class="action-btn" title="点击轮换模式：普通模式 → 签到模式 → 分组模式">
+                        <span class="action-icon" id="modeSwitchIcon">▦</span>
+                        <span id="modeSwitchLabel">普通模式</span>
                     </button>
-                    <div id="modeSwitchDropdown" class="print-dropdown" role="menu" style="display:none;">
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="checkin">
-                            <span class="print-dropdown-icon" aria-hidden="true">✓</span>
-                            <span>签到模式</span>
-                        </div>
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="group">
-                            <span class="print-dropdown-icon" aria-hidden="true">👥</span>
-                            <span>分组模式</span>
-                        </div>
-                    </div>
                 </div>
                 <div class="action-btn-wrapper">
                     <button id="randomBtn" class="action-btn action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="randomDropdown">
@@ -164,15 +153,6 @@
                 <button id="redoBtn" class="sub-btn" disabled title="重做">↷ 重做</button>
                 <button id="toggleViewBtn" class="sub-btn">教师视角</button>
                 <button id="toggleIconsBtn" class="sub-btn">隐藏图标</button>
-            </div>
-
-            <!-- 分组模式工具栏（默认隐藏，进入分组模式时显示） -->
-            <div class="group-mode-toolbar no-print" id="groupModeToolbar" style="display:none;">
-                <span class="group-mode-title">分组模式</span>
-                <span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>
-                <div class="group-mode-list" id="groupModeList"></div>
-                <button id="groupModeNewBtn" class="mini-btn">＋新建分组并分配</button>
-                <button id="groupModeExitBtn" class="mini-btn">退出</button>
             </div>
 
             <!-- 折叠面板：座位设置 -->

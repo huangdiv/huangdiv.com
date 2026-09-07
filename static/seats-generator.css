@@ -945,8 +945,8 @@ h1:focus {
     flex: none;
 }
 
-/* 签到模式横幅 */
-.checkin-banner {
+/* 模式横幅(签到 / 分组 共用,风格统一) */
+.mode-banner {
     grid-column: 1 / -1;
     background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
     color: white;
@@ -956,28 +956,31 @@ h1:focus {
     font-weight: 500;
     display: none;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
     animation: slideDown 0.3s ease;
 }
 
-.checkin-banner.visible {
+.mode-banner.visible {
     display: flex;
 }
 
-.checkin-banner-icon {
+.mode-banner-icon {
     background: rgba(255, 255, 255, 0.25);
     width: 22px;
     height: 22px;
+    min-width: 22px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
     font-weight: bold;
+    flex: none;
 }
 
-.checkin-banner-close {
+.mode-banner-close {
     margin-left: auto;
     background: rgba(255, 255, 255, 0.2);
     border: none;
@@ -998,11 +1001,11 @@ h1:focus {
     font-weight: bold;
 }
 
-.checkin-banner-close:hover {
+.mode-banner-close:hover {
     background: rgba(255, 255, 255, 0.35);
 }
 
-.checkin-banner-btn {
+.mode-banner-btn {
     margin-left: 8px;
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1015,8 +1018,31 @@ h1:focus {
     transition: background 0.2s;
 }
 
-.checkin-banner-btn:hover {
+.mode-banner-btn:hover {
     background: rgba(255, 255, 255, 0.35);
+}
+
+/* 分组横幅：计数徽标 + 分组按钮列表(白字绿底下需提亮/留白) */
+.group-banner .group-mode-count {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    padding: 2px 8px;
+    white-space: nowrap;
+    flex: none;
+}
+
+.group-banner .group-mode-list {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.group-banner .group-mode-group-btn {
+    color: #1a1a1a;
+}
+
+.group-banner .group-mode-empty {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 @keyframes slideDown {
@@ -1682,23 +1708,6 @@ h1:focus {
 }
 
 /* ==================== 分组模式样式 ==================== */
-.group-mode-toolbar {
-    display: none;  /* 由 JS 切换为 flex(内联 style 覆盖) */
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    background: #e8f5e9;
-    border: 1px solid #a5d6a7;
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 8px;
-}
-
-.group-mode-title {
-    font-weight: 600;
-    color: #2e7d32;
-}
-
 .group-mode-count {
     font-size: 12px;
     color: #555;
@@ -2962,6 +2971,7 @@ button:disabled {
     .app-info-modal,
     .batch-toolbar,
     .checkin-banner,
+    .group-banner,
     .no-print {
         display: none !important;
     }
