@@ -668,6 +668,12 @@ h1:focus {
     font-size: 14px;
 }
 
+.print-dropdown-divider {
+    height: 1px;
+    margin: 4px 8px;
+    background: var(--border-light);
+}
+
 /* 辅助操作行 */
 .sub-actions {
     display: flex;

@@ -101,7 +101,7 @@ let isTouchDevice = state.isTouchDevice;
         const groupModeNewBtn = document.getElementById('groupModeNewBtn');
         const groupModeExitBtn = document.getElementById('groupModeExitBtn');
         const quickRandomBtn = document.getElementById('quickRandomBtn');
-        const pairSettingsBtn = document.getElementById('pairSettingsBtn');
+        const randomBtn = document.getElementById('randomBtn');
         const mobileBanner = document.getElementById('mobileBanner');
 
         // 分组导入相关变量
@@ -1304,11 +1304,14 @@ let isTouchDevice = state.isTouchDevice;
             function renderAll() {
                 renderPairList(popup.querySelector('.pair-forced-list'), forcedPairs, 'forced');
                 renderPairList(popup.querySelector('.pair-avoid-list'), avoidPairs, 'avoid');
-                // 更新按钮文字
-                pairSettingsBtn.textContent = '配对设置' +
-                    (forcedPairs.length > 0 ? ' [' + forcedPairs.length + '强' : '') +
-                    (avoidPairs.length > 0 ? (forcedPairs.length > 0 ? '/' : ' [') + avoidPairs.length + '避' : '') +
-                    (forcedPairs.length > 0 || avoidPairs.length > 0 ? ']' : '');
+                // 更新菜单项文字(已从独立按钮改为「随机排座」下拉内的菜单项)
+                var pairSettingsMenuItemLabel = document.querySelector('[data-action="pairSettings"] .pair-settings-label');
+                if (pairSettingsMenuItemLabel) {
+                    pairSettingsMenuItemLabel.textContent = '配对设置' +
+                        (forcedPairs.length > 0 ? ' [' + forcedPairs.length + '强' : '') +
+                        (avoidPairs.length > 0 ? (forcedPairs.length > 0 ? '/' : ' [') + avoidPairs.length + '避' : '') +
+                        (forcedPairs.length > 0 || avoidPairs.length > 0 ? ']' : '');
+                }
             }
 
             renderAll();
@@ -1462,21 +1465,13 @@ let isTouchDevice = state.isTouchDevice;
             }
         }
 
-        // 配对设置按钮事件
-        pairSettingsBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (activePairPopup) {
-                closePairPopup();
-            } else {
-                openPairPopup(pairSettingsBtn);
-            }
-        });
+        // 配对设置现在通过「随机排座」下拉内的 data-action="pairSettings" 菜单项打开/关闭
 
         // 点击 popup 外部关闭
         document.addEventListener('click', function (e) {
             if (!activePairPopup) return;
             if (activePairPopup.popupEl.contains(e.target)) return;
-            if (e.target.closest('#pairSettingsBtn')) return;
+            if (e.target.closest('[data-action="pairSettings"]')) return;
             closePairPopup();
         });
 
@@ -3554,6 +3549,14 @@ function isWholeWordMatch(label, keyword) {
                     toggleCheckinMode();
                 } else if (action === 'group') {
                     toggleGroupMode();
+                }
+                // 随机排座下拉里的「配对设置」菜单项
+                else if (action === 'pairSettings') {
+                    if (activePairPopup) {
+                        closePairPopup();
+                    } else {
+                        openPairPopup(randomBtn);
+                    }
                 }
                 return;
             }
