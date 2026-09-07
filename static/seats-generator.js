@@ -2045,7 +2045,9 @@ function isWholeWordMatch(label, keyword) {
                 onToggleCheckinMode: toggleCheckinMode,
                 onPushSnapshot: pushSnapshot,
                 onGenerateStudentList: generateStudentList,
-                onAutoSave: autoSave
+                onAutoSave: autoSave,
+                // 分组 banner 每次全量重建后回填内容(视角切换 / 行列变更 / 走道变更等)
+                onRenderGroupBannerContent: renderGroupBannerContent
             }
         });
         // 顶层别名 — 保留主 IIFE 内既有调用点零修改
@@ -2152,7 +2154,8 @@ function isWholeWordMatch(label, keyword) {
             }
             list.innerHTML = groups.map(function (g) {
                 return '<button type="button" class="group-mode-group-btn" data-group-id="' +
-                    escapeHtml(g.id) + '"' +
+                    escapeHtml(g.id) + '" title="点击：把选中的学生分配到「' +
+                    escapeHtml(g.name) + '」；长按：删除该分组"' +
                     (g.color ? ' style="background:' + escapeHtml(g.color) + '"' : '') + '>' +
                     escapeHtml(g.name) + '</button>';
             }).join('');
@@ -2188,6 +2191,14 @@ function isWholeWordMatch(label, keyword) {
             if (el) {
                 el.textContent = '已选 ' + groupModeSelectedIds.size + ' 名学生';
             }
+        }
+
+        // 分组 banner 的壳子由 seat-grid 在每次全量重建时重新生成(节点全新),
+        // 内容必须重建后回填 — 否则切换视角 / 改行列 / 改走道后分组按钮会整排消失。
+        function renderGroupBannerContent() {
+            if (!isGroupMode) return;
+            renderGroupModeList();
+            updateGroupModeCount();
         }
 
         // 切换学生签到状态
@@ -3907,6 +3918,11 @@ function isWholeWordMatch(label, keyword) {
             }
             const gBtn = e.target.closest('.group-mode-group-btn');
             if (gBtn) {
+                // 长按删除已在 pointerup 前触发 ⇒ 抑制这次 click,避免「删完又分配」
+                if (groupLongPressFired) {
+                    groupLongPressFired = false;
+                    return;
+                }
                 const groupId = gBtn.getAttribute('data-group-id');
                 if (!groupId) return;
                 if (groupModeSelectedIds.size === 0) {
@@ -3916,6 +3932,98 @@ function isWholeWordMatch(label, keyword) {
                 assignSelectedToGroup(groupId);
                 return;
             }
+        });
+
+        // ── 分组按钮长按删除(鼠标 + 触摸) ────────────────────────────────
+        // 短按 = 分配选中学生到该组;长按 600ms = 直接删除该分组(可撤销)。
+        // banner 会随座位表重建,故一律走 #classroom 事件委托。
+        const GROUP_LONG_PRESS_MS = 600;
+        const GROUP_PRESS_MOVE_TOLERANCE = 10;   // px,超过视为滑动 ⇒ 取消长按
+        let groupPress = null;                   // { timer, btn, x, y }
+        let groupLongPressFired = false;         // 供 click 委托判断是否需要抑制
+
+        function cancelGroupPress() {
+            if (!groupPress) return;
+            clearTimeout(groupPress.timer);
+            if (groupPress.btn) groupPress.btn.classList.remove('long-pressing');
+            groupPress = null;
+        }
+
+        function beginGroupPress(btn, x, y) {
+            cancelGroupPress();
+            groupLongPressFired = false;
+            btn.classList.add('long-pressing');
+            groupPress = {
+                btn: btn,
+                x: x,
+                y: y,
+                timer: setTimeout(function () {
+                    const groupId = btn.getAttribute('data-group-id');
+                    cancelGroupPress();
+                    groupLongPressFired = true;
+                    if (groupId) deleteGroupFromBanner(groupId);
+                }, GROUP_LONG_PRESS_MS)
+            };
+        }
+
+        function deleteGroupFromBanner(groupId) {
+            const group = groups.find(function (g) { return g.id === groupId; });
+            if (!group) return;
+            pushSnapshot('group');
+            students.forEach(function (s) {
+                if (s.groupId === groupId) s.groupId = null;
+            });
+            groups = groups.filter(function (g) { return g.id !== groupId; });
+            commit({ students: students, groups: groups });
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
+            generateSeats();
+            renderGroupModeList();
+            updateGroupModeCount();
+            autoSave();
+            showStatToast('已删除分组「' + group.name + '」,可点「撤销」恢复');
+        }
+
+        function isGroupPressMoved(x, y) {
+            if (!groupPress) return false;
+            return Math.abs(x - groupPress.x) > GROUP_PRESS_MOVE_TOLERANCE
+                || Math.abs(y - groupPress.y) > GROUP_PRESS_MOVE_TOLERANCE;
+        }
+
+        function onGroupPressDown(btn, x, y) {
+            beginGroupPress(btn, x, y);
+        }
+
+        if (window.PointerEvent) {
+            classroom.addEventListener('pointerdown', function (e) {
+                const btn = e.target.closest('.group-mode-group-btn');
+                if (btn) onGroupPressDown(btn, e.clientX, e.clientY);
+            });
+            classroom.addEventListener('pointermove', function (e) {
+                if (groupPress && isGroupPressMoved(e.clientX, e.clientY)) cancelGroupPress();
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (type) {
+                classroom.addEventListener(type, cancelGroupPress);
+            });
+        } else {
+            // 老版 iOS Safari 等无 PointerEvent 的环境,回退到 touch 事件
+            classroom.addEventListener('touchstart', function (e) {
+                const btn = e.target.closest('.group-mode-group-btn');
+                if (!btn || !e.touches.length) return;
+                onGroupPressDown(btn, e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+            classroom.addEventListener('touchmove', function (e) {
+                if (!groupPress || !e.touches.length) return;
+                if (isGroupPressMoved(e.touches[0].clientX, e.touches[0].clientY)) cancelGroupPress();
+            }, { passive: true });
+            ['touchend', 'touchcancel'].forEach(function (type) {
+                classroom.addEventListener(type, cancelGroupPress);
+            });
+        }
+
+        // 长按期间屏蔽系统右键菜单 / 移动端长按选择,避免打断删除手势
+        classroom.addEventListener('contextmenu', function (e) {
+            if (e.target.closest('.group-mode-group-btn')) e.preventDefault();
         });
 
         // 折叠面板交互

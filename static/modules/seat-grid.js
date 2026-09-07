@@ -13,7 +13,8 @@
 //   - getView()      — 懒读取当前视角模式('teacher' / 'student'),返回布尔表示教师视角
 //   - helpers        — { escapeHtml, adjustColor, isLightColor, getStudentById, getStudentGroupColor }
 //   - callbacks      — { onUpdateToggleIconsBtnText, onToggleCheckinMode,
-//                        onPushSnapshot, onGenerateStudentList, onAutoSave }
+//                        onPushSnapshot, onGenerateStudentList, onAutoSave,
+//                        onRenderGroupBannerContent }
 //
 // 读路径:全部从 state(./state.js)直读,不走顶层 let 别名,path-A2 等价行为。
 // 写路径:`state.students[i].checkedIn = ...` 是 in-place 字段变更,state.students
@@ -42,7 +43,8 @@ export function createSeatGrid(deps) {
         onToggleCheckinMode,
         onPushSnapshot,
         onGenerateStudentList,
-        onAutoSave
+        onAutoSave,
+        onRenderGroupBannerContent
     } = callbacks;
 
     // ─────────── 持久化缓存(persistent 节点 + 上次渲染快照) ───────────
@@ -78,6 +80,12 @@ export function createSeatGrid(deps) {
         }
 
         classroom.classList.toggle('checkin-mode', state.isCheckinMode);
+        // 分组 banner 的内容(分组按钮 / 选中计数)每次渲染都要回填:
+        // 全量重建时壳子是全新节点,diff 更新时壳子虽在但 groups 可能已被
+        // 撤销/删除/导入等操作改变 —— 统一在这里兜底,避免按钮整排消失或内容过期。
+        if (state.isGroupMode && typeof onRenderGroupBannerContent === 'function') {
+            onRenderGroupBannerContent();
+        }
         onGenerateStudentList();
         updateStatistics();
         updateCheckinStats();
@@ -256,13 +264,23 @@ export function createSeatGrid(deps) {
     function buildGroupBanner() {
         const banner = document.createElement('div');
         banner.className = 'mode-banner group-banner visible';
+        // 两行布局:
+        //   第 1 行 — 图标 + 说明文字 + 选中计数 + 新建分组 + 关闭(与签到 banner 同款)
+        //   第 2 行 — 已有分组按钮独占一行(长按可删除)
         banner.innerHTML =
-            '<span class="mode-banner-icon">👥</span>' +
-            '<span>分组模式 — 点击座位多选学生,再点分组按钮分配</span>' +
-            '<span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>' +
-            '<div class="group-mode-list" id="groupModeList"></div>' +
-            '<button class="mode-banner-btn" id="groupModeNewBtn">＋新建分组并分配</button>' +
-            '<button class="mode-banner-close" id="groupModeExitBtn">×</button>';
+            '<div class="group-banner-row group-banner-main">' +
+                '<span class="mode-banner-icon">👥</span>' +
+                '<span class="group-banner-tip">分组模式 — 点击座位多选学生,再点分组按钮分配</span>' +
+                '<span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>' +
+                '<button class="mode-banner-btn" id="groupModeNewBtn">＋新建分组并分配</button>' +
+                '<button class="mode-banner-close" id="groupModeExitBtn">×</button>' +
+            '</div>' +
+            '<div class="group-banner-row group-banner-groups">' +
+                '<span class="group-banner-groups-label">已有分组' +
+                    '<span class="group-banner-hint">(长按删除)</span>' +
+                '</span>' +
+                '<div class="group-mode-list" id="groupModeList"></div>' +
+            '</div>';
         return banner;
     }
 

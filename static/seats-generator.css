@@ -630,6 +630,11 @@ h1:focus {
     opacity: 0.6;
 }
 
+/* 「切换模式」无下拉菜单,用不可见箭头占位,使高度与带下拉的按钮一致 */
+.caret-placeholder {
+    visibility: hidden;
+}
+
 .print-dropdown {
     position: absolute;
     top: 100%;
@@ -1020,6 +1025,48 @@ h1:focus {
 
 .mode-banner-btn:hover {
     background: rgba(255, 255, 255, 0.35);
+}
+
+/* 分组横幅：两行布局(上=说明+操作,下=已有分组按钮独占一行) */
+.group-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+
+.group-banner-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.group-banner-row .mode-banner-btn {
+    margin-left: 0;
+}
+
+/* 第 2 行:与说明行用虚线分隔,视觉上独立成区 */
+.group-banner-groups {
+    border-top: 1px dashed rgba(255, 255, 255, 0.3);
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.group-banner-tip {
+    flex: 0 1 auto;
+}
+
+.group-banner-groups-label {
+    font-size: 12px;
+    white-space: nowrap;
+    flex: none;
+}
+
+.group-banner-hint {
+    margin-left: 4px;
+    font-size: 11px;
+    opacity: 0.75;
+    font-weight: 400;
 }
 
 /* 分组横幅：计数徽标 + 分组按钮列表(白字绿底下需提亮/留白) */
@@ -1721,16 +1768,45 @@ h1:focus {
 }
 
 .group-mode-group-btn {
+    position: relative;
+    overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.15);
     border-radius: 4px;
     padding: 4px 10px;
     font-size: 13px;
     cursor: pointer;
     color: #1a1a1a;
+    /* 长按删除手势:禁用长按选择 / 系统长按菜单,避免打断 */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
 }
 
 .group-mode-group-btn:hover {
     filter: brightness(0.95);
+}
+
+/* 长按期间从左到右填充的进度遮罩,给用户「即将删除」的视觉反馈 */
+.group-mode-group-btn.long-pressing::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: rgba(0, 0, 0, 0.32);
+    animation: groupPressFill 600ms linear forwards;
+    pointer-events: none;
+}
+
+@keyframes groupPressFill {
+    from {
+        width: 0;
+    }
+    to {
+        width: 100%;
+    }
 }
 
 .group-mode-empty {
