@@ -43,6 +43,10 @@ const groupModeSelectedIds = new Set();  // 分组模式:当前选中的学生 i
 let groupFocusId = null;               // 分组模式:当前聚焦查看的分组 id(高亮成员 + 统计栏展示)
 let groupCurrentStudentId = null;      // 分组模式:多选时统计栏展示的「当前学生」(最后点击的那位)
 let groupRotateOffset = 1;             // 分组轮换步长(默认 +1:轮换到下一组)
+// 智能排座下拉的三个选项开关(初始值均为「关」,之后由配置覆盖)
+let smartArrangeMixed = false;         // 男女同桌
+let smartArrangeSameGender = false;    // 男女不同桌(与「男女同桌」互斥)
+let smartArrangeRotate = false;        // 小组轮换(开启后智能排座会在排座后按步长轮换)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
 
@@ -59,6 +63,7 @@ function normalizeRotateOffset(value) {
         const classroom = document.getElementById('classroom');
         const classroomWrapper = classroom.parentElement;
         const pageTitle = document.getElementById('pageTitle');
+        const titleDate = document.getElementById('titleDate');
         const studentList = document.getElementById('studentList');
         const fileInput = document.getElementById('fileInput');
         const fileInfo = document.getElementById('fileInfo');
@@ -109,7 +114,9 @@ function normalizeRotateOffset(value) {
         const modeSwitchIcon = document.getElementById('modeSwitchIcon');
         const modeSwitchLabel = document.getElementById('modeSwitchLabel');
         const quickRandomBtn = document.getElementById('quickRandomBtn');
-        const randomBtn = document.getElementById('randomBtn');
+        // 智能排座:上段 #smartArrangeBtn 直接执行;下段 #randomDropdownBtn 展开选项菜单
+        const smartArrangeBtn = document.getElementById('smartArrangeBtn');
+        const randomDropdownBtn = document.getElementById('randomDropdownBtn');
         const mobileBanner = document.getElementById('mobileBanner');
 
         // 分组导入相关变量
@@ -251,6 +258,9 @@ function normalizeRotateOffset(value) {
                 isCheckinMode: isCheckinMode,
                 isGroupMode: isGroupMode,
                 groupRotateOffset: groupRotateOffset,
+                smartArrangeMixed: smartArrangeMixed,
+                smartArrangeSameGender: smartArrangeSameGender,
+                smartArrangeRotate: smartArrangeRotate,
                 version: APP_VERSION
             };
         }
@@ -583,6 +593,8 @@ function normalizeRotateOffset(value) {
                 autoSave();
             }
             updateRotateOffsetBadge();
+            // 分组增删会改变步长的可用上限,同步智能排座下拉的开关/步长 UI
+            syncSmartArrangeUI();
             if (isGroupMode) updateGroupStatsRow();
         }
 
@@ -1520,156 +1532,27 @@ function normalizeRotateOffset(value) {
 
         // 配对设置现在通过「随机排座」下拉内的 data-action="pairSettings" 菜单项打开/关闭
 
-        // ==================== 轮换设置弹窗 ====================
-
-        let activeRotatePopup = null;
-
-        // 轮换预览:按当前步长给出「源组 → 目标组」的映射表
-        function buildRotatePreviewMap(offset) {
-            const n = groups.length;
-            if (n < 2) return '<div class="rotate-empty">请先创建至少 2 个分组</div>';
-            return groups.map(function (g, i) {
-                const t = groups[(i + offset) % n];
-                const cnt = students.filter(function (s) { return s.groupId === g.id; }).length;
-                return '<div class="rotate-map-row">' +
-                    '<span class="rotate-map-src">' + escapeHtml(g.name) + '</span>' +
-                    '<span class="rotate-map-arrow">→</span>' +
-                    '<span class="rotate-map-dst">' + escapeHtml(t.name) + '</span>' +
-                    '<span class="rotate-map-count">' + cnt + ' 人</span>' +
-                    '</div>';
-            }).join('');
-        }
+        // ==================== 轮换设置 ====================
+        // 轮换步长改由「智能排座」下拉内的「小组轮换」开关 + 步长 −/+ 直接调整,
+        // 不再需要独立的轮换设置弹窗。
 
         function updateRotateOffsetBadge() {
             const badge = document.getElementById('rotateOffsetBadge');
             if (badge) badge.textContent = '+' + groupRotateOffset;
         }
 
-        function openRotatePopup(anchorEl) {
-            if (activeRotatePopup) closeRotatePopup();
-            if (activePairPopup) closePairPopup();
-
-            const container = ensureTagPopupContainer();
-            const popup = document.createElement('div');
-            popup.className = 'pair-popup rotate-popup';
-            popup.setAttribute('role', 'dialog');
-            popup.setAttribute('aria-modal', 'true');
-            popup.setAttribute('aria-labelledby', 'rotatePopupTitle');
-
-            const maxOffset = Math.max(1, groups.length - 1);
-            popup.innerHTML =
-                '<div class="pair-popup-title" id="rotatePopupTitle">轮换设置</div>' +
-                '<div class="pair-popup-section">' +
-                    '<div class="pair-popup-section-title">轮换步长</div>' +
-                    '<div class="pair-popup-row">' +
-                        '<label class="pair-popup-label">轮换到往下第</label>' +
-                        '<input type="number" class="rotate-offset-input" min="1" max="' + maxOffset +
-                            '" step="1" value="' + groupRotateOffset + '">' +
-                        '<span class="pair-popup-hint">组</span>' +
-                    '</div>' +
-                    '<div class="rotate-popup-hint">按分组建立顺序循环;人数不等时按较少一方的人数轮换</div>' +
-                '</div>' +
-                '<div class="pair-popup-section">' +
-                    '<div class="pair-popup-section-title">轮换预览</div>' +
-                    '<div class="rotate-map-list"></div>' +
-                '</div>' +
-                '<div class="pair-popup-row rotate-popup-actions">' +
-                    '<button class="mini-btn rotate-apply">立即轮换</button>' +
-                    '<button class="mini-btn rotate-close">关闭</button>' +
-                '</div>';
-
-            container.appendChild(popup);
-
-            const rect = anchorEl.getBoundingClientRect();
-            const popupWidth = 320;
-            let left = rect.left;
-            let top = rect.bottom + 4;
-            if (left + popupWidth > window.innerWidth - 8) {
-                left = Math.max(8, window.innerWidth - popupWidth - 8);
-            }
-            if (top + 320 > window.innerHeight) {
-                top = Math.max(8, rect.top - 320);
-            }
-            popup.style.left = left + 'px';
-            popup.style.top = top + 'px';
-
-            activeRotatePopup = { popupEl: popup };
-
-            const input = popup.querySelector('.rotate-offset-input');
-            const mapList = popup.querySelector('.rotate-map-list');
-
-            function renderPreview() {
-                mapList.innerHTML = buildRotatePreviewMap(groupRotateOffset);
-            }
-            renderPreview();
-
-            // 输入即生效(步长是纯配置项,不改动座位),同步徽标与预览
-            input.addEventListener('input', function () {
-                const v = normalizeRotateOffset(input.value);
-                groupRotateOffset = v;
-                input.value = v;
-                updateRotateOffsetBadge();
-                renderPreview();
-                // 分组模式下统计栏的「即将轮换到」跟着步长实时变化
-                if (isGroupMode) updateGroupStatsRow();
-                autoSave();
-            });
-
-            popup.querySelector('.rotate-close').addEventListener('click', closeRotatePopup);
-            popup.querySelector('.rotate-apply').addEventListener('click', function () {
-                closeRotatePopup();
-                runGroupRotation();
-            });
-
-            popup.addEventListener('click', function (e) {
-                e.stopPropagation();
-            });
-
-            requestAnimationFrame(function () {
-                popup.classList.add('visible');
-            });
-
-            const trap = installFocusTrap(popup, closeRotatePopup);
-            activeRotatePopup.focusTrap = trap;
-        }
-
-        function closeRotatePopup() {
-            if (activeRotatePopup) {
-                if (activeRotatePopup.focusTrap && typeof activeRotatePopup.focusTrap.restoreFocus === 'function') {
-                    activeRotatePopup.focusTrap.restoreFocus();
-                }
-                activeRotatePopup.popupEl.classList.remove('visible');
-                setTimeout(function () {
-                    if (activeRotatePopup && activeRotatePopup.popupEl.parentNode) {
-                        activeRotatePopup.popupEl.parentNode.removeChild(activeRotatePopup.popupEl);
-                    }
-                    activeRotatePopup = null;
-                }, 150);
-            }
-        }
-
-        // 执行一次分组轮换(下拉项 / 弹窗「立即轮换」共用)
+        // 执行一次分组轮换,返回 { warnings, moved };提示文案交给调用方决定
+        // (智能排座需要把排座与轮换的 warnings 合并成一条 toast)
         function runGroupRotation() {
             groupRotateOffset = normalizeRotateOffset(groupRotateOffset);
             updateRotateOffsetBadge();
-            const result = rotateGroupSeats(groupRotateOffset) || {};
-            if (result.warnings && result.warnings.length > 0) {
-                showStatToast(result.warnings.join(' / '));
-            } else if (result.moved > 0) {
-                showStatToast(MESSAGES.ROTATE_DONE(groupRotateOffset, result.moved));
-            }
+            return rotateGroupSeats(groupRotateOffset) || {};
         }
 
         // ==================== 轮换设置结束 ====================
 
         // 点击 popup 外部关闭
         document.addEventListener('click', function (e) {
-            if (activeRotatePopup) {
-                if (!activeRotatePopup.popupEl.contains(e.target) &&
-                    !e.target.closest('[data-action="rotateSettings"]')) {
-                    closeRotatePopup();
-                }
-            }
             if (!activePairPopup) return;
             if (activePairPopup.popupEl.contains(e.target)) return;
             if (e.target.closest('[data-action="pairSettings"]')) return;
@@ -1678,9 +1561,6 @@ function normalizeRotateOffset(value) {
 
         // Esc 关闭
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && activeRotatePopup) {
-                closeRotatePopup();
-            }
             if (e.key === 'Escape' && activePairPopup) {
                 closePairPopup();
             }
@@ -2704,6 +2584,18 @@ function isWholeWordMatch(label, keyword) {
         const clearDragHighlights = dragdrop.clearDragHighlights;
         const handleDrop = dragdrop.handleDrop;
 
+        // 标题旁的日期(打印 / 导出图片时显示;屏幕上由 CSS 隐藏)
+        function getTodayStr() {
+            const now = new Date();
+            return now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0');
+        }
+
+        function updateTitleDate() {
+            if (titleDate) titleDate.textContent = getTodayStr();
+        }
+
         // 标题编辑后自动保存
         pageTitle.addEventListener('input', autoSave);
         pageTitle.addEventListener('blur', function () {
@@ -2726,18 +2618,31 @@ function isWholeWordMatch(label, keyword) {
             // 创建临时容器，包含标题和座位表，用于导出
             const exportWrapper = document.createElement('div');
             exportWrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;background:#fff;padding:20px;border-radius:8px;';
-            const titleClone = pageTitle.cloneNode(true);
-            titleClone.style.cssText = 'margin:0 0 16px 0;font-size:24px;font-weight:700;text-align:center;cursor:default;background:none;box-shadow:none;position:static;transform:none;display:block;left:auto;';
-            // 在标题后追加当前日期
-            const now = new Date();
-            const dateStr = now.getFullYear() + '-' +
-                String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                String(now.getDate()).padStart(2, '0');
-            const dateLabel = document.createElement('span');
-            dateLabel.textContent = dateStr;
-            dateLabel.style.cssText = 'font-size:0.6em;font-weight:normal;color:#666;margin-left:12px;';
-            titleClone.appendChild(dateLabel);
-            exportWrapper.appendChild(titleClone);
+            // 复用页面上的标题行(标题 + 日期同一行),与打印保持一致。
+            // 克隆后去掉 id/contenteditable,并强制显示日期(屏幕样式下它是 display:none)。
+            const titleRow = document.querySelector('.page-title-row');
+            const titleRowClone = titleRow ? titleRow.cloneNode(true) : null;
+            if (titleRowClone) {
+                const cloneTitle = titleRowClone.querySelector('h1');
+                if (cloneTitle) {
+                    cloneTitle.removeAttribute('id');
+                    cloneTitle.removeAttribute('contenteditable');
+                    cloneTitle.removeAttribute('spellcheck');
+                    cloneTitle.style.cssText = 'margin:0 0 16px 0;font-size:24px;font-weight:700;text-align:center;cursor:default;background:none;box-shadow:none;position:static;transform:none;display:inline-block;left:auto;';
+                }
+                const cloneDate = titleRowClone.querySelector('.title-date');
+                if (cloneDate) {
+                    cloneDate.removeAttribute('id');
+                    cloneDate.textContent = getTodayStr();
+                    cloneDate.style.display = 'inline-block';
+                    cloneDate.style.fontSize = '15px';
+                    cloneDate.style.fontWeight = '400';
+                    cloneDate.style.color = '#94a3b8';
+                    cloneDate.style.marginLeft = '12px';
+                }
+                titleRowClone.style.cssText = 'text-align:center;margin-bottom:16px;';
+                exportWrapper.appendChild(titleRowClone);
+            }
             exportWrapper.appendChild(classroom.cloneNode(true));
 
             // 临时挂载到页面外
@@ -2771,7 +2676,7 @@ function isWholeWordMatch(label, keyword) {
         }
 
         // P1 UX #3:统一封装下拉按钮 — 同步 ARIA + 键盘 Enter/↓/Space 触发 + 内部 ↑↓/Enter/Esc 导航。
-        // 取代原先 randomBtn/printBtn 的零散 click handler,既闭环 ARIA,又修下拉键盘可达性。
+        // 取代原先智能排座/打印按钮的零散 click handler,既闭环 ARIA,又修下拉键盘可达性。
         function setupActionDropdown(btn, dropdown, peerBtn, peerDropdown) {
             let isOpen = false;
             // 将下拉改为 fixed 定位并按视口钳制,避免被 .controls 的 overflow:hidden 裁剪,
@@ -2857,10 +2762,10 @@ function isWholeWordMatch(label, keyword) {
         }
         const randomDropdown = document.getElementById('randomDropdown');
         const printDropdown = document.getElementById('printDropdown');
-        const randomDropdownCtrl = setupActionDropdown(randomBtn, randomDropdown, printBtn, printDropdown);
+        const randomDropdownCtrl = setupActionDropdown(randomDropdownBtn, randomDropdown, printBtn, printDropdown);
         // 「切换模式」:点击即轮换 普通 → 签到 → 分组 → 普通(不再是下拉)
         modeSwitchBtn.addEventListener('click', cycleMode);
-        const printDropdownCtrl = setupActionDropdown(printBtn, printDropdown, randomBtn, randomDropdown);
+        const printDropdownCtrl = setupActionDropdown(printBtn, printDropdown, randomDropdownBtn, randomDropdown);
 
         // 点击关闭 randomDropdown / printDropdown（事件委托，在 printBtn 的 document click handler 里统一处理）
 
@@ -2882,6 +2787,121 @@ function isWholeWordMatch(label, keyword) {
         // 顶层别名 — 保留既有调用点零修改
         const randomSeatArrange = randomArrange.randomSeatArrange;
         const rotateGroupSeats = randomArrange.rotateGroupSeats;
+
+        // 本地预览专用测试钩子:冒烟测试借此驱动「应用内真实实例」
+        // (带撤销快照 / UI 刷新回调),而不是另建一份工厂实例。
+        if (typeof window !== 'undefined' &&
+            /^(127\.0\.0\.1|localhost)$/.test(window.location.hostname)) {
+            window.__seatsTest = {
+                rotateGroupSeats: rotateGroupSeats,
+                randomSeatArrange: randomSeatArrange
+            };
+        }
+
+        // ==================== 智能排座(按钮 + 选项开关) ====================
+        // 上段按钮:按下方开关的组合直接执行;下段按钮:展开选项菜单。
+        // 开关状态持久化在 config 的 smartArrange* 三个字段里。
+
+        function setSwitchState(name, on) {
+            // 直接按 id 现取:本函数可能在初始化早期(randomDropdown 别名就绪前)被调用
+            const dd = document.getElementById('randomDropdown');
+            const row = dd && dd.querySelector('[data-toggle="' + name + '"]');
+            if (row) row.setAttribute('aria-checked', on ? 'true' : 'false');
+        }
+
+        // 把三个开关 + 步长行的 UI 同步到当前状态
+        function syncSmartArrangeUI() {
+            setSwitchState('mixed', smartArrangeMixed);
+            setSwitchState('samegender', smartArrangeSameGender);
+            setSwitchState('rotate', smartArrangeRotate);
+            const stepRow = document.getElementById('rotateStepRow');
+            if (stepRow) stepRow.style.display = smartArrangeRotate ? '' : 'none';
+            syncRotateStepButtons();
+            updateRotateOffsetBadge();
+        }
+
+        // 步长 −/+ 的可用边界:1 ~ 分组数-1
+        function syncRotateStepButtons() {
+            const maxOffset = Math.max(1, groups.length - 1);
+            const minus = document.getElementById('rotateStepMinus');
+            const plus = document.getElementById('rotateStepPlus');
+            if (minus) minus.disabled = groupRotateOffset <= 1;
+            if (plus) plus.disabled = groupRotateOffset >= maxOffset;
+        }
+
+        function toggleSmartSwitch(name) {
+            if (name === 'mixed') {
+                smartArrangeMixed = !smartArrangeMixed;
+                // 与「男女不同桌」互斥:开启一个即关掉另一个
+                if (smartArrangeMixed) smartArrangeSameGender = false;
+            } else if (name === 'samegender') {
+                smartArrangeSameGender = !smartArrangeSameGender;
+                if (smartArrangeSameGender) smartArrangeMixed = false;
+            } else if (name === 'rotate') {
+                smartArrangeRotate = !smartArrangeRotate;
+            }
+            syncSmartArrangeUI();
+            autoSave();
+        }
+
+        function adjustRotateOffset(delta) {
+            groupRotateOffset = normalizeRotateOffset(groupRotateOffset + delta);
+            syncRotateStepButtons();
+            updateRotateOffsetBadge();
+            // 分组模式下统计栏的「即将轮换到」跟着步长实时变化
+            if (isGroupMode) updateGroupStatsRow();
+            autoSave();
+        }
+
+        // 两个性别开关都关闭 ⇒ 完全随机
+        function smartArrangeMode() {
+            if (smartArrangeMixed) return 'mixed';
+            if (smartArrangeSameGender) return 'samegender';
+            return 'random';
+        }
+
+        // 上段按钮:按当前开关组合执行一次智能排座
+        function runSmartArrange() {
+            // #5 批次:从 localStorage 读 maxAttempts 配置(配对设置弹窗可改,默认 200)
+            const storedAttempts = parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10);
+            const result = randomSeatArrange(smartArrangeMode(), { maxAttempts: storedAttempts }) || {};
+            const warnings = (result.warnings || []).slice();
+            let rotateMsg = '';
+            if (smartArrangeRotate) {
+                const rot = runGroupRotation();
+                if (rot.warnings && rot.warnings.length > 0) {
+                    warnings.push.apply(warnings, rot.warnings);
+                } else if (rot.moved > 0) {
+                    rotateMsg = MESSAGES.ROTATE_DONE(groupRotateOffset, rot.moved);
+                }
+            }
+            // 排座与轮换的提示合并为一条 toast,避免后一条盖掉前一条
+            if (warnings.length > 0) {
+                showStatToast(warnings.join(' / '));
+            } else if (rotateMsg) {
+                showStatToast(rotateMsg);
+            }
+        }
+
+        smartArrangeBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            // 执行即收起选项菜单(与「点菜单项后关闭」的既有行为保持一致)
+            if (randomDropdownCtrl) randomDropdownCtrl.close();
+            runSmartArrange();
+        });
+
+        // 开关行 / 步长按钮:点击只改变设置,不关闭下拉(与菜单项行为区分开)
+        document.addEventListener('click', function (e) {
+            const sw = e.target.closest('.dropdown-switch-row');
+            if (sw) {
+                toggleSmartSwitch(sw.getAttribute('data-toggle'));
+                return;
+            }
+            const stepBtn = e.target.closest('.dropdown-step-btn');
+            if (stepBtn && !stepBtn.disabled) {
+                adjustRotateOffset(parseInt(stepBtn.getAttribute('data-step'), 10) || 0);
+            }
+        });
 
         // 重置座位
         document.getElementById('resetBtn').addEventListener('click', function () {
@@ -3699,6 +3719,9 @@ function isWholeWordMatch(label, keyword) {
                     isCheckinMode = !!config.isCheckinMode;
                     isGroupMode = !!config.isGroupMode;
                     groupRotateOffset = normalizeRotateOffset(config.groupRotateOffset);
+                    smartArrangeMixed = !!config.smartArrangeMixed;
+                    smartArrangeSameGender = !!config.smartArrangeSameGender;
+                    smartArrangeRotate = !!config.smartArrangeRotate;
                     if (config.title) pageTitle.textContent = config.title;
 
                     // 调整座位数组长度以匹配当前行列
@@ -3827,6 +3850,9 @@ function isWholeWordMatch(label, keyword) {
                     isCheckinMode = !!config.isCheckinMode;
                     isGroupMode = !!config.isGroupMode;
                     groupRotateOffset = normalizeRotateOffset(config.groupRotateOffset);
+                    smartArrangeMixed = !!config.smartArrangeMixed;
+                    smartArrangeSameGender = !!config.smartArrangeSameGender;
+                    smartArrangeRotate = !!config.smartArrangeRotate;
                     if (config.title) pageTitle.textContent = config.title;
 
                     const targetLen = rows * cols;
@@ -3889,19 +3915,9 @@ function isWholeWordMatch(label, keyword) {
             classroom.style.transform = '';
             classroom.style.transformOrigin = '';
 
-            // 在标题后追加当前日期（仅打印时显示）
-            let dateLabel = document.getElementById('printDateLabel');
-            if (!dateLabel) {
-                dateLabel = document.createElement('span');
-                dateLabel.id = 'printDateLabel';
-                dateLabel.style.cssText = 'font-size:0.7em;font-weight:normal;color:#666;margin-left:12px;';
-                pageTitle.appendChild(dateLabel);
-            }
-            const now = new Date();
-            const dateStr = now.getFullYear() + '-' +
-                String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                String(now.getDate()).padStart(2, '0');
-            dateLabel.textContent = dateStr;
+            // 日期写进标题旁的 #titleDate(CSS 只在 @media print 下显示),
+            // 不再 appendChild 进 contenteditable 的标题 —— 否则会污染标题文本并被自动保存写进配置。
+            updateTitleDate();
 
             printScaleValue = calculatePrintScale();
 
@@ -3921,9 +3937,6 @@ function isWholeWordMatch(label, keyword) {
             classroom.style.transformOrigin = '';
             classroomWrapper.style.width = '';
             classroomWrapper.style.height = '';
-            // 移除打印日期标签
-            const dateLabel = document.getElementById('printDateLabel');
-            if (dateLabel) dateLabel.remove();
             printPrepared = false;
         }
 
@@ -3971,39 +3984,15 @@ function isWholeWordMatch(label, keyword) {
                 } else if (action === 'exportImage') {
                     exportSeatImage();
                 }
-                // randomDropdown 动作
-                else if (action === 'random' || action === 'mixed' || action === 'samegender') {
-                    // #5 批次:从 localStorage 读 maxAttempts 配置(配对设置弹窗可改,默认 200)
-                    const storedAttempts = parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10);
-                    const result = randomSeatArrange(action, { maxAttempts: storedAttempts });
-                    // #4 批次:失败 toast 提示(算法自检结果)
-                    if (result && result.warnings && result.warnings.length > 0) {
-                        showStatToast(result.warnings.join(' / '));
-                    }
-                }
-                // 随机排座下拉里的「分组轮换」菜单项
-                else if (action === 'rotateGroups') {
-                    runGroupRotation();
-                }
-                // 随机排座下拉里的「轮换设置」菜单项
-                else if (action === 'rotateSettings') {
-                    if (activeRotatePopup) {
-                        closeRotatePopup();
-                    } else {
-                        // 同配对设置:焦点先还给触发按钮,避免焦点陷阱恢复落空
-                        randomBtn.focus();
-                        openRotatePopup(randomBtn);
-                    }
-                }
-                // 随机排座下拉里的「配对设置」菜单项
+                // 智能排座下拉里的「配对设置」菜单项
                 else if (action === 'pairSettings') {
                     if (activePairPopup) {
                         closePairPopup();
                     } else {
                         // 焦点先还给触发按钮:焦点陷阱会把「打开瞬间的 activeElement」
                         // 记为恢复目标,菜单项随下拉隐藏后无法聚焦,会导致恢复落空
-                        randomBtn.focus();
-                        openPairPopup(randomBtn);
+                        randomDropdownBtn.focus();
+                        openPairPopup(randomDropdownBtn);
                     }
                 }
                 return;
@@ -4015,9 +4004,9 @@ function isWholeWordMatch(label, keyword) {
                 printDd.style.display = 'none';
                 printBtn.setAttribute('aria-expanded', 'false');
             }
-            if (randDd && !randDd.contains(e.target) && !randomBtn.contains(e.target)) {
+            if (randDd && !randDd.contains(e.target) && !randomDropdownBtn.contains(e.target)) {
                 randDd.style.display = 'none';
-                randomBtn.setAttribute('aria-expanded', 'false');
+                randomDropdownBtn.setAttribute('aria-expanded', 'false');
             }
         });
 

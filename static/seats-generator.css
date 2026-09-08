@@ -39,6 +39,13 @@ body {
     min-height: 100vh;
 }
 
+/* 标题行:标题与日期同排一行,整体居中。
+   此前 h1 靠 position:relative + left:50% + translateX(-50%) 自居中,
+   任何兄弟元素都会错位;改由父层 text-align:center 居中后,日期可自然接在标题后。 */
+.page-title-row {
+    text-align: center;
+}
+
 h1 {
     text-align: center;
     color: var(--text-primary);
@@ -48,13 +55,20 @@ h1 {
     letter-spacing: -0.5px;
     outline: none;
     cursor: text;
-    position: relative;
     display: inline-block;
-    left: 50%;
-    transform: translateX(-50%);
     padding: 4px 16px;
     border-radius: var(--radius-sm);
     transition: background 0.15s ease;
+}
+
+/* 打印/导出图片时的日期:接在标题后同一行,屏幕上不显示 */
+.title-date {
+    display: none;
+    margin-left: 12px;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text-tertiary, #94a3b8);
+    white-space: nowrap;
 }
 
 h1:hover {
@@ -654,6 +668,40 @@ h1:focus {
     position: relative;
 }
 
+/* 智能排座:上下两段式 — 上段直接执行,下段展开选项菜单。
+   两段合起来的高度与其他单块按钮(打印/PDF、切换模式)保持一致。 */
+.action-btn-split {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex: 1;
+}
+
+.action-btn-split > .action-btn {
+    width: 100%;
+    flex: none;
+}
+
+.action-btn-split-main {
+    padding: 8px 6px 5px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.action-btn-split-caret {
+    padding: 3px 6px 7px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    margin-top: -1px;          /* 两段共享一条边框,视觉上仍是一组 */
+    min-height: 18px;
+    justify-content: center;
+}
+
+.action-btn-split-caret .dropdown-caret {
+    margin-top: 0;
+    font-size: 11px;
+}
+
 .dropdown-caret {
     font-size: 10px;
     margin-top: -2px;
@@ -720,6 +768,119 @@ h1:focus {
     height: 1px;
     margin: 4px 8px;
     background: var(--border-light);
+}
+
+/* ── 智能排座下拉:选项开关 ─────────────────────────────── */
+.dropdown-switch-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.dropdown-switch-row:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.dropdown-switch-row:focus-visible,
+.dropdown-switch-row:focus {
+    background: var(--primary-light);
+    color: var(--primary);
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.dropdown-switch-label {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 开关轨道 + 滑块(纯 CSS,无额外 DOM) */
+.dropdown-switch {
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 15px;
+    border-radius: 8px;
+    background: var(--border);
+    transition: background 0.18s ease;
+}
+
+.dropdown-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.18s ease;
+}
+
+.dropdown-switch-row[aria-checked="true"] {
+    color: var(--primary);
+}
+
+.dropdown-switch-row[aria-checked="true"] .dropdown-switch {
+    background: var(--primary);
+}
+
+.dropdown-switch-row[aria-checked="true"] .dropdown-switch::after {
+    transform: translateX(13px);
+}
+
+/* 轮换步长行(仅「小组轮换」开启时显示) */
+.dropdown-step-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 9px;
+}
+
+.dropdown-step-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.dropdown-step-btn {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.dropdown-step-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.dropdown-step-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* 辅助操作行 */
@@ -3144,20 +3305,36 @@ button:disabled {
         display: block;
     }
 
+    .page-title-row {
+        text-align: center;
+        margin: 0;
+        padding: 0;
+    }
+
     h1 {
         margin: 0 0 2mm 0;
         font-size: 12pt;
         text-align: center;
         position: static !important;
         transform: none !important;
-        display: block !important;
+        /* inline-block 而非 block:保证日期能接在标题后同一行 */
+        display: inline-block !important;
         left: auto !important;
         background: none !important;
         box-shadow: none !important;
         padding: 0 !important;
-        height: 5mm;
+        height: auto;
         line-height: 1.2;
-        overflow: hidden;
+        overflow: visible;
+    }
+
+    /* 日期接在标题后、同一行 */
+    .title-date {
+        display: inline-block;
+        margin-left: 8px;
+        font-size: 9pt;
+        font-weight: 400;
+        color: #666;
     }
 
     .drag-hint,

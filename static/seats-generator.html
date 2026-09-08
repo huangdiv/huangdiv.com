@@ -33,7 +33,10 @@
         </div>
     </div>
 
-    <h1 id="pageTitle" contenteditable="true" spellcheck="false">班级座位表</h1>
+    <div class="page-title-row">
+        <h1 id="pageTitle" contenteditable="true" spellcheck="false">班级座位表</h1>
+        <span id="titleDate" class="title-date" aria-hidden="true"></span>
+    </div>
 
     <div class="container">
         <div class="classroom-wrapper">
@@ -119,33 +122,36 @@
                     </button>
                 </div>
                 <div class="action-btn-wrapper">
-                    <button id="randomBtn" class="action-btn action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="randomDropdown">
-                        <span class="action-icon">⇄</span>
-                        <span>随机排座</span>
-                        <span class="dropdown-caret" aria-hidden="true">▾</span>
-                    </button>
+                    <div class="action-btn-split">
+                        <button id="smartArrangeBtn" class="action-btn action-btn-split-main" title="按下方选项的设置智能排座">
+                            <span class="action-icon">⇄</span>
+                            <span>智能排座</span>
+                        </button>
+                        <button id="randomDropdownBtn" class="action-btn action-btn-dropdown action-btn-split-caret" aria-haspopup="menu" aria-expanded="false" aria-controls="randomDropdown" title="排座选项与设置">
+                            <span class="dropdown-caret" aria-hidden="true">▾</span>
+                        </button>
+                    </div>
                     <div id="randomDropdown" class="print-dropdown" role="menu" style="display:none;">
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="random">
-                            <span class="print-dropdown-icon" aria-hidden="true">🎲</span>
-                            <span>完全随机</span>
-                        </div>
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="mixed">
+                        <div class="dropdown-switch-row" role="menuitem" aria-checked="false" tabindex="0" data-toggle="mixed">
                             <span class="print-dropdown-icon" aria-hidden="true">👫</span>
-                            <span>男女同桌</span>
+                            <span class="dropdown-switch-label">男女同桌</span>
+                            <span class="dropdown-switch" aria-hidden="true"></span>
                         </div>
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="samegender">
+                        <div class="dropdown-switch-row" role="menuitem" aria-checked="false" tabindex="0" data-toggle="samegender">
                             <span class="print-dropdown-icon" aria-hidden="true">👬</span>
-                            <span>男女不同桌</span>
+                            <span class="dropdown-switch-label">男女不同桌</span>
+                            <span class="dropdown-switch" aria-hidden="true"></span>
                         </div>
-                        <div class="print-dropdown-divider"></div>
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="rotateGroups">
+                        <div class="dropdown-switch-row" role="menuitem" aria-checked="false" tabindex="0" data-toggle="rotate">
                             <span class="print-dropdown-icon" aria-hidden="true">🔄</span>
-                            <span>分组轮换</span>
-                            <span class="dropdown-item-badge" id="rotateOffsetBadge">+1</span>
+                            <span class="dropdown-switch-label">小组轮换</span>
+                            <span class="dropdown-switch" aria-hidden="true"></span>
                         </div>
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="rotateSettings">
-                            <span class="print-dropdown-icon" aria-hidden="true">⚙</span>
-                            <span>轮换设置</span>
+                        <div class="dropdown-step-row" id="rotateStepRow" style="display:none;">
+                            <span class="dropdown-step-label">轮换步长</span>
+                            <button type="button" class="dropdown-step-btn" id="rotateStepMinus" data-step="-1" aria-label="减小轮换步长">−</button>
+                            <span class="dropdown-item-badge" id="rotateOffsetBadge">+1</span>
+                            <button type="button" class="dropdown-step-btn" id="rotateStepPlus" data-step="1" aria-label="增大轮换步长">＋</button>
                         </div>
                         <div class="print-dropdown-divider"></div>
                         <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="pairSettings">
