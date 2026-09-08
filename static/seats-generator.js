@@ -41,6 +41,7 @@ let isCheckinMode = state.isCheckinMode;
 let isGroupMode = state.isGroupMode;   // 分组模式:座位表多选学生 → 批量分配到分组
 const groupModeSelectedIds = new Set();  // 分组模式:当前选中的学生 id 集合(座位表多选)
 let groupFocusId = null;               // 分组模式:当前聚焦查看的分组 id(高亮成员 + 统计栏展示)
+let groupCurrentStudentId = null;      // 分组模式:多选时统计栏展示的「当前学生」(最后点击的那位)
 let groupRotateOffset = 1;             // 分组轮换步长(默认 +1:轮换到下一组)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
@@ -2238,6 +2239,7 @@ function isWholeWordMatch(label, keyword) {
             groupModeSelectedIds.clear();
             clearGroupModeSelection();
             groupFocusId = null;
+            groupCurrentStudentId = null;
             applyGroupFocusHighlight();
             setStatsRowMode('normal');
             updateModeSwitchButton();
@@ -2301,6 +2303,7 @@ function isWholeWordMatch(label, keyword) {
                 groupModeSelectedIds.clear();
                 clearGroupModeSelection();
                 groupFocusId = null;
+                groupCurrentStudentId = null;
                 applyGroupFocusHighlight();
                 setStatsRowMode('normal');
             }
@@ -2355,6 +2358,9 @@ function isWholeWordMatch(label, keyword) {
                 if (student) student.groupId = groupId;
             });
             groupModeSelectedIds.clear();
+            groupCurrentStudentId = null;
+            // 分配完成 ⇒ 顺势查看目标分组(高亮其成员 + 统计栏展示),给出完成反馈
+            groupFocusId = groupId;
             clearGroupModeSelection();
             generateSeats();
             updateStudentAssignmentDisplay();
@@ -2368,6 +2374,8 @@ function isWholeWordMatch(label, keyword) {
             if (el) {
                 el.textContent = '已选 ' + groupModeSelectedIds.size + ' 名学生';
             }
+            // 选中人数变化 ⇒ 统计栏在多选视图 / 分组视图之间切换
+            updateGroupStatsRow();
         }
 
         // 分组 banner 的壳子由 seat-grid 在每次全量重建时重新生成(节点全新),
@@ -2401,40 +2409,96 @@ function isWholeWordMatch(label, keyword) {
             return groups[(idx + step) % groups.length];
         }
 
-        // 分组模式统计栏:当前分组名 / 人数(可点菜单) / 即将轮换到的分组名
+        // 分组模式统计栏(三项等宽,风格与签到/普通模式一致):
+        //   多选学生中 ⇒ 当前学生 / 所属分组 / 已选人数(可点菜单)
+        //   查看某分组 ⇒ 当前分组 / 分组人数(可点菜单) / 即将轮换到
+        //   其余情况   ⇒ 未选择 / 0 / —
         function updateGroupStatsRow() {
-            const nameEl = document.getElementById('groupStatNameVal');
-            const countEl = document.getElementById('groupMemberCount');
-            const nextEl = document.getElementById('groupStatNextVal');
-            if (!nameEl || !countEl || !nextEl) return;
+            const slots = [1, 2, 3].map(function (i) {
+                return {
+                    box: document.getElementById('groupStatSlot' + i),
+                    val: document.getElementById('groupStatVal' + i),
+                    label: document.getElementById('groupStatLabel' + i)
+                };
+            });
+            if (!slots[0].box || !slots[0].val || !slots[0].label) return;
 
+            // statId 非空 ⇒ 该块可点击(弹出复制姓名 / 下载 Excel 菜单)
+            const setSlot = function (i, value, label, statId, color, title) {
+                const s = slots[i];
+                s.val.textContent = value;
+                s.val.style.color = color || '';
+                s.val.title = title || String(value);
+                s.label.textContent = label;
+                if (statId) {
+                    s.box.setAttribute('data-stat', statId);
+                    s.box.classList.remove('stat-block-static');
+                    s.box.removeAttribute('tabindex');
+                    s.box.title = '点击：复制姓名 / 下载 Excel';
+                    s.box.setAttribute('aria-label', label + '，点击复制姓名或下载 Excel');
+                } else {
+                    s.box.removeAttribute('data-stat');
+                    s.box.classList.add('stat-block-static');
+                    s.box.setAttribute('tabindex', '-1');
+                    s.box.removeAttribute('title');
+                    s.box.removeAttribute('aria-label');
+                }
+            };
+
+            // ── 多选学生中:优先展示本次多选的上下文 ──
+            if (groupModeSelectedIds.size > 0) {
+                const cur = groupCurrentStudentId ? getStudentById(groupCurrentStudentId) : null;
+                const grp = cur && cur.groupId
+                    ? groups.find(function (g) { return g.id === cur.groupId; })
+                    : null;
+                setSlot(0, cur ? cur.name : '—', '当前学生', '', '', '');
+                setSlot(1, grp ? grp.name : '未分组', '所属分组', '', grp ? grp.color : '', '');
+                setSlot(2, String(groupModeSelectedIds.size), '已选人数', 'groupSelected', '', '');
+                return;
+            }
+
+            // ── 查看某分组 ──
             const group = groupFocusId
                 ? groups.find(function (g) { return g.id === groupFocusId; })
                 : null;
             if (!group) {
-                // 分组被删除 / 配置变更后聚焦项失效 ⇒ 顺手清掉,避免残留高亮
+                // 分组被删除 / 配置变更后聚焦项失效 ⇒ 清掉,避免残留高亮
                 groupFocusId = null;
-                nameEl.textContent = '未选择';
-                nameEl.style.color = '';
-                nameEl.title = '点击 banner 中的分组按钮查看该组';
-                countEl.textContent = '0';
-                nextEl.textContent = '—';
-                nextEl.style.color = '';
-                nextEl.title = '';
+                setSlot(0, '未选择', '当前分组', '', '', '点击 banner 中的分组按钮查看该组');
+                setSlot(1, '0', '分组人数', '', '', '');
+                setSlot(2, '—', '即将轮换到', '', '', '');
                 return;
             }
 
             const members = students.filter(function (s) { return s.groupId === group.id; });
-            nameEl.textContent = group.name;
-            nameEl.style.color = group.color || '';
-            nameEl.title = group.name;
-            countEl.textContent = String(members.length);
-
             const target = getGroupRotateTarget(group.id);
-            nextEl.textContent = target ? target.name : '—';
-            nextEl.style.color = target && target.color ? target.color : '';
-            nextEl.title = target ? ('+' + normalizeRotateOffset(groupRotateOffset) + ' → ' + target.name) : '';
+            const step = normalizeRotateOffset(groupRotateOffset);
+            setSlot(0, group.name, '当前分组', '', group.color, group.name);
+            setSlot(1, String(members.length), '分组人数', 'groupMembers', '', '');
+            setSlot(2, target ? target.name : '—', '即将轮换到',
+                '', target ? target.color : '', target ? ('+' + step + ' → ' + target.name) : '');
         }
+
+        // 分组统计栏里「可点」的块由 updateGroupStatsRow 动态赋予 data-stat,
+        // initStatBlockActions 在初始化时绑定不到 ⇒ 这里单独走事件委托。
+        (function bindGroupStatsRowActions() {
+            const row = document.getElementById('groupStatsRow');
+            if (!row) return;
+            row.addEventListener('click', function (e) {
+                const block = e.target.closest('.stat-block[data-stat]');
+                if (!block) return;
+                const statId = block.getAttribute('data-stat');
+                if (!statId) return;
+                e.stopPropagation();
+                const ctx = getStatContext(statId);
+                if (!ctx.students.length) {
+                    showStatToast(ctx.title + '：暂无学生');
+                    return;
+                }
+                const rect = block.getBoundingClientRect();
+                showStatActionMenu(statId, rect.left + rect.width / 2, rect.bottom);
+            });
+        })();
 
         // 高亮聚焦分组的成员:座位表 .seat + 未入座名单 .student-item
         function applyGroupFocusHighlight() {
@@ -2470,15 +2534,13 @@ function isWholeWordMatch(label, keyword) {
             updateGroupStatsRow();
         }
 
-        // 点击学生 ⇒ 高亮其所属分组;该生未入组 ⇒ 取消聚焦
-        function setGroupFocusByStudent(student) {
-            if (!student) return;
-            const inGroup = student.groupId
-                && groups.some(function (g) { return g.id === student.groupId; });
-            groupFocusId = inGroup ? student.groupId : null;
+        // 进入多选状态时清掉分组查看态:避免整组橙色高亮抢走「多选学生」的视觉焦点。
+        // 查看态只在「点击 banner 分组按钮」这一条路径上进入。
+        function dropGroupFocusIfViewing() {
+            if (!groupFocusId) return;
+            groupFocusId = null;
             applyGroupFocusHighlight();
             renderGroupModeList();
-            updateGroupStatsRow();
         }
 
         // 切换学生签到状态
@@ -3894,16 +3956,6 @@ function isWholeWordMatch(label, keyword) {
             }
         });
 
-        // 分组模式:点击未入座名单中的学生 ⇒ 高亮其当前所属分组(触摸/鼠标皆走 click)
-        studentList.addEventListener('click', function (e) {
-            if (!isGroupMode) return;
-            const item = e.target.closest('.student-item');
-            if (!item) return;
-            const studentId = item.getAttribute('data-student');
-            if (!studentId) return;
-            setGroupFocusByStudent(getStudentById(studentId));
-        });
-
         if (window.matchMedia) {
             const mediaQueryList = window.matchMedia('print');
             const handleMediaChange = function (mql) {
@@ -4053,10 +4105,12 @@ function isWholeWordMatch(label, keyword) {
                     } else {
                         groupModeSelectedIds.add(studentId);
                         seat.classList.add('group-selected');
+                        // 选中学生 ⇒ 退出分组查看态,焦点留在多选高亮上
+                        dropGroupFocusIfViewing();
                     }
+                    // 统计栏展示「当前学生」(最后点击的那位)
+                    groupCurrentStudentId = studentId;
                     updateGroupModeCount();
-                    // 点击学生 ⇒ 高亮其当前所属分组(未入组则取消聚焦)
-                    setGroupFocusByStudent(getStudentById(studentId));
                 }
                 return;
             }
@@ -4474,6 +4528,11 @@ function isWholeWordMatch(label, keyword) {
                             list = students.filter(function (s) { return s.groupId === fg.id; });
                         }
                     }
+                    break;
+                case 'groupSelected':
+                    // 分组模式下统计栏的「已选人数」⇒ 取当前多选中的学生(按名单顺序)
+                    title = '已选学生';
+                    list = students.filter(function (s) { return groupModeSelectedIds.has(s.id); });
                     break;
             }
             return { statId: statId, title: title, students: list };

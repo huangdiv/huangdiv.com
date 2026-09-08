@@ -430,10 +430,14 @@ h1:focus {
     transform: none;
 }
 
-/* 分组名 / 目标组名可能较长 ⇒ 缩小字号并省略号截断 */
-.group-stat-text {
-    font-size: 16px;
-    max-width: 108px;
+/* 与其他模式风格统一:三项等宽均分、字号沿用 .stat-num(22px),长文本省略号 */
+.group-stats .stat-block {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+}
+
+.group-stats .stat-num {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

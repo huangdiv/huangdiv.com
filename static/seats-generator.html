@@ -84,18 +84,18 @@
                     </button>
                 </div>
                 <div class="stats-row group-stats" id="groupStatsRow" style="display:none;">
-                    <div class="stat-block stat-block-static" id="groupStatNameBlock">
-                        <div class="stat-num group-stat-text" id="groupStatNameVal">未选择</div>
-                        <div class="stat-label">当前分组</div>
-                    </div>
-                    <button type="button" class="stat-block" data-stat="groupMembers" aria-label="分组人数，点击复制姓名或下载 Excel" title="点击：复制姓名 / 下载 Excel">
-                        <div class="stat-num" id="groupMemberCount">0</div>
-                        <div class="stat-label">分组人数</div>
+                    <button type="button" class="stat-block stat-block-static" id="groupStatSlot1" tabindex="-1">
+                        <div class="stat-num" id="groupStatVal1">未选择</div>
+                        <div class="stat-label" id="groupStatLabel1">当前分组</div>
                     </button>
-                    <div class="stat-block stat-block-static" id="groupStatNextBlock">
-                        <div class="stat-num group-stat-text" id="groupStatNextVal">—</div>
-                        <div class="stat-label">即将轮换到</div>
-                    </div>
+                    <button type="button" class="stat-block stat-block-static" id="groupStatSlot2" tabindex="-1">
+                        <div class="stat-num" id="groupStatVal2">0</div>
+                        <div class="stat-label" id="groupStatLabel2">分组人数</div>
+                    </button>
+                    <button type="button" class="stat-block stat-block-static" id="groupStatSlot3" tabindex="-1">
+                        <div class="stat-num" id="groupStatVal3">—</div>
+                        <div class="stat-label" id="groupStatLabel3">即将轮换到</div>
+                    </button>
                 </div>
                 <div class="checkin-mini" id="checkinMini">
                     <div class="checkin-mini-label">
