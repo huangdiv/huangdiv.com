@@ -413,6 +413,32 @@ h1:focus {
     margin-top: 2px;
 }
 
+/* 分组模式统计行:当前分组 / 分组人数(可点) / 即将轮换到 */
+.group-stats .stat-block-static {
+    cursor: default;
+}
+
+.group-stats .stat-block-static:hover {
+    background: transparent;
+}
+
+.group-stats .stat-block-static:hover .stat-num {
+    color: var(--text-primary);
+}
+
+.group-stats .stat-block-static:active {
+    transform: none;
+}
+
+/* 分组名 / 目标组名可能较长 ⇒ 缩小字号并省略号截断 */
+.group-stat-text {
+    font-size: 16px;
+    max-width: 108px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .checkin-stats #checkedInCount {
     color: var(--success);
 }
@@ -1836,6 +1862,27 @@ h1:focus {
     outline: 3px solid #2e7d32;
     outline-offset: -3px;
     box-shadow: 0 0 0 2px #a5d6a7 inset;
+}
+
+/* 分组模式聚焦某分组时:该组成员高亮(座位表 + 未入座名单) */
+.seat.group-highlight {
+    outline: 3px solid #f57c00;
+    outline-offset: -3px;
+    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.35);
+    z-index: 1;
+}
+
+.student-item.group-highlight {
+    outline: 2px solid #f57c00;
+    outline-offset: -2px;
+    box-shadow: 0 0 0 3px rgba(245, 124, 0, 0.28);
+}
+
+/* banner 内被聚焦(查看中)的分组按钮 */
+.group-mode-group-btn.active {
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.6), 0 2px 6px rgba(0, 0, 0, 0.22);
+    font-weight: 700;
+    text-decoration: underline;
 }
 
 /* 下拉菜单项激活态(签到 / 分组模式高亮) */

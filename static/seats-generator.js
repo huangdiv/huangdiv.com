@@ -40,6 +40,7 @@ let isTeacherView = state.viewMode === 'teacher';
 let isCheckinMode = state.isCheckinMode;
 let isGroupMode = state.isGroupMode;   // 分组模式:座位表多选学生 → 批量分配到分组
 const groupModeSelectedIds = new Set();  // 分组模式:当前选中的学生 id 集合(座位表多选)
+let groupFocusId = null;               // 分组模式:当前聚焦查看的分组 id(高亮成员 + 统计栏展示)
 let groupRotateOffset = 1;             // 分组轮换步长(默认 +1:轮换到下一组)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
@@ -581,6 +582,7 @@ function normalizeRotateOffset(value) {
                 autoSave();
             }
             updateRotateOffsetBadge();
+            if (isGroupMode) updateGroupStatsRow();
         }
 
         // 分组列表事件委托
@@ -1572,6 +1574,8 @@ function normalizeRotateOffset(value) {
                 input.value = v;
                 updateRotateOffsetBadge();
                 renderPreview();
+                // 分组模式下统计栏的「即将轮换到」跟着步长实时变化
+                if (isGroupMode) updateGroupStatsRow();
                 autoSave();
             });
 
@@ -2233,6 +2237,9 @@ function isWholeWordMatch(label, keyword) {
             classroom.classList.remove('group-mode');
             groupModeSelectedIds.clear();
             clearGroupModeSelection();
+            groupFocusId = null;
+            applyGroupFocusHighlight();
+            setStatsRowMode('normal');
             updateModeSwitchButton();
         }
 
@@ -2259,12 +2266,10 @@ function isWholeWordMatch(label, keyword) {
             updateModeSwitchButton();
             if (isCheckinMode) {
                 classroom.classList.add('checkin-mode');
-                document.getElementById('normalStatsRow').style.display = 'none';
-                document.getElementById('checkinStatsRow').style.display = 'flex';
+                setStatsRowMode('checkin');
             } else {
                 classroom.classList.remove('checkin-mode');
-                document.getElementById('normalStatsRow').style.display = 'flex';
-                document.getElementById('checkinStatsRow').style.display = 'none';
+                setStatsRowMode('normal');
             }
             generateSeats();
             updateCheckinStats();
@@ -2281,8 +2286,7 @@ function isWholeWordMatch(label, keyword) {
                 state.isCheckinMode = false;
                 commit({ isCheckinMode: false });
                 classroom.classList.remove('checkin-mode');
-                document.getElementById('normalStatsRow').style.display = 'flex';
-                document.getElementById('checkinStatsRow').style.display = 'none';
+                setStatsRowMode('normal');
                 updateCheckinStats();
             }
             isGroupMode = !isGroupMode;
@@ -2291,10 +2295,14 @@ function isWholeWordMatch(label, keyword) {
             updateModeSwitchButton();
             if (isGroupMode) {
                 classroom.classList.add('group-mode');
+                setStatsRowMode('group');
             } else {
                 classroom.classList.remove('group-mode');
                 groupModeSelectedIds.clear();
                 clearGroupModeSelection();
+                groupFocusId = null;
+                applyGroupFocusHighlight();
+                setStatsRowMode('normal');
             }
             generateSeats();
             // 分组 banner 由 generateSeats 重建,内容需在重建后回填
@@ -2321,9 +2329,10 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
             list.innerHTML = groups.map(function (g) {
-                return '<button type="button" class="group-mode-group-btn" data-group-id="' +
-                    escapeHtml(g.id) + '" title="点击：把选中的学生分配到「' +
-                    escapeHtml(g.name) + '」；长按：删除该分组"' +
+                return '<button type="button" class="group-mode-group-btn' +
+                    (g.id === groupFocusId ? ' active' : '') + '" data-group-id="' +
+                    escapeHtml(g.id) + '" title="未选学生时点击：查看「' +
+                    escapeHtml(g.name) + '」成员；选中学生后点击：分配到该组；长按：删除该分组"' +
                     (g.color ? ' style="background:' + escapeHtml(g.color) + '"' : '') + '>' +
                     escapeHtml(g.name) + '</button>';
             }).join('');
@@ -2367,6 +2376,109 @@ function isWholeWordMatch(label, keyword) {
             if (!isGroupMode) return;
             renderGroupModeList();
             updateGroupModeCount();
+            // 座位表重建会抹掉自定义 class ⇒ 每次渲染出口重新贴高亮
+            applyGroupFocusHighlight();
+            updateGroupStatsRow();
+        }
+
+        // 切换统计栏:普通 / 签到 / 分组 三选一可见
+        function setStatsRowMode(mode) {
+            const ns = document.getElementById('normalStatsRow');
+            const cs = document.getElementById('checkinStatsRow');
+            const gs = document.getElementById('groupStatsRow');
+            if (ns) ns.style.display = mode === 'normal' ? 'flex' : 'none';
+            if (cs) cs.style.display = mode === 'checkin' ? 'flex' : 'none';
+            if (gs) gs.style.display = mode === 'group' ? 'flex' : 'none';
+        }
+
+        // 按当前轮换步长,算出 groupId 将轮换到的目标分组
+        function getGroupRotateTarget(groupId) {
+            if (!groups.length) return null;
+            if (groups.length === 1) return groups[0];
+            const idx = groups.findIndex(function (g) { return g.id === groupId; });
+            if (idx < 0) return null;
+            const step = normalizeRotateOffset(groupRotateOffset);
+            return groups[(idx + step) % groups.length];
+        }
+
+        // 分组模式统计栏:当前分组名 / 人数(可点菜单) / 即将轮换到的分组名
+        function updateGroupStatsRow() {
+            const nameEl = document.getElementById('groupStatNameVal');
+            const countEl = document.getElementById('groupMemberCount');
+            const nextEl = document.getElementById('groupStatNextVal');
+            if (!nameEl || !countEl || !nextEl) return;
+
+            const group = groupFocusId
+                ? groups.find(function (g) { return g.id === groupFocusId; })
+                : null;
+            if (!group) {
+                // 分组被删除 / 配置变更后聚焦项失效 ⇒ 顺手清掉,避免残留高亮
+                groupFocusId = null;
+                nameEl.textContent = '未选择';
+                nameEl.style.color = '';
+                nameEl.title = '点击 banner 中的分组按钮查看该组';
+                countEl.textContent = '0';
+                nextEl.textContent = '—';
+                nextEl.style.color = '';
+                nextEl.title = '';
+                return;
+            }
+
+            const members = students.filter(function (s) { return s.groupId === group.id; });
+            nameEl.textContent = group.name;
+            nameEl.style.color = group.color || '';
+            nameEl.title = group.name;
+            countEl.textContent = String(members.length);
+
+            const target = getGroupRotateTarget(group.id);
+            nextEl.textContent = target ? target.name : '—';
+            nextEl.style.color = target && target.color ? target.color : '';
+            nextEl.title = target ? ('+' + normalizeRotateOffset(groupRotateOffset) + ' → ' + target.name) : '';
+        }
+
+        // 高亮聚焦分组的成员:座位表 .seat + 未入座名单 .student-item
+        function applyGroupFocusHighlight() {
+            const idSet = new Set();
+            if (groupFocusId) {
+                students.forEach(function (s) {
+                    if (s.groupId === groupFocusId) idSet.add(s.id);
+                });
+            }
+            classroom.querySelectorAll('.seat').forEach(function (seat) {
+                const sid = seat.getAttribute('data-student');
+                seat.classList.toggle('group-highlight', !!(sid && idSet.has(sid)));
+            });
+            studentList.querySelectorAll('.student-item').forEach(function (item) {
+                const sid = item.getAttribute('data-student');
+                item.classList.toggle('group-highlight', !!(sid && idSet.has(sid)));
+            });
+        }
+
+        // 聚焦某分组(未选中学生时点击分组按钮);再次点击同一分组 ⇒ 取消聚焦
+        function focusGroupMode(groupId) {
+            if (!isGroupMode) return;
+            groupFocusId = (groupFocusId === groupId) ? null : groupId;
+            applyGroupFocusHighlight();
+            renderGroupModeList();
+            updateGroupStatsRow();
+        }
+
+        function clearGroupFocus() {
+            groupFocusId = null;
+            applyGroupFocusHighlight();
+            renderGroupModeList();
+            updateGroupStatsRow();
+        }
+
+        // 点击学生 ⇒ 高亮其所属分组;该生未入组 ⇒ 取消聚焦
+        function setGroupFocusByStudent(student) {
+            if (!student) return;
+            const inGroup = student.groupId
+                && groups.some(function (g) { return g.id === student.groupId; });
+            groupFocusId = inGroup ? student.groupId : null;
+            applyGroupFocusHighlight();
+            renderGroupModeList();
+            updateGroupStatsRow();
         }
 
         // 切换学生签到状态
@@ -2391,6 +2503,7 @@ function isWholeWordMatch(label, keyword) {
 
             if (unassigned.length === 0) {
                 studentList.innerHTML = '<p style="margin:0;font-size:13px;color:var(--text-muted);text-align:center;padding:20px 0;">所有学生已安排座位</p>';
+                if (isGroupMode) applyGroupFocusHighlight();
                 updateStatistics();
                 updateCheckinStats();
                 return;
@@ -2430,6 +2543,8 @@ function isWholeWordMatch(label, keyword) {
                 studentList.appendChild(studentItem);
             });
 
+            // 名单整体重建 ⇒ 重新贴上聚焦分组的高亮
+            if (isGroupMode) applyGroupFocusHighlight();
             updateStatistics();
             updateCheckinStats();
         }
@@ -3520,12 +3635,12 @@ function isWholeWordMatch(label, keyword) {
             // 恢复模式 UI(签到 / 分组互斥,分组优先)
             if (isGroupMode) {
                 classroom.classList.add('group-mode');
+                setStatsRowMode('group');
             } else if (isCheckinMode) {
                 classroom.classList.add('checkin-mode');
-                const ns = document.getElementById('normalStatsRow');
-                const cs = document.getElementById('checkinStatsRow');
-                if (ns) ns.style.display = 'none';
-                if (cs) cs.style.display = 'flex';
+                setStatsRowMode('checkin');
+            } else {
+                setStatsRowMode('normal');
             }
             updateModeSwitchButton();
             updateRotateOffsetBadge();
@@ -3535,6 +3650,7 @@ function isWholeWordMatch(label, keyword) {
             if (isGroupMode) {
                 renderGroupModeList();
                 updateGroupModeCount();
+                updateGroupStatsRow();
             }
             isInitialized = true;
         }
@@ -3778,6 +3894,16 @@ function isWholeWordMatch(label, keyword) {
             }
         });
 
+        // 分组模式:点击未入座名单中的学生 ⇒ 高亮其当前所属分组(触摸/鼠标皆走 click)
+        studentList.addEventListener('click', function (e) {
+            if (!isGroupMode) return;
+            const item = e.target.closest('.student-item');
+            if (!item) return;
+            const studentId = item.getAttribute('data-student');
+            if (!studentId) return;
+            setGroupFocusByStudent(getStudentById(studentId));
+        });
+
         if (window.matchMedia) {
             const mediaQueryList = window.matchMedia('print');
             const handleMediaChange = function (mql) {
@@ -3929,6 +4055,8 @@ function isWholeWordMatch(label, keyword) {
                         seat.classList.add('group-selected');
                     }
                     updateGroupModeCount();
+                    // 点击学生 ⇒ 高亮其当前所属分组(未入组则取消聚焦)
+                    setGroupFocusByStudent(getStudentById(studentId));
                 }
                 return;
             }
@@ -4112,7 +4240,8 @@ function isWholeWordMatch(label, keyword) {
                 const groupId = gBtn.getAttribute('data-group-id');
                 if (!groupId) return;
                 if (groupModeSelectedIds.size === 0) {
-                    alert(MESSAGES.GROUP_MODE_NO_SELECTION || '请先在座位表中点击选择学生');
+                    // 未选中任何学生 ⇒ 查看该分组:高亮其成员 + 统计栏展示(再点一次取消)
+                    focusGroupMode(groupId);
                     return;
                 }
                 assignSelectedToGroup(groupId);
@@ -4160,6 +4289,7 @@ function isWholeWordMatch(label, keyword) {
                 if (s.groupId === groupId) s.groupId = null;
             });
             groups = groups.filter(function (g) { return g.id !== groupId; });
+            if (groupFocusId === groupId) groupFocusId = null;
             commit({ students: students, groups: groups });
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
@@ -4334,6 +4464,16 @@ function isWholeWordMatch(label, keyword) {
                     break;
                 case 'notCheckedInCount':
                     list = assignedStudentsArr.filter(function (s) { return !s.checkedIn; });
+                    break;
+                case 'groupMembers':
+                    // 分组模式下统计栏的「分组人数」⇒ 取当前聚焦分组的成员
+                    if (groupFocusId) {
+                        const fg = groups.find(function (g) { return g.id === groupFocusId; });
+                        if (fg) {
+                            title = fg.name;
+                            list = students.filter(function (s) { return s.groupId === fg.id; });
+                        }
+                    }
                     break;
             }
             return { statId: statId, title: title, students: list };
