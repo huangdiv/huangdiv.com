@@ -76,6 +76,209 @@ export function createRandomArrange(deps) {
         return 'X'; // unknown / wildcard
     }
 
+    // ─────────── 配对设置:满足情况检测 + 修复(随机排座 / 分组轮换共用)───────────
+
+    // 回避配对查重器:一次性把 avoidPairs 建成 Set(key 为排序后的 "idA|idB"),O(1) 查询
+    function makeAvoidChecker() {
+        var set = new Set();
+        state.avoidPairs.forEach(function (p) {
+            if (!p || p.length < 2) return;
+            set.add(p[0] < p[1] ? p[0] + '|' + p[1] : p[1] + '|' + p[0]);
+        });
+        return function isAvoided(idA, idB) {
+            if (set.size === 0) return false;
+            return set.has(idA < idB ? idA + '|' + idB : idB + '|' + idA);
+        };
+    }
+
+    // studentId → seatIdx 映射
+    function buildSeatOf() {
+        var seatOf = Object.create(null);
+        for (var i = 0; i < state.seats.length; i++) {
+            if (state.seats[i]) seatOf[state.seats[i]] = i;
+        }
+        return seatOf;
+    }
+
+    // 当前座位的配对违规情况(任一学生未入座的配对不参与判定)
+    function computePairViolations(pairMap) {
+        var seatOf = buildSeatOf();
+        var forcedBroken = [];
+        var avoidBroken = [];
+        state.forcedPairs.forEach(function (p) {
+            if (!p || p.length < 2) return;
+            var a = seatOf[p[0]], b = seatOf[p[1]];
+            if (a === undefined || b === undefined) return;
+            if (findPairMate(a, pairMap) !== b) forcedBroken.push(p);
+        });
+        state.avoidPairs.forEach(function (p) {
+            if (!p || p.length < 2) return;
+            var a = seatOf[p[0]], b = seatOf[p[1]];
+            if (a === undefined || b === undefined) return;
+            if (findPairMate(a, pairMap) === b) avoidBroken.push(p);
+        });
+        return { forcedBroken: forcedBroken, avoidBroken: avoidBroken, seatOf: seatOf };
+    }
+
+    // 每条配对当前的满足状态,供 UI 着色:
+    //   'ok'  = 已满足(强制已同桌 / 回避已分开)
+    //   'bad' = 未满足(强制未同桌 / 回避仍同桌)
+    //   'na'  = 有人未入座,无法判定
+    function getPairStatus() {
+        var pm = getDeskMatePairs().pairMap;
+        var seatOf = buildSeatOf();
+        function statusOf(pair, kind) {
+            var a = seatOf[pair[0]], b = seatOf[pair[1]];
+            if (a === undefined || b === undefined) return 'na';
+            var together = findPairMate(a, pm) === b;
+            if (kind === 'forced') return together ? 'ok' : 'bad';
+            return together ? 'bad' : 'ok';
+        }
+        return {
+            forced: state.forcedPairs.map(function (p) {
+                return { ids: p, status: statusOf(p, 'forced') };
+            }),
+            avoid: state.avoidPairs.map(function (p) {
+                return { ids: p, status: statusOf(p, 'avoid') };
+            })
+        };
+    }
+
+    // 修复配对违规。只在「已占座」之间两两交换 ⇒ 占座总数、各区人数分布均不变。
+    // opts:
+    //   pairMap           同桌映射
+    //   maxAttempts       最大尝试次数
+    //   shuffle           洗牌函数
+    //   candidateSeatsOf  (seatIdx) => 允许换到的座位数组;不传 = 全部已占座
+    //                    (分组轮换时限定为「同区座位」,保证轮换后各区人数不变)
+    // 返回修复后的违规情况(仍可能非空 —— 由调用方决定是否提示)
+    function repairPairViolations(opts) {
+        var pairMap = opts.pairMap;
+        var maxAttempts = opts.maxAttempts || 200;
+        var shuffleFn = opts.shuffle || function (a) { return a; };
+        var candidateSeatsOf = opts.candidateSeatsOf || null;
+        var isAvoided = makeAvoidChecker();
+
+        function allOccupied() {
+            var out = [];
+            for (var i = 0; i < state.seats.length; i++) if (state.seats[i]) out.push(i);
+            return out;
+        }
+
+        // 交换 seatA / seatB 的占座者后,是否会产生新的回避同桌
+        function swapCreatesAvoid(seatA, seatB) {
+            var idA = state.seats[seatA], idB = state.seats[seatB];
+            if (!idA || !idB) return false;
+            var mateA = findPairMate(seatA, pairMap);
+            var mateB = findPairMate(seatB, pairMap);
+            if (mateA != null && state.seats[mateA] && state.seats[mateA] !== idA && state.seats[mateA] !== idB) {
+                if (isAvoided(idB, state.seats[mateA])) return true;
+            }
+            if (mateB != null && state.seats[mateB] && state.seats[mateB] !== idA && state.seats[mateB] !== idB) {
+                if (isAvoided(idA, state.seats[mateB])) return true;
+            }
+            return false;
+        }
+
+        function doSwap(seatA, seatB) {
+            var t = state.seats[seatA];
+            state.seats[seatA] = state.seats[seatB];
+            state.seats[seatB] = t;
+        }
+
+        // 已满足的强制配对里的人不能搬走(搬走就拆散了)
+        function lockedIds() {
+            var v = computePairViolations(pairMap);
+            var ids = new Set();
+            state.forcedPairs.forEach(function (p) {
+                if (!p || p.length < 2) return;
+                if (v.forcedBroken.indexOf(p) < 0) { ids.add(p[0]); ids.add(p[1]); }
+            });
+            return ids;
+        }
+
+        // 强制同桌:把其中一人换到另一人的同桌位上
+        function tryFixForced(pair, locked) {
+            var seatOf = buildSeatOf();
+            var sa = seatOf[pair[0]], sb = seatOf[pair[1]];
+            if (sa === undefined || sb === undefined) return false;
+            var target = findPairMate(sa, pairMap);
+            var mover = sb;
+            if (target === null || target === undefined) {
+                // a 是单座 ⇒ 反过来把 a 换到 b 的同桌位
+                target = findPairMate(sb, pairMap);
+                mover = sa;
+            }
+            if (target === null || target === undefined) return false;
+            var occupant = state.seats[target];
+            if (!occupant) return false;                       // 只与已占座交换
+            if (locked.has(occupant)) return false;
+            if (locked.has(state.seats[mover])) return false;
+            if (swapCreatesAvoid(target, mover)) return false;
+            doSwap(target, mover);
+            return true;
+        }
+
+        // 回避同桌:把其中一人换到别的座位(默认全区,轮换时仅同区)
+        function tryFixAvoid(pair, locked) {
+            var seatOf = buildSeatOf();
+            var sa = seatOf[pair[0]], sb = seatOf[pair[1]];
+            if (sa === undefined || sb === undefined) return false;
+            if (findPairMate(sa, pairMap) !== sb) return false;   // 已经不同桌了
+            var movers = [sa, sb];
+            for (var mi = 0; mi < movers.length; mi++) {
+                var from = movers[mi];
+                var partnerSeat = (from === sa) ? sb : sa;
+                if (locked.has(state.seats[from])) continue;
+                var pool = candidateSeatsOf ? candidateSeatsOf(from) : allOccupied();
+                var cands = shuffleFn(pool.slice());
+                for (var ci = 0; ci < cands.length; ci++) {
+                    var to = cands[ci];
+                    if (to === from) continue;
+                    var other = state.seats[to];
+                    if (!other) continue;
+                    if (locked.has(other)) continue;
+                    if (swapCreatesAvoid(from, to)) continue;
+                    // 换过去之后不能又和对方同桌
+                    if (findPairMate(to, pairMap) === partnerSeat) continue;
+                    doSwap(from, to);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        var attempts = 0;
+        while (attempts < maxAttempts) {
+            var v = computePairViolations(pairMap);
+            if (v.forcedBroken.length === 0 && v.avoidBroken.length === 0) break;
+            var locked = lockedIds();
+            var queue = [];
+            v.forcedBroken.forEach(function (p) { queue.push({ type: 'forced', pair: p }); });
+            v.avoidBroken.forEach(function (p) { queue.push({ type: 'avoid', pair: p }); });
+            var progress = false;
+            for (var qi = 0; qi < queue.length && attempts < maxAttempts; qi++) {
+                var item = queue[qi];
+                // 前面的修复可能顺带解决了这条 ⇒ 逐条重新核对
+                var cur = computePairViolations(pairMap);
+                var still = item.type === 'forced'
+                    ? cur.forcedBroken.indexOf(item.pair) >= 0
+                    : cur.avoidBroken.indexOf(item.pair) >= 0;
+                if (!still) continue;
+                attempts++;
+                var ok = item.type === 'forced'
+                    ? tryFixForced(item.pair, locked)
+                    : tryFixAvoid(item.pair, locked);
+                if (ok) {
+                    progress = true;
+                    locked = lockedIds();
+                }
+            }
+            if (!progress) break;   // 一整轮都修不动 ⇒ 放弃,避免死循环
+        }
+        return computePairViolations(pairMap);
+    }
+
     // ─────────── 入口函数 ───────────
 
     function randomSeatArrange(mode, options) {
@@ -136,18 +339,8 @@ export function createRandomArrange(deps) {
         // 性能优化:一次性构建 Set 索引(key 为排序后的 "idA|idB"),O(1) 查询;
         // 后处理最多 200 次 × 每对座位一次 swapCreatesAvoidPair 检查,
         // 原线性 some() 在 100 人班 + 25 对回避配对时接近 1s,Set 后为常数级。
-        const avoidKeySet = new Set();
-        state.avoidPairs.forEach(function (p) {
-            if (!p || p.length < 2) return;
-            // key 规范化:两个 id 按字典序排序,保证 (A,B) 与 (B,A) 命中同一 key
-            const k = p[0] < p[1] ? p[0] + '|' + p[1] : p[1] + '|' + p[0];
-            avoidKeySet.add(k);
-        });
-        function isAvoided(idA, idB) {
-            if (avoidKeySet.size === 0) return false;
-            const k = idA < idB ? idA + '|' + idB : idB + '|' + idA;
-            return avoidKeySet.has(k);
-        }
+        // 共用 makeAvoidChecker()(与 repairPairViolations 同一套 key 规范化)
+        const isAvoided = makeAvoidChecker();
 
         // ==================== 第一步:处理强制配对 ====================
         const placedIds = new Set();
@@ -282,6 +475,14 @@ export function createRandomArrange(deps) {
             }
         } // end else (mixed / samegender)
 
+        // ==================== 配对修复 ====================
+        // 初始落座只保证了「强制配对尽量同桌」/「mixed·samegender 模式下的回避检查」,
+        // random 模式完全没查回避。这里统一补一次修复:尝试 maxAttempts 次把
+        // 强制/回避违规消掉;仍做不到就保留座位,由下面统一给提示。
+        // 放在「换位后处理」之前 —— 后处理本身有 guard(强制配对学生不参与交换、
+        // swapCreatesAvoidPair 防新增回避),不会把这里修好的结果又破坏掉。
+        repairPairViolations({ pairMap: pairMap, maxAttempts: maxAttempts, shuffle: shuffle });
+
         // ==================== 后处理:确保每位学生都不在原来的座位 ====================
         // 收集哪些座位属于强制配对学生(不能被交换破坏)
         var forcedPairStudentIds = new Set();
@@ -397,6 +598,12 @@ export function createRandomArrange(deps) {
         if (placedCount < state.students.length) {
             warnings.push(MESSAGES.RANDOM_WARNING_NOT_SEATED(state.students.length - placedCount));
         }
+        // 配对设置最终仍未满足 ⇒ 保留座位并提示(先安排、后提示)
+        var finalPair = computePairViolations(pairMap);
+        if (finalPair.forcedBroken.length > 0 || finalPair.avoidBroken.length > 0) {
+            warnings.push(MESSAGES.PAIR_UNSATISFIED(
+                finalPair.forcedBroken.length, finalPair.avoidBroken.length));
+        }
         return { warnings: warnings };
     }
 
@@ -495,6 +702,15 @@ export function createRandomArrange(deps) {
             freeSeats[d] = freeSeats[d].slice(m);
         }
 
+        // ── 溢出快照(必须在 B1/B2 消费 pending 之前取)──
+        // 源组人数 > 目标组座位数时,随机多出来、没能轮换的这批学生,
+        // 之后要改归「即将轮换到本组座位的上游组」= (s - offset + n) % n ——
+        // 也就是占了他们原来座位的那个组(落单学生跟着那个组走)。
+        var overflowBySrc = [];
+        for (var ov = 0; ov < n; ov++) {
+            overflowBySrc.push(pending[ov].slice());
+        }
+
         // ── 阶段 B1:leftover 优先回到自己组的空余座位 ──
         for (var b1 = 0; b1 < n; b1++) {
             var mb = Math.min(pending[b1].length, freeSeats[b1].length);
@@ -545,6 +761,61 @@ export function createRandomArrange(deps) {
         }
         if (dup > 0) warnings.push('出现重复占座(' + dup + '处)');
 
+        // ── 溢出学生改归上游组 ──
+        // 这些学生没挤进目标组的座位,而自己原来的座位区已被上游组占据,
+        // 因此让他们「跟着占了其座位的上游组走」,保持分组与所在座位区一致。
+        var reassignTotal = 0;
+        var fromNames = [];
+        var toNames = [];
+        for (var rs = 0; rs < n; rs++) {
+            var oList = overflowBySrc[rs];
+            if (!oList || oList.length === 0) continue;
+            var upIdx = (rs - offset + n) % n;
+            var upGroup = state.groups[upIdx];
+            var srcGroup = state.groups[rs];
+            if (!upGroup) continue;
+            (function (gid) {
+                oList.forEach(function (sid) {
+                    var stu = state.students.find(function (x) { return x.id === sid; });
+                    if (stu) stu.groupId = gid;
+                });
+            })(upGroup.id);
+            reassignTotal += oList.length;
+            if (srcGroup && fromNames.indexOf(srcGroup.name) < 0) fromNames.push(srcGroup.name);
+            if (toNames.indexOf(upGroup.name) < 0) toNames.push(upGroup.name);
+        }
+        if (reassignTotal > 0) {
+            warnings.push(MESSAGES.ROTATE_OVERFLOW_REGROUP(
+                reassignTotal,
+                fromNames.join('、'),
+                toNames.join('、')
+            ));
+            commit({ students: state.students });
+        }
+
+        // ── 配对修复(仅限同区换座)──
+        // 轮换的语义是「谁坐进哪个组的座位区」,区内具体坐哪把椅子不影响轮换结果。
+        // 因此把换座范围限定在同区,既修好配对,又保持各区人数分布与轮换语义不变。
+        var seatArea = new Array(state.seats.length).fill(-1);
+        for (var ai2 = 0; ai2 < n; ai2++) {
+            (function (area) {
+                pool[area].forEach(function (idx) { seatArea[idx] = area; });
+            })(ai2);
+        }
+        var finalPairRot = repairPairViolations({
+            pairMap: getDeskMatePairs().pairMap,
+            maxAttempts: 200,
+            shuffle: shuffle,
+            candidateSeatsOf: function (from) {
+                var a = seatArea[from];
+                return a >= 0 ? pool[a] : [];
+            }
+        });
+        if (finalPairRot.forcedBroken.length > 0 || finalPairRot.avoidBroken.length > 0) {
+            warnings.push(MESSAGES.PAIR_UNSATISFIED(
+                finalPairRot.forcedBroken.length, finalPairRot.avoidBroken.length));
+        }
+
         commit({ seats: state.seats });
         onGenerateSeats();
         return { warnings: warnings, moved: moved };
@@ -553,6 +824,9 @@ export function createRandomArrange(deps) {
     return {
         randomSeatArrange,
         rotateGroupSeats,
+        // 配对设置:满足情况检测(供 UI 着色)与修复
+        getPairStatus,
+        computePairViolations,
         // 导出 helper 供单元测试使用(#16 批次)
         getDeskMatePairs,
         findPairMate,

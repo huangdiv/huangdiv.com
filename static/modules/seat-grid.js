@@ -44,7 +44,8 @@ export function createSeatGrid(deps) {
         onPushSnapshot,
         onGenerateStudentList,
         onAutoSave,
-        onRenderGroupBannerContent
+        onRenderGroupBannerContent,
+        onAfterSeatsRender
     } = callbacks;
 
     // ─────────── 持久化缓存(persistent 节点 + 上次渲染快照) ───────────
@@ -90,6 +91,10 @@ export function createSeatGrid(deps) {
         updateStatistics();
         updateCheckinStats();
         onAutoSave();
+        // 通用渲染出口回调:座位变了 ⇒ 依赖座位的派生 UI(如配对满足情况)自行刷新
+        if (typeof onAfterSeatsRender === 'function') {
+            try { onAfterSeatsRender(); } catch (e) { console.error('[seat-grid] onAfterSeatsRender', e); }
+        }
     }
 
     // ─────────── 结构键:决定是否需要全量重建 DOM ───────────
@@ -272,6 +277,8 @@ export function createSeatGrid(deps) {
                 '<span class="mode-banner-icon">👥</span>' +
                 '<span class="group-banner-tip">分组模式 — 点击座位多选学生,再点分组按钮分配</span>' +
                 '<span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>' +
+                '<button class="mode-banner-btn group-mode-clear-btn" id="groupModeClearBtn"' +
+                    ' style="display:none;" title="取消当前已选中的全部学生">取消选择</button>' +
                 '<button class="mode-banner-btn" id="groupModeNewBtn">＋新建分组并分配</button>' +
                 '<button class="mode-banner-close" id="groupModeExitBtn">×</button>' +
             '</div>' +

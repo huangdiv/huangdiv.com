@@ -1122,6 +1122,20 @@ h1:focus {
     flex: none;
 }
 
+/* 「取消选择」——仅在已有多选时出现,用描边样式与「新建分组」区分 */
+.group-banner .group-mode-clear-btn {
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.12);
+    white-space: nowrap;
+    flex: none;
+}
+
+.group-banner .group-mode-clear-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: #fff;
+}
+
 .group-banner .group-mode-list {
     flex: 1 1 auto;
     min-width: 0;
@@ -3063,6 +3077,49 @@ button:disabled {
     font-size: 11px;
     color: #94a3b8;
     padding: 4px 0;
+}
+
+/* ==================== 配对设置:满足情况底色 ====================
+   每次座位变化(拖拽 / 随机排座 / 分组轮换 / 撤销)都会重算并刷新:
+     ok  已满足 —— 强制已同桌 / 回避已分开
+     bad 未满足 —— 强制未同桌 / 回避仍同桌
+     na  有人未入座,暂无法判定
+   颜色 + 圆点双重编码,便于色弱用户区分。 */
+.pair-item {
+    gap: 5px;
+    border: 1px solid transparent;
+}
+
+.pair-item .pair-item-dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.pair-status-ok {
+    background: #e8f6ee;
+    border-color: #a7dfc0;
+    color: #1f7a4d;
+}
+
+.pair-status-bad {
+    background: #fdeceb;
+    border-color: #f5b7b1;
+    color: #c0392b;
+}
+
+.pair-status-na {
+    background: #f1f5f9;
+    border-color: #dbe2ea;
+    color: #7b8794;
+}
+
+.pair-status-ok .pair-item-names,
+.pair-status-bad .pair-item-names,
+.pair-status-na .pair-item-names {
+    color: var(--text-primary);
 }
 
 /* ==================== 打印样式 ==================== */

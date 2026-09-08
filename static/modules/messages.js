@@ -105,5 +105,16 @@ export const MESSAGES = {
         `确定要将各分组轮换到往下第 ${offset} 组吗？(共 ${n} 个分组)`,
     ROTATE_DONE: (offset, moved) =>
         `分组轮换完成(步长 +${offset},移动 ${moved} 人)`,
-    ROTATE_BAD_OFFSET: (n) => `轮换步长需为 1 ~ ${n - 1} 之间的整数`
+    ROTATE_BAD_OFFSET: (n) => `轮换步长需为 1 ~ ${n - 1} 之间的整数`,
+    // 轮换溢出:源组人数 > 目标组座位数,多出来的人改归「占了其原座位的上游组」
+    ROTATE_OVERFLOW_REGROUP: (count, fromName, toName) =>
+        `${count} 名学生未能轮换(目标组座位不足),已自动改归「${toName}」(原「${fromName}」)`,
+
+    // —— 配对设置满足情况 ——
+    PAIR_UNSATISFIED: (forcedCount, avoidCount) => {
+        const parts = [];
+        if (forcedCount > 0) parts.push(`${forcedCount} 对强制同桌未能安排在一起`);
+        if (avoidCount > 0) parts.push(`${avoidCount} 对回避同桌未能分开`);
+        return `已安排座位,但配对设置未能完全满足:${parts.join('；')}`;
+    }
 };

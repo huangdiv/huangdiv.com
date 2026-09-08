@@ -1226,21 +1226,56 @@ function normalizeRotateOffset(value) {
             return idA < idB ? idA + '|' + idB : idB + '|' + idA;
         }
 
+        // 配对满足情况的文案(强制 / 回避两种语义不同)
+        function pairStatusTitle(type, status) {
+            if (status === 'na') return '当前满足情况:有人未入座,暂无法判定';
+            if (type === 'forced') {
+                return status === 'ok' ? '当前满足情况:已同桌 ✓' : '当前满足情况:未同桌 ✗';
+            }
+            return status === 'ok' ? '当前满足情况:已分开 ✓' : '当前满足情况:仍同桌 ✗';
+        }
+
         function renderPairList(container, pairArr, type) {
             if (pairArr.length === 0) {
                 container.innerHTML = '<div class="pair-empty">暂无' + (type === 'forced' ? '强制' : '回避') + '配对</div>';
                 return;
+            }
+            // 每条配对的实时满足状态(ok / bad / na)—— 座位一变就重新取
+            var statusList = null;
+            try {
+                var st = randomArrange.getPairStatus();
+                statusList = (type === 'forced' ? st.forced : st.avoid) || null;
+            } catch (e) {
+                statusList = null;
             }
             container.innerHTML = pairArr.map(function (pair, idx) {
                 var sA = students.find(function (s) { return s.id === pair[0]; });
                 var sB = students.find(function (s) { return s.id === pair[1]; });
                 var nameA = sA ? sA.name : '(已删除)';
                 var nameB = sB ? sB.name : '(已删除)';
-                return '<div class="pair-item">' +
+                var status = (statusList && statusList.length === pairArr.length && statusList[idx])
+                    ? statusList[idx].status
+                    : 'na';
+                return '<div class="pair-item pair-status-' + status + '"' +
+                        ' title="' + escapeHtml(pairStatusTitle(type, status)) + '">' +
+                    '<span class="pair-item-dot" aria-hidden="true"></span>' +
                     '<span class="pair-item-names">' + escapeHtml(nameA) + ' ↔ ' + escapeHtml(nameB) + '</span>' +
                     '<button class="pair-item-remove" data-pair-type="' + type + '" data-pair-idx="' + idx + '" title="删除">×</button>' +
                 '</div>';
             }).join('');
+        }
+
+        // 座位发生变化(手动拖拽 / 随机排座 / 分组轮换 / 撤销 等)后,
+        // 若配对设置弹窗正开着,就按新座位刷新每条配对的底色。
+        function refreshPairPopupStatus() {
+            if (!activePairPopup || !activePairPopup.popupEl) return;
+            var popup = activePairPopup.popupEl;
+            // 轮换设置弹窗复用 .pair-popup 外壳但没有配对列表 ⇒ 跳过
+            var fList = popup.querySelector('.pair-forced-list');
+            var aList = popup.querySelector('.pair-avoid-list');
+            if (!fList || !aList) return;
+            renderPairList(fList, forcedPairs, 'forced');
+            renderPairList(aList, avoidPairs, 'avoid');
         }
 
         function openPairPopup(anchorEl) {
@@ -2220,7 +2255,9 @@ function isWholeWordMatch(label, keyword) {
                 onGenerateStudentList: generateStudentList,
                 onAutoSave: autoSave,
                 // 分组 banner 每次全量重建后回填内容(视角切换 / 行列变更 / 走道变更等)
-                onRenderGroupBannerContent: renderGroupBannerContent
+                onRenderGroupBannerContent: renderGroupBannerContent,
+                // 座位渲染出口:刷新配对设置弹窗里各配对的满足状态底色
+                onAfterSeatsRender: refreshPairPopupStatus
             }
         });
         // 顶层别名 — 保留主 IIFE 内既有调用点零修改
@@ -2374,8 +2411,36 @@ function isWholeWordMatch(label, keyword) {
             if (el) {
                 el.textContent = '已选 ' + groupModeSelectedIds.size + ' 名学生';
             }
+            // 「取消选择」仅在已有多选时出现
+            const clearBtn = document.getElementById('groupModeClearBtn');
+            if (clearBtn) {
+                clearBtn.style.display = groupModeSelectedIds.size > 0 ? '' : 'none';
+            }
+            // 普通模式下一旦有多选,统计栏要切到三槽的「多选视图」
+            updateStatsRowVisibility();
             // 选中人数变化 ⇒ 统计栏在多选视图 / 分组视图之间切换
             updateGroupStatsRow();
+        }
+
+        // 统计行可见性(四选一):签到 > 分组 > 普通模式多选 > 普通
+        // 普通模式多选时复用分组那套三槽行(当前学生 / 所属分组 / 已选人数)。
+        function updateStatsRowVisibility() {
+            if (isCheckinMode) { setStatsRowMode('checkin'); return; }
+            if (isGroupMode) { setStatsRowMode('group'); return; }
+            if (groupModeSelectedIds.size > 0) { setStatsRowMode('group'); return; }
+            setStatsRowMode('normal');
+        }
+
+        // 一键取消当前多选(分组 banner「取消选择」按钮 / 普通模式点空白区域)
+        function clearMultiSelection(options) {
+            options = options || {};
+            if (groupModeSelectedIds.size === 0) return false;
+            groupModeSelectedIds.clear();
+            clearGroupModeSelection();      // 内部会再调 updateGroupModeCount → 刷新统计栏
+            if (options.toast !== false && typeof showStatToast === 'function') {
+                showStatToast('已取消选择');
+            }
+            return true;
         }
 
         // 分组 banner 的壳子由 seat-grid 在每次全量重建时重新生成(节点全新),
@@ -4115,6 +4180,28 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
 
+            // 普通模式:点击座位多选学生(与分组模式同一套选中态 + 统计栏三槽视图)。
+            // 仅非触屏生效 —— 触屏的「点选 → 点目标位置移动」交互要保持原样。
+            if (!isGroupMode && !isCheckinMode && !isTouchDevice && seat) {
+                const studentId = seat.getAttribute('data-student');
+                if (studentId) {
+                    if (groupModeSelectedIds.has(studentId)) {
+                        groupModeSelectedIds.delete(studentId);
+                        seat.classList.remove('group-selected');
+                    } else {
+                        groupModeSelectedIds.add(studentId);
+                        seat.classList.add('group-selected');
+                    }
+                    // 统计栏展示「当前学生」(最后点击的那位)
+                    groupCurrentStudentId = studentId;
+                    updateGroupModeCount();
+                    return;
+                }
+                // 空白座位 = 空白区域 ⇒ 一键取消选择
+                if (groupModeSelectedIds.size > 0) clearMultiSelection({ toast: false });
+                return;
+            }
+
             if (!isTouchDevice) return;
             if (!seat) return;
 
@@ -4284,6 +4371,11 @@ function isWholeWordMatch(label, keyword) {
                 createGroupAndAssign();
                 return;
             }
+            if (e.target.closest('#groupModeClearBtn')) {
+                // 一键清空已有选择(不清分组查看态,仅退多选)
+                clearMultiSelection();
+                return;
+            }
             const gBtn = e.target.closest('.group-mode-group-btn');
             if (gBtn) {
                 // 长按删除已在 pointerup 前触发 ⇒ 抑制这次 click,避免「删完又分配」
@@ -4301,6 +4393,18 @@ function isWholeWordMatch(label, keyword) {
                 assignSelectedToGroup(groupId);
                 return;
             }
+        });
+
+        // 普通模式多选:点击空白区域(座位表空白处 / 面板 / 页面其他位置)自动取消选择。
+        // 座位本身由上面的 classroom 委托处理(选中/取消/空白座位),这里跳过,避免刚选中就被清掉。
+        document.addEventListener('click', function (e) {
+            if (isGroupMode || isCheckinMode || isTouchDevice) return;
+            if (groupModeSelectedIds.size === 0) return;
+            if (e.target.closest('.seat')) return;                  // 座位走上面的分支
+            if (e.target.closest('#groupStatsRow')) return;          // 点「已选人数」弹菜单
+            if (e.target.closest('.stat-action-menu')) return;       // 菜单本身
+            if (e.target.closest('.pair-popup')) return;             // 配对设置弹窗内操作
+            clearMultiSelection({ toast: false });
         });
 
         // ── 分组按钮长按删除(鼠标 + 触摸) ────────────────────────────────

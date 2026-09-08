@@ -472,6 +472,53 @@ group('G. forcedPair — 强制配对必同桌', () => {
 });
 
 // =====================================================================
+// 套件 H:配对修复 — 随机排座后必须满足配对设置,做不到则提示
+// =====================================================================
+group('H. 配对修复 — 满足则无提示,做不到则先安排后提示', () => {
+    function isDeskmate(mod, idA, idB) {
+        const { pairMap } = mod.getDeskMatePairs();
+        const a = state.seats.indexOf(idA);
+        const b = state.seats.indexOf(idB);
+        if (a < 0 || b < 0) return null;
+        return pairMap[a] === b;
+    }
+
+    test('2 对互不相交的强制配对 + 1 对回避 ⇒ 全部满足,无配对提示', () => {
+        const students = makeStudents(12, 6);
+        resetState({ rows: 4, cols: 6, students });
+        state.forcedPairs = [['s001', 's002'], ['s003', 's004']];
+        state.avoidPairs = [['s005', 's006']];
+        globalThis.__confirmAnswer__ = true;
+        const { mod } = makeModule();
+        const r = mod.randomSeatArrange('random');
+        assert(isDeskmate(mod, 's001', 's002') === true, 's001/s002 应同桌');
+        assert(isDeskmate(mod, 's003', 's004') === true, 's003/s004 应同桌');
+        assert(isDeskmate(mod, 's005', 's006') === false, 's005/s006 应分开');
+        assert(!(r.warnings || []).some(w => /配对设置未能完全满足/.test(w)),
+            `不应出现配对未满足提示,实际 ${JSON.stringify(r.warnings)}`);
+    });
+
+    test('不可能同时满足的强制配对(s001 配 s002 又配 s003)⇒ 保留座位并提示', () => {
+        const students = makeStudents(12, 6);
+        resetState({ rows: 4, cols: 6, students });
+        // s001 只有 1 个同桌位,不可能同时与 s002、s003 同桌 ⇒ 必然剩 1 条未满足
+        state.forcedPairs = [['s001', 's002'], ['s001', 's003']];
+        state.avoidPairs = [];
+        globalThis.__confirmAnswer__ = true;
+        const { mod } = makeModule();
+        const r = mod.randomSeatArrange('random');
+        const ok12 = isDeskmate(mod, 's001', 's002');
+        const ok13 = isDeskmate(mod, 's001', 's003');
+        assert(ok12 === true || ok13 === true, '至少满足其中 1 对');
+        assert(!(ok12 === true && ok13 === true), '不可能两对同时满足');
+        assert((r.warnings || []).some(w => /配对设置未能完全满足/.test(w)),
+            `应给出配对未满足提示,实际 ${JSON.stringify(r.warnings)}`);
+        // 座位仍然排好了(所有人都入座)
+        assertEq(state.seats.filter(Boolean).length, 12, '12 人全部入座(先安排)');
+    });
+});
+
+// =====================================================================
 // 收尾
 // =====================================================================
 console.log('\n' + '='.repeat(60));

@@ -70,6 +70,16 @@ function assert(cond, msg) {
     if (!cond) throw new Error(msg || 'assertion failed');
 }
 
+// 「溢出改归上游组」是预期行为,会产出一条提示性 warning;
+// 数据完整性类(占座总数异常 / 重复占座 / 轮换中止)才是真错误 —— 这里把它们分开。
+const OVERFLOW_WARN = /未能轮换/;
+function integrityWarnings(warnings) {
+    return (warnings || []).filter(function (w) { return !OVERFLOW_WARN.test(w); });
+}
+function overflowWarnings(warnings) {
+    return (warnings || []).filter(function (w) { return OVERFLOW_WARN.test(w); });
+}
+
 // --- 4. 工厂(确定性 shuffle)---
 function makeModule(seed = 42) {
     let s = seed >>> 0;
@@ -266,7 +276,8 @@ group('B. 人数不等 — 按较少一方轮换,剩余回到自己组', () => {
         const { mod } = makeModule();
         const r = mod.rotateGroupSeats(1);
 
-        assertEq(r.warnings, [], '无 warning');
+        assertEq(integrityWarnings(r.warnings), [], '无数据完整性 warning');
+        assertEq(overflowWarnings(r.warnings).length, 1, '1 条溢出改归提示');
         assertEq(placedCount(), 11, '占座总数不变(5+3+3)');
         assert(!hasDuplicate(), '无重复占座');
 
@@ -281,9 +292,10 @@ group('B. 人数不等 — 按较少一方轮换,剩余回到自己组', () => {
         assertEq(inRegion.g2, ['g1', 'g1', 'g1'], 'B 区坐 3 名 A 组学生');
         // C 区(3 座)全坐 B 组学生:m = min(3, 3) = 3
         assertEq(inRegion.g3, ['g2', 'g2', 'g2'], 'C 区坐 3 名 B 组学生');
-        // A 区(5 座):3 名 C 组 + 2 名未能轮换的 A 组
-        assertEq(inRegion.g1.filter(g => g === 'g3').length, 3, 'A 区含 3 名 C 组');
-        assertEq(inRegion.g1.filter(g => g === 'g1').length, 2, 'A 区含 2 名留在原区的 A 组');
+        // A 区(5 座):3 名 C 组轮换进来 + 2 名未能轮换的 A 组。
+        // 新规则:A 组溢出的 2 人改归「占了其原座位的上游组」= C 组 ⇒ A 区 5 人全为 C 组
+        assertEq(inRegion.g1.filter(g => g === 'g3').length, 5, 'A 区 5 人全为 C 组(3 轮换 + 2 溢出改归)');
+        assertEq(inRegion.g1.filter(g => g === 'g1').length, 0, 'A 区已无 A 组(溢出者已改归 C 组)');
     });
 
     test('A(2) B(6) C(2) offset=1 → A/C 区各 2 人换走,B 区 4 人留原区', () => {
@@ -291,7 +303,8 @@ group('B. 人数不等 — 按较少一方轮换,剩余回到自己组', () => {
         globalThis.__confirmAnswer__ = true;
         const { mod } = makeModule();
         const r = mod.rotateGroupSeats(1);
-        assertEq(r.warnings, [], '无 warning');
+        assertEq(integrityWarnings(r.warnings), [], '无数据完整性 warning');
+        assertEq(overflowWarnings(r.warnings).length, 1, '1 条溢出改归提示');
         assertEq(placedCount(), 10, '占座总数不变');
 
         const inRegion = { g1: [], g2: [], g3: [] };
@@ -304,9 +317,10 @@ group('B. 人数不等 — 按较少一方轮换,剩余回到自己组', () => {
         assertEq(inRegion.g1, ['g3', 'g3'], 'A 区坐 2 名 C 组');
         // C 区(2 座) ← B 组:m = min(6, 2) = 2
         assertEq(inRegion.g3, ['g2', 'g2'], 'C 区坐 2 名 B 组');
-        // B 区(6 座)= 2 名 A 组(m=min(2,6)=2)+ 4 名未能轮换的 B 组
-        assertEq(inRegion.g2.filter(g => g === 'g1').length, 2, 'B 区含 2 名 A 组');
-        assertEq(inRegion.g2.filter(g => g === 'g2').length, 4, 'B 区含 4 名留下的 B 组');
+        // B 区(6 座)= 2 名 A 组(m=min(2,6)=2)+ 4 名未能轮换的 B 组。
+        // 新规则:B 组溢出的 4 人改归上游组 = A 组 ⇒ B 区 6 人全为 A 组
+        assertEq(inRegion.g2.filter(g => g === 'g1').length, 6, 'B 区 6 人全为 A 组(2 轮换 + 4 溢出改归)');
+        assertEq(inRegion.g2.filter(g => g === 'g2').length, 0, 'B 区已无 B 组(溢出者已改归 A 组)');
     });
 
     test('极端:某组 0 人 → 其余组正常轮换,空组不产生错误', () => {
@@ -314,7 +328,9 @@ group('B. 人数不等 — 按较少一方轮换,剩余回到自己组', () => {
         globalThis.__confirmAnswer__ = true;
         const { mod } = makeModule();
         const r = mod.rotateGroupSeats(1);
-        assertEq(r.warnings, [], '无 warning');
+        // C 组 4 人挤不进 A 组(0 座)⇒ 全部溢出,改归上游组 B 组
+        assertEq(integrityWarnings(r.warnings), [], '无数据完整性 warning');
+        assertEq(overflowWarnings(r.warnings).length, 1, '1 条溢出改归提示');
         assertEq(placedCount(), 8, '占座总数不变');
         assert(!hasDuplicate(), '无重复占座');
         void scene;
@@ -515,7 +531,8 @@ group('G. 压力 — 随机规模 × 多 seed,占座总数与唯一性恒成立'
             globalThis.__confirmAnswer__ = true;
             const { mod } = makeModule(1000 + t);
             const r = mod.rotateGroupSeats(1 + rnd(gCount));
-            assertEq(r.warnings, [], `第 ${t} 轮不应有 warning:${r.warnings.join('/')}`);
+            assertEq(integrityWarnings(r.warnings), [],
+                `第 ${t} 轮不应有数据完整性 warning:${r.warnings.join('/')}`);
             assertEq(placedCount(), sum, `第 ${t} 轮占座总数应为 ${sum}`);
             assert(!hasDuplicate(), `第 ${t} 轮出现重复占座`);
         }
