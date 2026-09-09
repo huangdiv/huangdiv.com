@@ -2930,20 +2930,15 @@ function isWholeWordMatch(label, keyword) {
             // #5 批次:从 localStorage 读 maxAttempts 配置(配对设置弹窗可改,默认 200)
             const storedAttempts = parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10);
             const genderMode = smartArrangeMode();   // 'mixed' | 'samegender' | 'random'
-            // 小组轮换 + 性别规则同时开启:
-            //   顺序改为「先保证小组轮换,再做全班性别规则检测与调整」——
-            //   打底排座走完全随机,性别规则留到轮换之后由 rotateGroupSeats 内部
-            //   按「仅同组座位区内互换」的约束完成后处理。
-            const baseMode = (smartArrangeRotate && genderMode !== 'random') ? 'random' : genderMode;
-            // 开启小组轮换时,打底排座只是轮换的前置步骤 —— 不再弹「完全随机」确认,
-            // 只保留后面那条轮换确认,避免一次点击弹两次框。
-            const result = randomSeatArrange(baseMode, {
-                maxAttempts: storedAttempts,
-                skipConfirm: smartArrangeRotate
-            }) || {};
-            const warnings = (result.warnings || []).slice();
+            const warnings = [];
             let rotateMsg = '';
             if (smartArrangeRotate) {
+                // 开启「小组轮换」:**只做轮换**,不做全班随机排座。
+                //   全班座位保持原样(无分组学生原地不动),仅把各分组整体迁移到
+                //   往下第 N 组的座位区;随后按当前性别规则在**各组座位区内部**
+                //   做有限调整(由 rotateGroupSeats 的 options.genderMode 完成后处理),
+                //   绝不把学生挪到别的小组座位区域。
+                //   也因此全程只有一条轮换确认,不会有「完全随机」确认。
                 const rot = runGroupRotation({
                     genderMode: genderMode === 'random' ? null : genderMode
                 });
@@ -2951,6 +2946,11 @@ function isWholeWordMatch(label, keyword) {
                     warnings.push.apply(warnings, rot.warnings);
                 } else if (rot.moved > 0) {
                     rotateMsg = MESSAGES.ROTATE_DONE(groupRotateOffset, rot.moved);
+                }
+            } else {
+                const result = randomSeatArrange(genderMode, { maxAttempts: storedAttempts }) || {};
+                if (result.warnings && result.warnings.length > 0) {
+                    warnings.push.apply(warnings, result.warnings);
                 }
             }
             // 排座与轮换的提示合并为一条 toast,避免后一条盖掉前一条
