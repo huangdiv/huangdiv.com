@@ -2935,7 +2935,12 @@ function isWholeWordMatch(label, keyword) {
             //   打底排座走完全随机,性别规则留到轮换之后由 rotateGroupSeats 内部
             //   按「仅同组座位区内互换」的约束完成后处理。
             const baseMode = (smartArrangeRotate && genderMode !== 'random') ? 'random' : genderMode;
-            const result = randomSeatArrange(baseMode, { maxAttempts: storedAttempts }) || {};
+            // 开启小组轮换时,打底排座只是轮换的前置步骤 —— 不再弹「完全随机」确认,
+            // 只保留后面那条轮换确认,避免一次点击弹两次框。
+            const result = randomSeatArrange(baseMode, {
+                maxAttempts: storedAttempts,
+                skipConfirm: smartArrangeRotate
+            }) || {};
             const warnings = (result.warnings || []).slice();
             let rotateMsg = '';
             if (smartArrangeRotate) {

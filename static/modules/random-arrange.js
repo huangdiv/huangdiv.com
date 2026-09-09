@@ -439,8 +439,11 @@ export function createRandomArrange(deps) {
 
     // ─────────── 入口函数 ───────────
 
+    // options:
+    //   maxAttempts   最大尝试次数(#5 批次,从 localStorage 或 UI 读)
+    //   skipConfirm   跳过「确定要执行…排座吗?」确认框;用于调用方已有自己的确认时
+    //                 (如智能排座开启「小组轮换」—— 打底排座只是前置步骤)
     function randomSeatArrange(mode, options) {
-        // #5 批次:options.maxAttempts 允许调用方覆盖默认尝试次数(从 localStorage 或 UI 读)。
         options = options || {};
         var maxAttempts = (typeof options.maxAttempts === 'number' && options.maxAttempts > 0)
             ? Math.floor(options.maxAttempts)
@@ -450,7 +453,9 @@ export function createRandomArrange(deps) {
             alert(MESSAGES.NO_STUDENTS_YET);
             return { warnings: [MESSAGES.NO_STUDENTS_YET_WARN] };
         }
-        if (!confirm(MESSAGES.CONFIRM_RANDOM_MODE(mode))) return { warnings: [] };
+        if (!options.skipConfirm && !confirm(MESSAGES.CONFIRM_RANDOM_MODE(mode))) {
+            return { warnings: [] };
+        }
 
         // 保存旧座位映射(学生ID → 旧座位索引),用于后处理确保完全换座
         var prevSeatMap = {};
