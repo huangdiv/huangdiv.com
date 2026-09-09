@@ -144,13 +144,17 @@ export function createSeatGrid(deps) {
         }
 
         // 渲染全部座位(节点持久化保留入 seatNodes)
+        // 注意:数组一律以「真实座位索引 seatIndex」为下标写入,而非 DOM 追加顺序。
+        // 教师视角下 DOM 追加顺序是镜像的(视觉从右往左、从后往前),若按 push 顺序
+        // 存数组,seatNodes[i] 与 state.seats[i] 就会错位 —— diffUpdateSeats 会把
+        // 学生按镜像顺序重填,表现为「拖一下座位表就翻回学生视角」。
         for (let row = 0; row < state.rows; row++) {
             for (let col = 0; col < state.cols; col++) {
                 const { seatIndex, actualCol } = resolveSeatCoord(row, col);
                 const seat = createSeatNode(seatIndex);
                 applySeatFullRender(seat, seatIndex);   // 计算 innerHTML / className / 颜色
-                seatNodes.push(seat);
-                seatStateCache.push(takeSeatSnapshot(seatIndex));
+                seatNodes[seatIndex] = seat;
+                seatStateCache[seatIndex] = takeSeatSnapshot(seatIndex);
                 classroom.appendChild(seat);
 
                 // 走道占位(若此列后有走道)

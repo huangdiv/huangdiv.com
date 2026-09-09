@@ -51,6 +51,15 @@ export function createDragdrop(deps) {
     let draggedFromIndex = null;
     let dragStartTime = 0;
 
+    // 拖拽事件的 e.target 不一定是 Element(落在文本节点上时为 Text),
+    // 而 Text 没有 closest()——统一收敛成元素再取 closest,避免
+    // "e.target.closest is not a function" 中断整个 drop 流程。
+    function targetEl(e) {
+        const t = e.target;
+        if (t && t.nodeType === 1) return t;
+        return (t && t.parentElement) || null;
+    }
+
     // 公共高亮视觉(座位/名单 dragstart 共享)
     function applyDragVisuals(sourceEl) {
         sourceEl.classList.add('dragging');
@@ -63,7 +72,8 @@ export function createDragdrop(deps) {
     // ─────────── 7 个导出函数 ───────────
 
     function handleDragStart(e) {
-        const seat = e.target.closest('.seat');
+        const el = targetEl(e);
+        const seat = el ? el.closest('.seat') : null;
         if (!seat) return;
 
         const studentId = seat.getAttribute('data-student');
@@ -85,12 +95,14 @@ export function createDragdrop(deps) {
 
     function handleDragEnter(e) {
         e.preventDefault();
-        const seat = e.target.closest('.seat');
+        const el = targetEl(e);
+        const seat = el ? el.closest('.seat') : null;
         if (seat) seat.classList.add('highlight');
     }
 
     function handleDragLeave(e) {
-        const seat = e.target.closest('.seat');
+        const el = targetEl(e);
+        const seat = el ? el.closest('.seat') : null;
         if (seat && !seat.contains(e.relatedTarget)) {
             seat.classList.remove('highlight');
         }
@@ -114,17 +126,19 @@ export function createDragdrop(deps) {
         // 用 try/finally 兜底:无论正常完成还是中途抛异常(例如 pushSnapshot 深拷贝
         // state 失败、commit 渲染失败等),都要保证拖拽高亮与拖拽状态被清除,
         // 否则会留下 .highlight/.dragging 残留,表现为"松开鼠标后界面保持不动"。
+        const target = targetEl(e);
         try {
             // 仅在有有效拖拽目标时才保存快照
-            const hasValidTarget = e.target.closest('#deleteZone') ||
-                                   e.target.closest('.student-list') ||
-                                   e.target.closest('.seat');
+            const hasValidTarget = !!target && (
+                                   target.closest('#deleteZone') ||
+                                   target.closest('.student-list') ||
+                                   target.closest('.seat'));
             if (hasValidTarget && draggedStudentId) {
                 onPushSnapshot('drag');
             }
 
             // 删除区域
-            if (e.target.closest('#deleteZone')) {
+            if (target && target.closest('#deleteZone')) {
                 const student = getStudentById(draggedStudentId);
                 const displayName = student ? student.name : '';
                 if (confirm(MESSAGES.CONFIRM_DELETE_STUDENT(displayName))) {
@@ -140,7 +154,7 @@ export function createDragdrop(deps) {
             }
 
             // 拖回学生名单区域
-            if (e.target.closest('.student-list')) {
+            if (target && target.closest('.student-list')) {
                 if (draggedFromIndex !== null) {
                     state.seats[draggedFromIndex] = null;
                     commit({ seats: state.seats });
@@ -150,7 +164,7 @@ export function createDragdrop(deps) {
             }
 
             // 拖到座位
-            const seat = e.target.closest('.seat');
+            const seat = target ? target.closest('.seat') : null;
             if (!seat) return;
             const seatIndex = parseInt(seat.getAttribute('data-index'));
             if (Number.isNaN(seatIndex)) return;
