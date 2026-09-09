@@ -753,6 +753,21 @@ h1:focus {
     overflow: hidden;
 }
 
+/* 菜单项继承容器圆角:最顶/最底的项本身也带圆角,
+   键盘焦点用的 inset 描边才会顺着圆角走,
+   不会在顶部/底部留下「矩形描边被容器裁掉一角」的缺口 */
+.print-dropdown > *:first-child {
+    border-top-left-radius: calc(var(--radius-md) - 1px);
+    border-top-right-radius: calc(var(--radius-md) - 1px);
+}
+.print-dropdown > *:last-child {
+    border-bottom-left-radius: calc(var(--radius-md) - 1px);
+    border-bottom-right-radius: calc(var(--radius-md) - 1px);
+}
+.print-dropdown > *:first-child:last-child {
+    border-radius: calc(var(--radius-md) - 1px);
+}
+
 .print-dropdown-item {
     display: flex;
     align-items: center;
@@ -822,7 +837,8 @@ h1:focus {
     background: var(--primary-light);
     color: var(--primary);
     outline: none;
-    box-shadow: inset 0 0 0 2px var(--primary);
+    /* 同 .print-dropdown-item:focus — 内缩 1px 的双层描边,跟随自身圆角 */
+    box-shadow: inset 0 0 0 1px var(--surface), inset 0 0 0 3px var(--primary);
 }
 
 .dropdown-switch-label {
@@ -907,6 +923,16 @@ h1:focus {
 .dropdown-step-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+/* 键盘焦点:用内描边(跟随自身小圆角),避免 UA 默认矩形蓝框盖在圆角按钮上 */
+.dropdown-step-btn:focus-visible,
+.dropdown-step-btn:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--primary-light);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 /* 辅助操作行 */
@@ -3501,7 +3527,6 @@ button:disabled {
     outline-offset: 1px;
 }
 
-.print-dropdown-item:focus-visible,
 .tag-suggestion-item:focus-visible {
     background: var(--primary-light);
     color: var(--primary);
@@ -3526,13 +3551,16 @@ button:disabled {
     border-radius: 2px;
 }
 
-/* P1 UX #3:菜单项处于键盘焦点时的可视环(下拉打开时第一项 auto-focus) */
+/* P1 UX #3:菜单项处于键盘焦点时的可视环(下拉打开时第一项 auto-focus)
+   双层 inset:先 1px 底色把描边从容器 1px 边框往里推,再 2px 主色描边。
+   两层 inset 阴影都跟随元素自身圆角 ⇒ 顶/底项(已继承容器圆角)的焦点环
+   与菜单外形完全贴合,不会出现「矩形描边被圆角裁掉一角」。 */
 .print-dropdown-item:focus-visible,
 .print-dropdown-item:focus {
     background: var(--primary-light);
     color: var(--primary);
     outline: none;
-    box-shadow: inset 0 0 0 2px var(--primary);
+    box-shadow: inset 0 0 0 1px var(--surface), inset 0 0 0 3px var(--primary);
 }
 
 /* 弹窗内输入框:与 .tag-popup-emoji/.tag-popup-input 一致的主色边框高亮 */
