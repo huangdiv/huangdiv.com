@@ -24,7 +24,15 @@ sys.path.insert(0, r"C:/Users/xingz/AppData/Local/Programs/Python/Python313/Lib/
 from playwright.async_api import async_playwright  # noqa: E402
 
 WORKTREE = Path(r"C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3")
-BASE_URL = "http://localhost:8123/seats-generator.html"
+BASE_URL = "http://127.0.0.1:8123/seats-generator.html"
+
+
+async def open_pair_popup(page):
+    """「配对设置」已移入「随机排座」下拉 — 先展开下拉再点菜单项。"""
+    await page.click("#randomDropdownBtn")
+    await page.wait_for_timeout(200)
+    await page.click("#randomDropdown [data-action='pairSettings']")
+    await page.wait_for_timeout(250)
 
 
 async def inject_config(page, config):
@@ -63,8 +71,8 @@ async def run():
         # 全局对话框接受(随机排座 confirm 等)
         page.on("dialog", lambda d: asyncio.create_task(d.accept()))
 
-        # ========== 场景 1: P1-UX-1 同组批量配对 ==========
-        print("\n=== 场景 1: P1-UX-1 同组同桌批量生成 ===")
+        # ========== 场景 1: 配对弹窗已移除「批量配对」「排座选项」==========
+        print("\n=== 场景 1: 配对设置弹窗只剩「强制同桌 / 回避同桌」===")
         cfg_a = {
             "title": "P1 UX 批量配对测试", "rows": 7, "cols": 7,
             "seats": [None] * 49,
@@ -77,67 +85,27 @@ async def run():
             "forcedPairs": [], "avoidPairs": [],
             "version": "1.3.1"
         }
-        # 把 8 学生分到 1 组
         for s in cfg_a["students"]:
             s["groupId"] = "grp1"
-        cfg_a["students"][0]["groupId"] = "grp1"
-        cfg_a["students"][1]["groupId"] = "grp1"
         await page.goto(BASE_URL, wait_until="networkidle")
         await inject_config(page, cfg_a)
         await page.wait_for_selector("#classroom .seat", timeout=10000)
-        # 打开配对设置 → 选「一班」→「一班」→ 生成
-        await page.click("#pairSettingsBtn")
+        await open_pair_popup(page)
         await page.wait_for_timeout(200)
         assert await page.evaluate("document.querySelector('.pair-popup') !== null"), "弹窗未打开"
-        # 同组 8 人 → 应生成 floor(8/2) = 4 对
-        await page.select_option(".pair-batch-a", "grp1")
-        await page.select_option(".pair-batch-b", "grp1")
-        await page.click(".pair-batch-go")
-        await page.wait_for_timeout(700)   # 等待 autoSave 500ms 防抖完成
-        forced_count = await page.evaluate("""
-            (() => {
-                const cfg = JSON.parse(localStorage.getItem('classroomConfig'));
-                return (cfg.forcedPairs || []).length;
-            })()
-        """)
-        assert forced_count == 4, f"同组 8 人应配 4 对,实际 {forced_count}"
-        print(f"  ✓ 同组批量生成 4 对强制同桌")
-
-        # ========== 场景 2: P1-UX-1 跨组批量配对 ==========
-        print("\n=== 场景 2: P1-UX-1 跨组 round-robin 配对 ===")
-        cfg_b = {
-            "title": "P1 UX 跨组配对测试", "rows": 7, "cols": 7,
-            "seats": [None] * 49,
-            "students": (
-                [{"id": "a" + str(i), "name": "甲班{:02d}".format(i), "checkedIn": False, "gender": "", "tags": [], "groupId": "grp1"}
-                 for i in range(1, 4)] +
-                [{"id": "b" + str(i), "name": "乙班{:02d}".format(i), "checkedIn": False, "gender": "", "tags": [], "groupId": "grp2"}
-                 for i in range(1, 6)]
-            ),
-            "groups": [
-                {"id": "grp1", "name": "甲班", "color": "#4ECDC4"},
-                {"id": "grp2", "name": "乙班", "color": "#FF6B6B"}
-            ],
-            "viewMode": "student", "aisles": [], "showStudentIcons": True,
-            "forcedPairs": [], "avoidPairs": [],
-            "version": "1.3.1"
-        }
-        # 关闭已有 popup 再开
-        await page.keyboard.press("Escape")
-        await page.wait_for_timeout(200)
-        await inject_config(page, cfg_b)
-        await page.click("#pairSettingsBtn")
-        await page.wait_for_timeout(200)
-        await page.select_option(".pair-batch-a", "grp1")
-        await page.select_option(".pair-batch-b", "grp2")
-        await page.click(".pair-batch-go")
-        await page.wait_for_timeout(700)   # 等待 autoSave 500ms 防抖
-        forced_b = await page.evaluate("""
-            (() => { const c = JSON.parse(localStorage.getItem('classroomConfig')); return (c.forcedPairs || []).length; })()
-        """)
-        # Na=3, Nb=5 → round-robin 输出 max(Na, Nb) = 5 对
-        assert forced_b == 5, f"跨组 round-robin 应配 5 对,实际 {forced_b}"
-        print(f"  ✓ 跨组 round-robin 生成 5 对")
+        shape = await page.evaluate("""() => ({
+            batchA: !!document.querySelector('.pair-batch-a'),
+            batchB: !!document.querySelector('.pair-batch-b'),
+            batchGo: !!document.querySelector('.pair-batch-go'),
+            maxAttempts: !!document.querySelector('.pair-max-attempts'),
+            titles: Array.from(document.querySelectorAll('.pair-popup-section-title')).map(e => e.textContent)
+        })""")
+        assert not shape["batchA"] and not shape["batchB"] and not shape["batchGo"], \
+            f"批量配对 UI 应已移除,实际 {shape}"
+        assert not shape["maxAttempts"], f"排座选项(尝试次数)UI 应已移除,实际 {shape}"
+        assert shape["titles"] == ["强制同桌", "回避同桌"], \
+            f"弹窗分区应只剩强制同桌/回避同桌,实际 {shape['titles']}"
+        print(f"  ✓ 批量配对 / 排座选项已移除,剩余分区 {shape['titles']}")
 
         # 关闭弹窗
         await page.keyboard.press("Escape")
@@ -224,35 +192,35 @@ async def run():
 
         # ========== 场景 4: P1-UX-3 键盘触发下拉菜单 ==========
         print("\n=== 场景 4: P1-UX-3 键盘 Enter 打开下拉 + ↑↓ + Esc ===")
-        # focus randomBtn
-        await page.evaluate("document.getElementById('randomBtn').focus()")
+        # focus randomDropdownBtn(下段展开按钮)
+        await page.evaluate("document.getElementById('randomDropdownBtn').focus()")
         # 确认初始 aria-expanded=false
-        ae_before = await page.evaluate("document.getElementById('randomBtn').getAttribute('aria-expanded')")
+        ae_before = await page.evaluate("document.getElementById('randomDropdownBtn').getAttribute('aria-expanded')")
         assert ae_before == "false", f"初始 aria-expanded 应 false,实际 {ae_before!r}"
         # 按 Enter 打开
         await page.keyboard.press("Enter")
         await page.wait_for_timeout(100)
-        ae_after = await page.evaluate("document.getElementById('randomBtn').getAttribute('aria-expanded')")
+        ae_after = await page.evaluate("document.getElementById('randomDropdownBtn').getAttribute('aria-expanded')")
         rand_visible = await page.evaluate("document.getElementById('randomDropdown').style.display")
         assert ae_after == "true" and rand_visible == "block", \
             f"Enter 应打开下拉: aria-expanded={ae_after!r} display={rand_visible!r}"
-        # 焦点应自动落到第一个 menuitem(完全随机)
-        focused_action = await page.evaluate("document.activeElement?.getAttribute('data-action')")
-        assert focused_action == "random", f"Enter 打开后焦点应落到首项 'random',实际 {focused_action!r}"
-        # 按 ↓ 应移到第二项 'mixed'
+        # 焦点应自动落到第一个 menuitem(「男女同桌」开关行)
+        focused_toggle = await page.evaluate("document.activeElement?.getAttribute('data-toggle')")
+        assert focused_toggle == "mixed", f"Enter 打开后焦点应落到首项开关 'mixed',实际 {focused_toggle!r}"
+        # 按 ↓ 应移到第二项(「男女不同桌」开关行)
         await page.keyboard.press("ArrowDown")
         await page.wait_for_timeout(50)
-        focused_action = await page.evaluate("document.activeElement?.getAttribute('data-action')")
-        assert focused_action == "mixed", f"↓ 后焦点应移到 'mixed',实际 {focused_action!r}"
-        # 按 Esc 关闭 + 焦点回到 randomBtn
+        focused_toggle = await page.evaluate("document.activeElement?.getAttribute('data-toggle')")
+        assert focused_toggle == "samegender", f"↓ 后焦点应移到 'samegender',实际 {focused_toggle!r}"
+        # 按 Esc 关闭 + 焦点回到 randomDropdownBtn
         await page.keyboard.press("Escape")
         await page.wait_for_timeout(150)
-        ae_close = await page.evaluate("document.getElementById('randomBtn').getAttribute('aria-expanded')")
+        ae_close = await page.evaluate("document.getElementById('randomDropdownBtn').getAttribute('aria-expanded')")
         rand_close = await page.evaluate("document.getElementById('randomDropdown').style.display")
         assert ae_close == "false" and rand_close == "none", \
             f"Esc 应关闭: aria-expanded={ae_close!r} display={rand_close!r}"
         focused_back = await page.evaluate("document.activeElement?.id")
-        assert focused_back == "randomBtn", f"Esc 后焦点应回到 randomBtn,实际 {focused_back!r}"
+        assert focused_back == "randomDropdownBtn", f"Esc 后焦点应回到 randomDropdownBtn,实际 {focused_back!r}"
         print(f"  ✓ 键盘 Enter ↓ Esc 全部就位 + aria-expanded 同步")
 
         # ========== 场景 5: P1-UX-4 emoji input VS16 安全 ==========
@@ -310,11 +278,11 @@ async def run():
         # 清理 popup(若上一场景遗留),打开真实配对弹窗
         await page.keyboard.press("Escape")
         await page.wait_for_timeout(150)
-        await page.click("#pairSettingsBtn")
+        await open_pair_popup(page)
         await page.wait_for_timeout(200)
-        # 弹出后,首焦点在 pair-batch-a(第一个 select)
+        # 弹出后,首焦点应在第一个 select(强制同桌的「学生A」)
         first_focus = await page.evaluate("document.activeElement?.className")
-        assert "pair-batch-a" in (first_focus or ""), f"弹窗打开首焦点应在 select,实际 {first_focus!r}"
+        assert "pair-forced-a" in (first_focus or ""), f"弹窗打开首焦点应在 select,实际 {first_focus!r}"
         # 反复 Tab 18 次(超过弹窗内可聚焦元素数)
         escape_attempts = 0
         for i in range(18):
@@ -332,7 +300,7 @@ async def run():
         assert popup_after, "Esc 应关闭配对弹窗"
         # 焦点回到配对按钮
         focused_back = await page.evaluate("document.activeElement?.id")
-        assert focused_back == "pairSettingsBtn", f"Esc 后焦点应在 pairSettingsBtn,实际 {focused_back!r}"
+        assert focused_back == "randomDropdownBtn", f"Esc 后焦点应回到触发按钮 randomDropdownBtn,实际 {focused_back!r}"
         print(f"  ✓ Esc 关闭弹窗 + 焦点回到 {focused_back!r}")
 
         # ========== 场景 7: P1-UX-6 座位图标反色 ==========

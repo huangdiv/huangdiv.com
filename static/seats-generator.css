@@ -3542,37 +3542,6 @@ button:disabled {
     outline-offset: 1px;
 }
 
-/* 配对设置弹窗 — 排座选项 label/hint + number input (#5 批次) */
-.pair-popup-label {
-    font-size: 13px;
-    color: var(--text-secondary, #555);
-}
-.pair-popup-hint {
-    font-size: 12px;
-    color: var(--text-tertiary, #888);
-    margin-left: 2px;
-}
-
-/* P1 UX #1:批量配对 hint 行(同组/跨组说明,放在行下方) */
-.pair-batch-hint {
-    font-size: 11px;
-    color: var(--text-secondary, #555);
-    line-height: 1.45;
-    padding: 4px 2px 2px;
-}
-.pair-popup .pair-max-attempts {
-    width: 80px;
-    padding: 4px 8px;
-    border: 1px solid var(--border, #ccc);
-    border-radius: 4px;
-    font-size: 13px;
-    text-align: center;
-}
-.pair-popup .pair-max-attempts:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 1px;
-}
-
 /* ── 轮换设置弹窗 ── */
 .rotate-popup .rotate-offset-input {
     width: 70px;

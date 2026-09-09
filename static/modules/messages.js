@@ -35,10 +35,6 @@ export const MESSAGES = {
     STUDENT_ALREADY_SEATED: (name) => `学生 ${name} 已经被安排座位了！`,
 
     // —— 配对 ——
-    PAIR_SELECT_GROUPS_AB: '请选择分组 A 与 B',
-    PAIR_GROUPS_EMPTY: '所选分组没有学生',
-    PAIR_SAME_GROUP_TOO_SMALL: '同组至少 2 人才能配对',
-    PAIR_NO_NEW_AVAILABLE: '没有可添加的新配对(全部已存在或分组过小)',
     PAIR_SELECT_TWO_DIFFERENT: '请选择两位不同的学生',
     PAIR_ALREADY_EXISTS: '该配对已存在',
 

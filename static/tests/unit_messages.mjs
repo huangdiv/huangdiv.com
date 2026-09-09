@@ -77,8 +77,6 @@ group('A. messages.js — 静态常量字符串', () => {
         assertEq(MESSAGES.STUDENT_NAME_EXISTS_NEW, '该学生已存在');
         assertEq(typeof MESSAGES.STUDENT_NAME_EXISTS_EDIT, 'string');
         assertEq(MESSAGES.STUDENT_NAME_EXISTS_EDIT, '该姓名已存在');
-        assertEq(typeof MESSAGES.PAIR_SELECT_GROUPS_AB, 'string');
-        assertEq(MESSAGES.PAIR_SELECT_GROUPS_AB, '请选择分组 A 与 B');
         assertEq(typeof MESSAGES.PAIR_SELECT_TWO_DIFFERENT, 'string');
         assertEq(MESSAGES.PAIR_SELECT_TWO_DIFFERENT, '请选择两位不同的学生');
         assertEq(typeof MESSAGES.PAIR_ALREADY_EXISTS, 'string');
@@ -200,8 +198,7 @@ group('C. messages.js — 完整性(防止 keys 漏定义被 undefined 调用)',
             'GROUP_NAME_REQUIRED', 'GROUP_NAME_EXISTS', 'CONFIRM_DELETE_GROUP',
             'STUDENT_NAME_REQUIRED', 'STUDENT_NAME_EXISTS_NEW', 'STUDENT_NAME_EXISTS_EDIT',
             'CONFIRM_DELETE_STUDENT', 'STUDENT_ALREADY_SEATED',
-            'PAIR_SELECT_GROUPS_AB', 'PAIR_GROUPS_EMPTY', 'PAIR_SAME_GROUP_TOO_SMALL',
-            'PAIR_NO_NEW_AVAILABLE', 'PAIR_SELECT_TWO_DIFFERENT', 'PAIR_ALREADY_EXISTS',
+            'PAIR_SELECT_TWO_DIFFERENT', 'PAIR_ALREADY_EXISTS',
             'EXPORT_FAILED', 'CONFIRM_RESET_SEATS', 'ROW_COL_RANGE', 'CONFIRM_REDUCE_AISLES',
             'CONFIRM_CLEAR_ALL', 'ALL_DATA_CLEARED',
             'CONFIRM_DELETE_CONFIG', 'CONFIG_NAME_EXISTS', 'CONFIRM_CLOUD_WINS',

@@ -1350,23 +1350,8 @@ function normalizeRotateOffset(value) {
             var studentOpts = students.length > 0
                 ? students.map(function (s) { return '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.name) + '</option>'; }).join('')
                 : '';
-            // P1 UX #1:同组/跨组批量配对 — 分组下拉构建一次复用
-            var groupOpts = groups.length > 0
-                ? groups.map(function (g) { return '<option value="' + escapeHtml(g.id) + '">' + escapeHtml(g.name) + '</option>'; }).join('')
-                : '';
-
             popup.innerHTML =
                 '<div class="pair-popup-title" id="pairPopupTitle">配对设置</div>' +
-                // 批量配对 — P1 UX #1(同组同桌 / 跨组同桌 一键生成)
-                '<div class="pair-popup-section pair-batch-section">' +
-                    '<div class="pair-popup-section-title">批量配对</div>' +
-                    '<div class="pair-popup-row">' +
-                        '<select class="pair-batch-a"><option value="">-- 分组 A --</option>' + groupOpts + '</select>' +
-                        '<select class="pair-batch-b"><option value="">-- 分组 B --</option>' + groupOpts + '</select>' +
-                        '<button class="mini-btn pair-batch-go">生成</button>' +
-                    '</div>' +
-                    '<div class="pair-batch-hint">A = B:组内两两同桌;A ≠ B:轮询把 A 的学生配给 B</div>' +
-                '</div>' +
                 '<div class="pair-popup-section">' +
                     '<div class="pair-popup-section-title">强制同桌</div>' +
                     '<div class="pair-popup-row">' +
@@ -1384,16 +1369,6 @@ function normalizeRotateOffset(value) {
                         '<button class="mini-btn pair-avoid-add">添加</button>' +
                     '</div>' +
                     '<div class="pair-avoid-list"></div>' +
-                '</div>' +
-                // #5 批次:排座尝试次数上限 UI(配对设置弹窗里的「高级选项」)
-                '<div class="pair-popup-section">' +
-                    '<div class="pair-popup-section-title">排座选项</div>' +
-                    '<div class="pair-popup-row">' +
-                        '<label class="pair-popup-label">后处理尝试上限</label>' +
-                        '<input type="number" class="pair-max-attempts" min="50" max="2000" step="50" value="' +
-                            (parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10)) + '">' +
-                        '<span class="pair-popup-hint">次</span>' +
-                    '</div>' +
                 '</div>';
 
             container.appendChild(popup);
@@ -1431,71 +1406,6 @@ function normalizeRotateOffset(value) {
             requestAnimationFrame(function () {
                 popup.classList.add('visible');
             });
-
-            // P1 UX #1:批量配对生成 — 同组两两配 / 跨组 round-robin
-            function generateBatchPairs() {
-                var aSel = popup.querySelector('.pair-batch-a');
-                var bSel = popup.querySelector('.pair-batch-b');
-                var aId = aSel.value;
-                var bId = bSel.value;
-                if (!aId || !bId) { alert(MESSAGES.PAIR_SELECT_GROUPS_AB); return; }
-                var aStudents = students.filter(function (s) { return s.groupId === aId; });
-                var bStudents = students.filter(function (s) { return s.groupId === bId; });
-                if (aStudents.length === 0 || bStudents.length === 0) {
-                    alert(MESSAGES.PAIR_GROUPS_EMPTY);
-                    return;
-                }
-                if (aId === bId && aStudents.length < 2) {
-                    alert(MESSAGES.PAIR_SAME_GROUP_TOO_SMALL);
-                    return;
-                }
-                var aIds = aStudents.map(function (s) { return s.id; });
-                var bIds = bStudents.map(function (s) { return s.id; });
-                var existing = new Set();
-                forcedPairs.forEach(function (p) { existing.add(pairKey(p[0], p[1])); });
-                var added = 0;
-                if (aId === bId) {
-                    // 同组:(0,1) (2,3) ... 最后一个奇数位单人无配
-                    for (var i = 0; i + 1 < aIds.length; i += 2) {
-                        var k = pairKey(aIds[i], aIds[i + 1]);
-                        if (existing.has(k)) continue;
-                        existing.add(k);
-                        forcedPairs.push([aIds[i], aIds[i + 1]]);
-                        added++;
-                    }
-                } else {
-                    // 跨组:用 max(Na, Nb) 次 round-robin,任一侧已尽则回到 0
-                    var len = Math.max(aIds.length, bIds.length);
-                    for (var j = 0; j < len; j++) {
-                        var x = aIds[j % aIds.length];
-                        var y = bIds[j % bIds.length];
-                        var k2 = pairKey(x, y);
-                        if (existing.has(k2)) continue;
-                        existing.add(k2);
-                        forcedPairs.push([x, y]);
-                        added++;
-                    }
-                }
-                if (added > 0) {
-                    showStatToast && showStatToast('已添加 ' + added + ' 对强制配对');
-                    autoSave();
-                } else {
-                    alert(MESSAGES.PAIR_NO_NEW_AVAILABLE);
-                }
-                aSel.value = '';
-                bSel.value = '';
-                renderAll();
-            }
-            var batchGoBtn = popup.querySelector('.pair-batch-go');
-            if (batchGoBtn) {
-                batchGoBtn.addEventListener('click', generateBatchPairs);
-                // Enter in either select triggers generation
-                popup.querySelector('.pair-batch-a').addEventListener('change', function () {
-                    // 同步 A 选到 B(若 B 为空),方便同组操作
-                    var bSel2 = popup.querySelector('.pair-batch-b');
-                    if (!bSel2.value) bSel2.value = this.value;
-                });
-            }
 
             // 添加强制配对
             popup.querySelector('.pair-forced-add').addEventListener('click', function () {
@@ -1540,18 +1450,6 @@ function normalizeRotateOffset(value) {
                 renderAll();
                 autoSave();
             });
-
-            // #5 批次:排座尝试次数 input 变更写回 localStorage
-            var maxAttemptsInput = popup.querySelector('.pair-max-attempts');
-            if (maxAttemptsInput) {
-                maxAttemptsInput.addEventListener('change', function () {
-                    var v = parseInt(this.value, 10);
-                    if (!isFinite(v) || v < 50) v = 50;
-                    if (v > 2000) v = 2000;
-                    this.value = v;
-                    localStorage.setItem('seatArrangeMaxAttempts', String(v));
-                });
-            }
 
             popup.addEventListener('click', function (e) {
                 e.stopPropagation();
@@ -2927,8 +2825,6 @@ function isWholeWordMatch(label, keyword) {
 
         // 上段按钮:按当前开关组合执行一次智能排座
         function runSmartArrange() {
-            // #5 批次:从 localStorage 读 maxAttempts 配置(配对设置弹窗可改,默认 200)
-            const storedAttempts = parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10);
             const genderMode = smartArrangeMode();   // 'mixed' | 'samegender' | 'random'
             const warnings = [];
             let rotateMsg = '';
@@ -2948,7 +2844,8 @@ function isWholeWordMatch(label, keyword) {
                     rotateMsg = MESSAGES.ROTATE_DONE(groupRotateOffset, rot.moved);
                 }
             } else {
-                const result = randomSeatArrange(genderMode, { maxAttempts: storedAttempts }) || {};
+                // 「排座选项」设置项已移除 ⇒ 走 random-arrange 内置默认尝试次数
+                const result = randomSeatArrange(genderMode) || {};
                 if (result.warnings && result.warnings.length > 0) {
                     warnings.push.apply(warnings, result.warnings);
                 }
