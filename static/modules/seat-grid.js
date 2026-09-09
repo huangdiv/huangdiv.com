@@ -45,7 +45,8 @@ export function createSeatGrid(deps) {
         onGenerateStudentList,
         onAutoSave,
         onRenderGroupBannerContent,
-        onAfterSeatsRender
+        onAfterSeatsRender,
+        onGetSeatExtraClass
     } = callbacks;
 
     // ─────────── 持久化缓存(persistent 节点 + 上次渲染快照) ───────────
@@ -295,6 +296,33 @@ export function createSeatGrid(deps) {
         return banner;
     }
 
+    // 座位附加 class(由主 IIFE 提供,例如性别规则未达成时的闪烁提示)。
+    // 返回 '' 或 ' xxx yyy' 形式(前置空格),方便直接拼在基础 class 后面。
+    function extraClassOf(seatIndex) {
+        if (typeof onGetSeatExtraClass !== 'function') return '';
+        try {
+            var extra = onGetSeatExtraClass(seatIndex);
+            return extra ? ' ' + String(extra).trim() : '';
+        } catch (e) {
+            console.error('[seat-grid] onGetSeatExtraClass', e);
+            return '';
+        }
+    }
+
+    // 只增删附加 class、不动基础 class —— 供性别规则提示独立刷新
+    function refreshSeatExtraClasses() {
+        for (var i = 0; i < seatNodes.length; i++) {
+            var seat = seatNodes[i];
+            if (!seat) continue;
+            seat.classList.remove('gender-rule-hint');
+            var extra = extraClassOf(i);
+            if (!extra) continue;
+            extra.trim().split(/\s+/).forEach(function (c) {
+                if (c) seat.classList.add(c);
+            });
+        }
+    }
+
     // 应用「该 seat 完整渲染」:className + data-student + 内层 innerHTML + 背景色
     // 用于:全量重建 或 某座位 studentId 发生变化
     function applySeatFullRender(seat, seatIndex) {
@@ -305,7 +333,7 @@ export function createSeatGrid(deps) {
         if (studentId && state.isCheckinMode) {
             seatClass += isCheckedIn ? ' checked-in' : ' not-checked-in';
         }
-        seat.className = seatClass;
+        seat.className = seatClass + extraClassOf(seatIndex);
         seat.setAttribute('data-student', studentId || '');
 
         // 内层 + 背景色 + draggable
@@ -322,7 +350,7 @@ export function createSeatGrid(deps) {
         if (studentId && state.isCheckinMode) {
             cls += isCheckedIn ? ' checked-in' : ' not-checked-in';
         }
-        seat.className = cls;
+        seat.className = cls + extraClassOf(seatIndex);
     }
 
     // 仅更新分组背景 / 边框 / 文字色(纯样式,不重建 innerHTML)
@@ -469,6 +497,7 @@ export function createSeatGrid(deps) {
         generateSeats,
         generateGridTemplateColumns,
         updateStatistics,
-        updateCheckinStats
+        updateCheckinStats,
+        refreshSeatExtraClasses
     };
 }

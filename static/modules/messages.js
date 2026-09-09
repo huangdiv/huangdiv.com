@@ -110,6 +110,13 @@ export const MESSAGES = {
     ROTATE_OVERFLOW_REGROUP: (count, fromName, toName) =>
         `${count} 名学生未能轮换(目标组座位不足),已自动改归「${toName}」(原「${fromName}」)`,
 
+    // —— 性别规则(男女同桌 / 男女不同桌)——
+    GENDER_RULE_LABEL: (mode) => (mode === 'mixed' ? '男女同桌' : '男女不同桌'),
+    // 小组轮换后,受「只能在同组座位区内调整」约束,仍有若干桌未达成
+    GENDER_RULE_PARTIAL: (mode, count) =>
+        `小组轮换后仍有 ${count} 桌未达成「${mode === 'mixed' ? '男女同桌' : '男女不同桌'}」` +
+        `(受小组座位区限制,无法进一步调整)`,
+
     // —— 配对设置满足情况 ——
     PAIR_UNSATISFIED: (forcedCount, avoidCount) => {
         const parts = [];

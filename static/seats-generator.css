@@ -202,6 +202,23 @@ h1:focus {
     box-shadow: none;
 }
 
+/* 性别规则(男女同桌 / 男女不同桌)未达成的同桌座位 —— 缓慢闪烁提示。
+   用 box-shadow 而非背景色:分组座位的内联背景色优先级更高,换背景会盖掉分组配色。 */
+.seat.gender-rule-hint {
+    animation: genderRuleBlink 2.6s ease-in-out infinite;
+}
+
+@keyframes genderRuleBlink {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+        border-color: #bfdbfe;
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.8);
+        border-color: #f59e0b;
+    }
+}
+
 .seat-number {
     font-size: 10px;
     color: var(--text-muted);
@@ -3318,6 +3335,12 @@ button:disabled {
         text-align: center;
         margin: 0;
         padding: 0;
+    }
+
+    /* 打印 / 导出图片时不闪烁 */
+    .seat.gender-rule-hint {
+        animation: none !important;
+        box-shadow: none !important;
     }
 
     h1 {

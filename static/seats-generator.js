@@ -49,6 +49,8 @@ let smartArrangeSameGender = false;    // 男女不同桌(与「男女同桌」�
 let smartArrangeRotate = false;        // 小组轮换(开启后智能排座会在排座后按步长轮换)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
+// 性别规则(男女同桌 / 男女不同桌)未达成的座位集合 —— 开座表闪烁提示用
+const genderHintSeats = new Set();
 
 // 轮换步长归一:必须是 >= 1 的整数;超过分组数时收敛到最大有效值(组数-1)。
 // 分组数变化(新建/删除分组)后旧配置可能越界,统一走这里修正。
@@ -1279,6 +1281,45 @@ function normalizeRotateOffset(value) {
 
         // 座位发生变化(手动拖拽 / 随机排座 / 分组轮换 / 撤销 等)后,
         // 若配对设置弹窗正开着,就按新座位刷新每条配对的底色。
+        // ─────────── 性别规则提示(男女同桌 / 男女不同桌)───────────
+        // 开关开启时,自动检测未达成条件的同桌座位 ⇒ 座位表上缓慢闪烁提示。
+        // 任何手动(拖拽 / 点选 / 删除)或自动(随机排座 / 小组轮换 / 撤销)调整座位后
+        // 都会经 generateSeats → afterSeatsRender 重新检测。
+        function currentGenderRuleMode() {
+            if (smartArrangeMixed) return 'mixed';
+            if (smartArrangeSameGender) return 'samegender';
+            return null;
+        }
+
+        // 重新计算未达成集合并刷新座位表(便宜:O(座位数),可随时调用)
+        function refreshGenderHints() {
+            genderHintSeats.clear();
+            const mode = currentGenderRuleMode();
+            if (mode) {
+                // randomArrange / refreshSeatExtraClasses 都是本 IIFE 后段才初始化的
+                // const,初始化早期调用会命中 TDZ ⇒ 统一 try 住,最坏只是不提示
+                try {
+                    const violations = randomArrange.findGenderViolations(
+                        mode, randomArrange.buildGenderMap(), null);
+                    violations.forEach(function (p) {
+                        genderHintSeats.add(p[0]);
+                        genderHintSeats.add(p[1]);
+                    });
+                } catch (e) {
+                    console.error('[gender-hint] 检测失败', e);
+                }
+            }
+            try {
+                refreshSeatExtraClasses();
+            } catch (e) {
+                /* 尚未初始化:忽略 */
+            }
+        }
+
+        function getSeatGenderHintClass(seatIndex) {
+            return genderHintSeats.has(seatIndex) ? 'gender-rule-hint' : '';
+        }
+
         function refreshPairPopupStatus() {
             if (!activePairPopup || !activePairPopup.popupEl) return;
             var popup = activePairPopup.popupEl;
@@ -1288,6 +1329,12 @@ function normalizeRotateOffset(value) {
             if (!fList || !aList) return;
             renderPairList(fList, forcedPairs, 'forced');
             renderPairList(aList, avoidPairs, 'avoid');
+        }
+
+        // 座位渲染统一出口:任何一次座位重绘后都要做的派生刷新
+        function afterSeatsRender() {
+            refreshPairPopupStatus();
+            refreshGenderHints();
         }
 
         function openPairPopup(anchorEl) {
@@ -1543,10 +1590,10 @@ function normalizeRotateOffset(value) {
 
         // 执行一次分组轮换,返回 { warnings, moved };提示文案交给调用方决定
         // (智能排座需要把排座与轮换的 warnings 合并成一条 toast)
-        function runGroupRotation() {
+        function runGroupRotation(options) {
             groupRotateOffset = normalizeRotateOffset(groupRotateOffset);
             updateRotateOffsetBadge();
-            return rotateGroupSeats(groupRotateOffset) || {};
+            return rotateGroupSeats(groupRotateOffset, options) || {};
         }
 
         // ==================== 轮换设置结束 ====================
@@ -2137,7 +2184,9 @@ function isWholeWordMatch(label, keyword) {
                 // 分组 banner 每次全量重建后回填内容(视角切换 / 行列变更 / 走道变更等)
                 onRenderGroupBannerContent: renderGroupBannerContent,
                 // 座位渲染出口:刷新配对设置弹窗里各配对的满足状态底色
-                onAfterSeatsRender: refreshPairPopupStatus
+                onAfterSeatsRender: afterSeatsRender,
+                // 座位附加 class:性别规则未达成的同桌座位 ⇒ 缓慢闪烁提示
+                onGetSeatExtraClass: getSeatGenderHintClass
             }
         });
         // 顶层别名 — 保留主 IIFE 内既有调用点零修改
@@ -2145,6 +2194,7 @@ function isWholeWordMatch(label, keyword) {
         const generateGridTemplateColumns = seatGrid.generateGridTemplateColumns;
         const updateStatistics = seatGrid.updateStatistics;
         const updateCheckinStats = seatGrid.updateCheckinStats;
+        const refreshSeatExtraClasses = seatGrid.refreshSeatExtraClasses;
 
         // 退出分组模式(进入其他模式 / 退出时调用)
         function exitGroupMode() {
@@ -2854,6 +2904,8 @@ function isWholeWordMatch(label, keyword) {
                 smartArrangeRotate = !smartArrangeRotate;
             }
             syncSmartArrangeUI();
+            // 性别开关一开一合 ⇒ 立刻重新检测并刷新闪烁提示
+            refreshGenderHints();
             autoSave();
         }
 
@@ -2877,11 +2929,19 @@ function isWholeWordMatch(label, keyword) {
         function runSmartArrange() {
             // #5 批次:从 localStorage 读 maxAttempts 配置(配对设置弹窗可改,默认 200)
             const storedAttempts = parseInt(localStorage.getItem('seatArrangeMaxAttempts') || '200', 10);
-            const result = randomSeatArrange(smartArrangeMode(), { maxAttempts: storedAttempts }) || {};
+            const genderMode = smartArrangeMode();   // 'mixed' | 'samegender' | 'random'
+            // 小组轮换 + 性别规则同时开启:
+            //   顺序改为「先保证小组轮换,再做全班性别规则检测与调整」——
+            //   打底排座走完全随机,性别规则留到轮换之后由 rotateGroupSeats 内部
+            //   按「仅同组座位区内互换」的约束完成后处理。
+            const baseMode = (smartArrangeRotate && genderMode !== 'random') ? 'random' : genderMode;
+            const result = randomSeatArrange(baseMode, { maxAttempts: storedAttempts }) || {};
             const warnings = (result.warnings || []).slice();
             let rotateMsg = '';
             if (smartArrangeRotate) {
-                const rot = runGroupRotation();
+                const rot = runGroupRotation({
+                    genderMode: genderMode === 'random' ? null : genderMode
+                });
                 if (rot.warnings && rot.warnings.length > 0) {
                     warnings.push.apply(warnings, rot.warnings);
                 } else if (rot.moved > 0) {

@@ -144,6 +144,173 @@ export function createRandomArrange(deps) {
         };
     }
 
+    // ─────────── 性别规则(男女同桌 / 男女不同桌)检测与组内调整 ───────────
+
+    // studentId → 'M' / 'F' / 'X'
+    function buildGenderMap() {
+        var m = Object.create(null);
+        state.students.forEach(function (s) { m[s.id] = getGender(s); });
+        return m;
+    }
+
+    // 交换 seatA / seatB 的占座者后,是否会产生新的回避同桌(与 repairPairViolations 同一套判定)
+    function swapCreatesAvoidCore(pairMap, isAvoided, seatA, seatB) {
+        var idA = state.seats[seatA], idB = state.seats[seatB];
+        if (!idA || !idB) return false;
+        var mateA = findPairMate(seatA, pairMap);
+        var mateB = findPairMate(seatB, pairMap);
+        if (mateA != null && state.seats[mateA] && state.seats[mateA] !== idA && state.seats[mateA] !== idB) {
+            if (isAvoided(idB, state.seats[mateA])) return true;
+        }
+        if (mateB != null && state.seats[mateB] && state.seats[mateB] !== idA && state.seats[mateB] !== idB) {
+            if (isAvoided(idA, state.seats[mateB])) return true;
+        }
+        return false;
+    }
+
+    // 当前座位表里,不满足性别规则的同桌对。
+    // 判定口径(与界面闪烁提示一致):
+    //   - 有一侧空座 ⇒ 不判定
+    //   - 任一侧性别未知('X') ⇒ 不判定(无法判断男女)
+    //   - mixed      :要求一男一女,同性 ⇒ 违规
+    //   - samegender :要求同性别,异性 ⇒ 违规
+    function findGenderViolations(mode, genderMap, pairMap) {
+        var dm = pairMap ? null : getDeskMatePairs();
+        var pairs = dm ? dm.pairs : null;
+        var pm = pairMap || (dm && dm.pairMap);
+        var out = [];
+        var visited = new Set();
+        // 有 pairMap 时按座位遍历即可(每个同桌对会被两侧各访问一次,用 visited 去重)
+        var i, a, b;
+        if (pairs) {
+            for (i = 0; i < pairs.length; i++) {
+                a = pairs[i][0]; b = pairs[i][1];
+                if (isGenderDeskViolation(a, b, mode, genderMap)) out.push([a, b]);
+            }
+            return out;
+        }
+        for (i = 0; i < pm.length; i++) {
+            a = i; b = pm[i];
+            if (b === null || b === undefined) continue;
+            var key = a < b ? a + '-' + b : b + '-' + a;
+            if (visited.has(key)) continue;
+            visited.add(key);
+            if (isGenderDeskViolation(a, b, mode, genderMap)) out.push([a, b]);
+        }
+        return out;
+    }
+
+    function isGenderDeskViolation(a, b, mode, genderMap) {
+        var ida = state.seats[a], idb = state.seats[b];
+        if (!ida || !idb) return false;
+        var ga = genderMap[ida] || 'X';
+        var gb = genderMap[idb] || 'X';
+        if (ga === 'X' || gb === 'X') return false;
+        return mode === 'mixed' ? (ga === gb) : (ga !== gb);
+    }
+
+    // 组内性别规则调整:
+    //   只允许「同一小组座位区内部」两两交换 ⇒ 轮换后的各组座位区归属完全不变,
+    //   任何学生都不会被挪到别的小组座位区域。
+    // 尽力达成 mode('mixed' / 'samegender');确实做不到就保留原样,由调用方提示。
+    //
+    // opts:
+    //   mode         'mixed' | 'samegender'
+    //   areaOf       (seatIdx) => 区域标识;null / undefined / <0 表示「不属于任何小组座位区」,
+    //                该座位不参与调整(不能在小组间挪人)
+    //   maxAttempts  最大尝试轮次
+    //   shuffle      洗牌函数
+    // 返回 { fixed, remaining } —— remaining 为仍未达成的同桌对 [[idxA, idxB], ...]
+    function adjustGenderRuleInGroups(opts) {
+        opts = opts || {};
+        var mode = opts.mode;
+        var areaOf = opts.areaOf;
+        var maxAttempts = opts.maxAttempts || 300;
+        var shuffleFn = opts.shuffle || function (a) { return a; };
+        var dm = getDeskMatePairs();
+        var pairMap = dm.pairMap;
+        var genderMap = buildGenderMap();
+        var isAvoided = makeAvoidChecker();
+
+        if (mode !== 'mixed' && mode !== 'samegender') {
+            return { fixed: 0, remaining: [] };
+        }
+        if (typeof areaOf !== 'function') {
+            // 没有区域约束 ⇒ 退化成「全班范围内调整」(仅用于兜底 / 单测)
+            areaOf = function () { return 0; };
+        }
+
+        // 某座位所在同桌是否满足性别规则(空座 / 性别未知 ⇒ 视为满足,不干预)
+        function deskOk(idx) {
+            var mate = findPairMate(idx, pairMap);
+            if (mate === null || mate === undefined) return true;
+            return !isGenderDeskViolation(idx, mate, mode, genderMap);
+        }
+
+        // 已满足的强制配对成员不可搬动(搬动就拆散了);回避配对由 swapCreatesAvoidCore 拦截
+        var locked = new Set();
+        (function () {
+            var v = computePairViolations(pairMap);
+            state.forcedPairs.forEach(function (p) {
+                if (!p || p.length < 2) return;
+                if (v.forcedBroken.indexOf(p) < 0) { locked.add(p[0]); locked.add(p[1]); }
+            });
+        })();
+
+        var occupied = [];
+        for (var i = 0; i < state.seats.length; i++) if (state.seats[i]) occupied.push(i);
+
+        var skip = new Set();
+        var fixed = 0;
+        var attempts = 0;
+
+        while (attempts < maxAttempts) {
+            var vio = findGenderViolations(mode, genderMap, pairMap).filter(function (p) {
+                return !skip.has(p[0] + '-' + p[1]);
+            });
+            if (vio.length === 0) break;
+            attempts++;
+            var target = vio[0];
+            var done = false;
+
+            // 先试 a、再试 b(顺序洗牌,避免总是牺牲同一侧)
+            var froms = shuffleFn([target[0], target[1]]);
+            for (var fi = 0; fi < froms.length && !done; fi++) {
+                var from = froms[fi];
+                var area = areaOf(from);
+                if (area === null || area === undefined || area < 0) continue;
+                var cands = shuffleFn(occupied.filter(function (idx) {
+                    if (idx === from) return false;
+                    if (!state.seats[idx]) return false;
+                    return areaOf(idx) === area;     // 硬约束:只在本小组座位区内换
+                }));
+                for (var ci = 0; ci < cands.length; ci++) {
+                    var to = cands[ci];
+                    var idFrom = state.seats[from];
+                    var idTo = state.seats[to];
+                    if (locked.has(idFrom) || locked.has(idTo)) continue;
+                    if (swapCreatesAvoidCore(pairMap, isAvoided, from, to)) continue;
+                    // 试换:两侧同桌都要满足规则(否则等于把问题搬家)
+                    state.seats[from] = idTo;
+                    state.seats[to] = idFrom;
+                    if (deskOk(from) && deskOk(to)) {
+                        done = true;
+                        fixed++;
+                        break;
+                    }
+                    state.seats[from] = idFrom;
+                    state.seats[to] = idTo;
+                }
+            }
+            if (!done) skip.add(target[0] + '-' + target[1]);   // 组内无解 ⇒ 保留原样
+        }
+
+        return {
+            fixed: fixed,
+            remaining: findGenderViolations(mode, genderMap, pairMap)
+        };
+    }
+
     // 修复配对违规。只在「已占座」之间两两交换 ⇒ 占座总数、各区人数分布均不变。
     // opts:
     //   pairMap           同桌映射
@@ -166,18 +333,9 @@ export function createRandomArrange(deps) {
         }
 
         // 交换 seatA / seatB 的占座者后,是否会产生新的回避同桌
+        // (判定逻辑已上提到 swapCreatesAvoidCore,与组内性别调整共用同一套口径)
         function swapCreatesAvoid(seatA, seatB) {
-            var idA = state.seats[seatA], idB = state.seats[seatB];
-            if (!idA || !idB) return false;
-            var mateA = findPairMate(seatA, pairMap);
-            var mateB = findPairMate(seatB, pairMap);
-            if (mateA != null && state.seats[mateA] && state.seats[mateA] !== idA && state.seats[mateA] !== idB) {
-                if (isAvoided(idB, state.seats[mateA])) return true;
-            }
-            if (mateB != null && state.seats[mateB] && state.seats[mateB] !== idA && state.seats[mateB] !== idB) {
-                if (isAvoided(idA, state.seats[mateB])) return true;
-            }
-            return false;
+            return swapCreatesAvoidCore(pairMap, isAvoided, seatA, seatB);
         }
 
         function doSwap(seatA, seatB) {
@@ -816,9 +974,27 @@ export function createRandomArrange(deps) {
                 finalPairRot.forcedBroken.length, finalPairRot.avoidBroken.length));
         }
 
+        // ── 性别规则后处理(轮换 + 男女同桌/不同桌 同时开启时)──
+        // 顺序:先完成小组轮换,再在全班范围内检测性别规则;
+        // 但调整只能在「该座位所属小组座位区」内部进行 —— 任何学生都不会被挪到
+        // 别的小组座位区域。确实做不到就保留原样并提示。
+        var genderResult = null;
+        if (options.genderMode === 'mixed' || options.genderMode === 'samegender') {
+            genderResult = adjustGenderRuleInGroups({
+                mode: options.genderMode,
+                areaOf: function (idx) { return seatArea[idx]; },
+                maxAttempts: options.genderMaxAttempts || 300,
+                shuffle: shuffle
+            });
+            if (genderResult.remaining.length > 0) {
+                warnings.push(MESSAGES.GENDER_RULE_PARTIAL(
+                    options.genderMode, genderResult.remaining.length));
+            }
+        }
+
         commit({ seats: state.seats });
         onGenerateSeats();
-        return { warnings: warnings, moved: moved };
+        return { warnings: warnings, moved: moved, gender: genderResult };
     }
 
     return {
@@ -827,6 +1003,10 @@ export function createRandomArrange(deps) {
         // 配对设置:满足情况检测(供 UI 着色)与修复
         getPairStatus,
         computePairViolations,
+        // 性别规则(男女同桌 / 男女不同桌):检测 + 组内调整
+        buildGenderMap,
+        findGenderViolations,
+        adjustGenderRuleInGroups,
         // 导出 helper 供单元测试使用(#16 批次)
         getDeskMatePairs,
         findPairMate,
