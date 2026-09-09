@@ -2677,6 +2677,12 @@ function isWholeWordMatch(label, keyword) {
 
         // P1 UX #3:统一封装下拉按钮 — 同步 ARIA + 键盘 Enter/↓/Space 触发 + 内部 ↑↓/Enter/Esc 导航。
         // 取代原先智能排座/打印按钮的零散 click handler,既闭环 ARIA,又修下拉键盘可达性。
+        // dropdown 元素 → 其 controller 的注册表。
+        // 用途:两个下拉互斥关闭时,必须走对方的 close() 同步内部 isOpen;
+        // 若只改 style.display,对方闭包里的 isOpen 会停留在 true,
+        // 下次点它就执行了「关闭」—— 表现为「要点两下才弹出」。
+        const dropdownCtrls = new WeakMap();
+
         function setupActionDropdown(btn, dropdown, peerBtn, peerDropdown) {
             let isOpen = false;
             // 将下拉改为 fixed 定位并按视口钳制,避免被 .controls 的 overflow:hidden 裁剪,
@@ -2707,18 +2713,22 @@ function isWholeWordMatch(label, keyword) {
             }
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                // 关闭另一个下拉(互斥)
-                if (peerDropdown && peerDropdown.style.display === 'block') {
+                // 关闭另一个下拉(互斥):走 close() 才能同步对方的 isOpen 与 aria-expanded
+                const peerCtrl = peerDropdown ? dropdownCtrls.get(peerDropdown) : null;
+                if (peerCtrl) {
+                    peerCtrl.close();
+                } else if (peerDropdown && peerBtn) {
                     peerDropdown.style.display = 'none';
-                    if (peerBtn) peerBtn.setAttribute('aria-expanded', 'false');
+                    peerBtn.setAttribute('aria-expanded', 'false');
                 }
-                setOpen(!isOpen);
+                // 以 DOM 实际显示状态为准翻转,避免 isOpen 被外部直接改 display 的操作带偏
+                setOpen(dropdown.style.display !== 'block');
             });
             // 键盘 Enter / ↓ / Space 在按钮上 → 展开并聚焦首项
             btn.addEventListener('keydown', function (e) {
                 if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (!isOpen) setOpen(true);
+                    if (dropdown.style.display !== 'block') setOpen(true);
                 } else if (e.key === 'Escape' && isOpen) {
                     e.preventDefault();
                     setOpen(false);
@@ -2755,10 +2765,13 @@ function isWholeWordMatch(label, keyword) {
                 }
             });
             // 用于外部点击关闭时同步 ARIA:返回 helper
-            return {
+            const ctrl = {
                 get isOpen() { return isOpen; },
-                close: function () { if (isOpen) setOpen(false); }
+                // 无条件 setOpen(false):即使 isOpen 已与外部失步,也要把 DOM 收干净
+                close: function () { setOpen(false); }
             };
+            dropdownCtrls.set(dropdown, ctrl);
+            return ctrl;
         }
         const randomDropdown = document.getElementById('randomDropdown');
         const printDropdown = document.getElementById('printDropdown');

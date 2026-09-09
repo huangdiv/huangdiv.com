@@ -661,7 +661,9 @@ h1:focus {
 
 .action-btn-wrapper > .action-btn {
     width: 100%;
-    flex: none;
+    /* 撑满 wrapper ⇒ 三个 wrapper 被 .quick-actions 拉伸到同一高度后,
+       按钮本身也跟着等高(切换模式 / 智能排座 / 打印) */
+    flex: 1 1 auto;
 }
 
 .action-btn-dropdown {
@@ -682,6 +684,11 @@ h1:focus {
     flex: none;
 }
 
+/* 上段吸收剩余高度,下段保持自然高度 ⇒ 分段总高跟随同排其他按钮 */
+.action-btn-split > .action-btn-split-main {
+    flex: 1 1 auto;
+}
+
 .action-btn-split-main {
     padding: 8px 6px 5px;
     border-bottom-left-radius: 0;
@@ -689,7 +696,9 @@ h1:focus {
 }
 
 .action-btn-split-caret {
-    padding: 3px 6px 7px;
+    /* padding 由 3/7 收到 2/5:使两段自然高度之和(57+22-1=78)
+       与单块按钮(切换模式 / 打印)的 78px 一致 */
+    padding: 2px 6px 5px;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
     margin-top: -1px;          /* 两段共享一条边框,视觉上仍是一组 */
