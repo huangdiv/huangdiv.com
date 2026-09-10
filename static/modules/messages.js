@@ -112,6 +112,10 @@ export const MESSAGES = {
     GENDER_RULE_PARTIAL: (mode, count) =>
         `小组轮换后仍有 ${count} 桌未达成「${mode === 'mixed' ? '男女同桌' : '男女不同桌'}」` +
         `(受小组座位区限制,无法进一步调整)`,
+    // 随机排座后仍有若干桌未达成(多为男女比例为奇数等数学上做不到的情形)
+    GENDER_RULE_UNSATISFIED: (mode, count) =>
+        `已安排座位,但仍有 ${count} 桌未达成「${mode === 'mixed' ? '男女同桌' : '男女不同桌'}」` +
+        `(受男女生人数比例限制,无法进一步调整)`,
 
     // —— 配对设置满足情况 ——
     PAIR_UNSATISFIED: (forcedCount, avoidCount) => {

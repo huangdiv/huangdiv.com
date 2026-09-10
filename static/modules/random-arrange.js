@@ -496,6 +496,114 @@ export function createRandomArrange(deps) {
             }
         }
 
+        // ── 性别规则上下文(仅 mixed / samegender 模式启用)──
+        // 关键:后续「每位学生都不在原来座位」的换座后处理,必须在不破坏性别规则的
+        // 前提下进行。此前该阶段完全无视性别 ⇒ 一次排座下来大量同桌被拆成违规,
+        // 这正是「开着开关却排不出符合要求座位」的根因。
+        var genderRuleMode = (mode === 'mixed' || mode === 'samegender') ? mode : null;
+        var genderMap = genderRuleMode ? buildGenderMap() : null;
+
+        // 某座位所在同桌当前是否满足性别规则(空座 / 性别未知 ⇒ 视为满足)
+        function deskGenderOk(idx) {
+            if (!genderRuleMode) return true;
+            var mate = findPairMate(idx, pairMap);
+            if (mate === null || mate === undefined) return true;
+            return !isGenderDeskViolation(idx, mate, genderRuleMode, genderMap);
+        }
+
+        // 试换 seatA / seatB 后两侧同桌是否会产生性别违规(试换后立即还原)
+        function swapBreaksGender(seatA, seatB) {
+            if (!genderRuleMode || seatA === seatB) return false;
+            var idA = state.seats[seatA];
+            var idB = state.seats[seatB];
+            if (!idA || !idB) return false;
+            state.seats[seatA] = idB;
+            state.seats[seatB] = idA;
+            var bad = !deskGenderOk(seatA) || !deskGenderOk(seatB);
+            state.seats[seatA] = idA;
+            state.seats[seatB] = idB;
+            return bad;
+        }
+
+        // 把剩余学生填进剩余座位:按桌(同桌单元)成组,优先凑出「符合性别规则」的
+        // 两人组合;实在凑不出时,宁可让该桌空一半也不制造异性同桌。
+        function placeStudentsGenderAware(seatIdxList, studentList) {
+            if (!genderRuleMode) { placeStudentsInSeats(seatIdxList, studentList); return; }
+            var pool = studentList.slice();
+            var g = genderMap;
+            function genderOf(st) { return g[st.id] || 'X'; }
+            function okPair(x, y) {
+                var gx = genderOf(x), gy = genderOf(y);
+                if (gx === 'X' || gy === 'X') return true;   // 性别未知 ⇒ 不违规
+                return genderRuleMode === 'mixed' ? (gx !== gy) : (gx === gy);
+            }
+            // 从 pool 里取出一对满足 okPair 的学生(取不到返回 null)
+            function takePair() {
+                for (var i = 0; i < pool.length; i++) {
+                    for (var j = i + 1; j < pool.length; j++) {
+                        if (okPair(pool[i], pool[j])) {
+                            var pair = [pool[i], pool[j]];
+                            pool.splice(j, 1); pool.splice(i, 1);
+                            return pair;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            // 按同桌单元分组:双座 [a,b] / 单座 [a]
+            var units = [];
+            var used = new Set();
+            seatIdxList.forEach(function (idx) {
+                if (used.has(idx)) return;
+                var mate = findPairMate(idx, pairMap);
+                if (mate !== null && mate !== undefined
+                    && seatIdxList.indexOf(mate) >= 0 && !used.has(mate)) {
+                    units.push([idx, mate]); used.add(idx); used.add(mate);
+                } else {
+                    units.push([idx]); used.add(idx);
+                }
+            });
+
+            // 双座单元:优先整桌成对的合规组合
+            var deferred = [];
+            units.forEach(function (u) {
+                if (u.length !== 2) return;
+                var picked = takePair();
+                if (picked) {
+                    state.seats[u[0]] = picked[0].id;
+                    state.seats[u[1]] = picked[1].id;
+                } else {
+                    deferred.push(u);     // 池里凑不出合规组合 ⇒ 只填一半
+                }
+            });
+
+            // 单座单元 + 凑不出对的双座。
+            // 分两轮填:先给每个单元填「第一座」(优先挑不违规的人),
+            // 若还有学生没坐下,再回头填这些桌的「第二座」——
+            // 「人人有座」优先于性别规则:留空只在学生确实不够坐时才发生。
+            var leftovers = [];
+            units.forEach(function (u) { if (u.length === 1) leftovers.push(u[0]); });
+            deferred.forEach(function (u) { leftovers.push(u[0]); });
+
+            function fill(seat) {
+                if (pool.length === 0) return;
+                var pick = -1;
+                for (var i = 0; i < pool.length; i++) {
+                    state.seats[seat] = pool[i].id;
+                    if (deskGenderOk(seat)) { pick = i; break; }
+                    state.seats[seat] = null;
+                }
+                if (pick < 0) { pick = 0; state.seats[seat] = pool[0].id; }
+                pool.splice(pick, 1);
+            }
+
+            leftovers.forEach(fill);
+            if (pool.length > 0) {
+                deferred.forEach(function (u) { fill(u[1]); });
+            }
+        }
+
         // 辅助:检查两个学生是否构成回避配对
         // 性能优化:一次性构建 Set 索引(key 为排序后的 "idA|idB"),O(1) 查询;
         // 后处理最多 200 次 × 每对座位一次 swapCreatesAvoidPair 检查,
@@ -585,7 +693,8 @@ export function createRandomArrange(deps) {
                 // 注意:shuffle() 返回新数组,必须接住返回值
                 const remainingSeats = neededIndices.filter(idx => !occupiedSeats.has(idx));
                 const remainingStudents = shuffle(state.students.filter(s => !placedIds.has(s.id)));
-                placeStudentsInSeats(remainingSeats, remainingStudents);
+                // mixed 模式:剩余学生同样按「一男一女」成桌填,避免尾部随机破坏规则
+                placeStudentsGenderAware(remainingSeats, remainingStudents);
 
             } else if (mode === 'samegender') {
                 // 男女不同桌:每对 pair 放同性别
@@ -632,7 +741,8 @@ export function createRandomArrange(deps) {
                 // 注意:shuffle() 返回新数组,必须接住返回值
                 const remainingSeats = neededIndices.filter(idx => !occupiedSeats.has(idx));
                 const remainingStudents = shuffle(state.students.filter(s => !placedIds.has(s.id)));
-                placeStudentsInSeats(remainingSeats, remainingStudents);
+                // samegender 模式:奇数落单的学生按「与同桌同性别」填,不再随机乱塞
+                placeStudentsGenderAware(remainingSeats, remainingStudents);
             }
         } // end else (mixed / samegender)
 
@@ -717,6 +827,10 @@ export function createRandomArrange(deps) {
                 if (wasOldSeat(swapId, ci)) continue;
                 // 条件3: 不产生回避配对
                 if (swapCreatesAvoidPair(ci, conflictId, si, swapId)) continue;
+                // 条件4: 不破坏性别规则(男女同桌 / 男女不同桌)
+                // —— 性别规则优先于「必须换座」:宁可让这名学生留在原座位,
+                //    也不把已经合规的同桌拆成违规
+                if (swapBreaksGender(ci, si)) continue;
 
                 // 执行交换
                 state.seats[ci] = swapId;
@@ -731,15 +845,35 @@ export function createRandomArrange(deps) {
                     if (si === ci) continue;
                     if (state.seats[si]) continue; // 只找空座位
                     if (wasOldSeat(conflictId, si)) continue;
-                    // 移到空座位
+                    // 移到空座位(同样不能制造性别违规)
                     state.seats[si] = conflictId;
                     state.seats[ci] = null;
+                    if (!deskGenderOk(si) || !deskGenderOk(ci)) {
+                        state.seats[si] = null;
+                        state.seats[ci] = conflictId;
+                        continue;
+                    }
                     resolved = true;
                     break;
                 }
             }
 
             // 重新计算冲突
+            conflicts = findConflicts();
+        }
+
+        // ==================== 性别规则收尾修复 ====================
+        // 落座阶段与上面的换座阶段都可能留下少量违规(例如男女比例为奇数、或换座
+        // 受性别 guard 限制没走完)。这里再做一轮**全班范围**的修复:
+        // 不传 areaOf ⇒ 允许跨区互换,把残留的违规桌尽量消掉。
+        // 优先级:性别规则 > 「不在原座位」(修复可能让个别学生回到原座位)。
+        if (genderRuleMode) {
+            adjustGenderRuleInGroups({
+                mode: genderRuleMode,
+                maxAttempts: Math.max(maxAttempts, 300),
+                shuffle: shuffle
+            });
+            // 修复后重新统计仍在原座位的人数
             conflicts = findConflicts();
         }
 
@@ -764,6 +898,13 @@ export function createRandomArrange(deps) {
         if (finalPair.forcedBroken.length > 0 || finalPair.avoidBroken.length > 0) {
             warnings.push(MESSAGES.PAIR_UNSATISFIED(
                 finalPair.forcedBroken.length, finalPair.avoidBroken.length));
+        }
+        // 性别规则最终仍未满足(男女比例为奇数等数学上做不到的情形)⇒ 如实提示
+        if (genderRuleMode) {
+            var finalGender = findGenderViolations(genderRuleMode, genderMap, pairMap);
+            if (finalGender.length > 0) {
+                warnings.push(MESSAGES.GENDER_RULE_UNSATISFIED(genderRuleMode, finalGender.length));
+            }
         }
         return { warnings: warnings };
     }
