@@ -372,6 +372,10 @@ export function createSeatGrid(deps) {
         const student = studentId ? getStudentById(studentId) : null;
         const displayRow = Math.floor(seatIndex / state.cols) + 1;
         const displayCol = (seatIndex % state.cols) + 1;
+        // 隐藏图标(showIcons=false)时,同步隐藏「X排Y列」坐标标签
+        const numberHtml = showIcons
+            ? '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>'
+            : '';
 
         if (studentId) {
             const displayName = student ? student.name : '';
@@ -399,13 +403,13 @@ export function createSeatGrid(deps) {
                 }
             }
             seat.innerHTML =
-                '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
+                numberHtml +
                 '<span class="seat-name">' + escapeHtml(displayName) + '</span>' +
                 iconsHtml +
                 deleteBtnHtml;
         } else {
             seat.innerHTML =
-                '<span class="seat-number">' + displayRow + '排' + displayCol + '列</span>' +
+                numberHtml +
                 '<span class="seat-name" style="color: #999;">空</span>';
         }
     }
