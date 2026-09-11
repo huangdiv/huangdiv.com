@@ -365,7 +365,7 @@
     }
     const initialState=()=>({
       page:"dashboard",scheduleSchemaVersion:3,gradeSchemaVersion:2,subtabs:{class:"basic",grades:"overview",seats:"current",dorms:"男",dormView:"rooms",comments:"generate",footprints:"all"},
-      classes:[{id:"class-demo",name:"初一（3）班"}],activeClassId:"class-demo",classProfiles:{},
+      classes:[{id:"class-demo",name:"初一（3）班",stage:"junior"}],activeClassId:"class-demo",classProfiles:{},deletedBuiltinClasses:[],
       students:seedStudents(),customPages:[],moduleTools:{},seatOrder:seedStudents().map(s=>s.id),seatHistory:[],seatRules:[],
       exams:seedExams(),activeExamId:"exam-demo-3",
       seatConfig:{name:"初一（3）班座位表",mode:"group",groups:4,colsPerGroup:2,rows:5,singleCols:7,singleRows:6,smallGroupSize:4,smallGroupParts:3,podium:"top",flipH:false,showLabels:true},
@@ -435,8 +435,9 @@
     state.schedule=Array.isArray(state.schedule)?state.schedule:JSON.parse(JSON.stringify(defaults.schedule));
     state.dormScores=Array.isArray(state.dormScores)?state.dormScores:JSON.parse(JSON.stringify(defaults.dormScores));
     state.dormRecords=Array.isArray(state.dormRecords)?state.dormRecords:JSON.parse(JSON.stringify(defaults.dormRecords));
-    state.classes=Array.isArray(state.classes)&&state.classes.length?state.classes:[{id:"class-demo",name:state.classInfo.name}];
+    state.classes=(Array.isArray(state.classes)&&state.classes.length?state.classes:[{id:"class-demo",name:state.classInfo.name,stage:"junior"}]).map(item=>({id:item.id,name:item.name,stage:item.stage||(item.id==="class-hs2"?"senior":/高/.test(item.name)?"senior":"junior")}));
     state.activeClassId=state.activeClassId||state.classes[0].id;
+    if(!Array.isArray(state.deletedBuiltinClasses))state.deletedBuiltinClasses=[];
     state.classProfiles=state.classProfiles&&typeof state.classProfiles==="object"?state.classProfiles:{};
     state.moduleTools=normalizeModuleTools(state.moduleTools);
     const CLASS_KEYS=["students","seatOrder","seatHistory","seatConfig","classInfo","classCulture","teachers","cadres","representatives","scheduleDays","schedule","exams","activeExamId","gradeLines","gradeConfig","groupConfig","seatRules","dormScores","dormRecords","pointsRecords","comments","footprints","todos","moduleTools","selectedCommentStudent","commentLevel","commentTags","commentDraft"];
@@ -504,9 +505,11 @@
     }
     function normalizeScheduleRows(schedule,dayCount=SCHEDULE_DAYS.length){
       const T=scheduleTiming(schedule);
-      const rows=Array.isArray(schedule)?schedule:[],byId=new Map(rows.map(x=>[x.id,x])),builtIds=new Set(DEFAULT_SCHEDULE.map(x=>x.id));
-      const built=DEFAULT_SCHEDULE.map(def=>{const old=byId.get(def.id),courses=(old?.courses||def.courses).slice(0,dayCount);while(courses.length<dayCount)courses.push("");if(def.kind==="reading")for(let i=0;i<courses.length;i++)if(!["语文","英语",""].includes(courses[i]))courses[i]=def.courses[i]||"";if(def.kind==="break")for(let i=0;i<Math.min(5,courses.length);i++)courses[i]="大课间";return Object.assign({},old||{},def,{courses})});
-      const custom=rows.filter(x=>!builtIds.has(x.id)).map(row=>{const courses=(row.courses||[]).slice(0,dayCount);while(courses.length<dayCount)courses.push("");const kind=row.kind||(/早读/.test(row.label)?"reading":/大课间/.test(row.label)?"break":"custom"),duration=row.duration||((kind==="lesson"?T.lesson:kind==="break"||kind==="reading"?T.reading:0));return Object.assign({},row,{kind,duration,end:row.end||addMinutes(row.start,duration),courses})});
+      const rows=Array.isArray(schedule)?schedule:[],byId=new Map(rows.map(x=>[x.id,x]));
+      const base=rows.some(x=>HS_SCHEDULE.some(h=>h.id===x.id))?HS_SCHEDULE:DEFAULT_SCHEDULE;
+      const baseIds=new Set(base.map(x=>x.id)),builtIds=new Set(DEFAULT_SCHEDULE.map(x=>x.id));
+      const built=base.map(def=>{const old=byId.get(def.id),courses=(old?.courses||def.courses).slice(0,dayCount);while(courses.length<dayCount)courses.push("");if(def.kind==="reading")for(let i=0;i<courses.length;i++)if(!["语文","英语",""].includes(courses[i]))courses[i]=def.courses[i]||"";if(def.kind==="break")for(let i=0;i<Math.min(5,courses.length);i++)courses[i]="大课间";return Object.assign({},old||{},def,{courses})});
+      const custom=rows.filter(x=>!baseIds.has(x.id)).map(row=>{const courses=(row.courses||[]).slice(0,dayCount);while(courses.length<dayCount)courses.push("");const kind=row.kind||(/早读/.test(row.label)?"reading":/大课间/.test(row.label)?"break":"custom"),duration=row.duration||((kind==="lesson"?T.lesson:kind==="break"||kind==="reading"?T.reading:0));return Object.assign({},row,{kind,duration,end:row.end||addMinutes(row.start,duration),courses})});
       return [...built,...custom];
     }
     function normalizeAcademicData(container,isDemo=false,upgradeSchedule=false){
@@ -552,7 +555,48 @@
         selectedCommentStudent:"",commentLevel:"优秀",commentTags:[],commentDraft:""
       };
     }
-    if(!state.classes.some(item=>item.id==="class-hs2")){state.classes.push({id:"class-hs2",name:"高一（2）班"});state.classProfiles["class-hs2"]=hsClassProfile()}
+    function juniorClassProfile(){
+      const d=defaults,students=seedStudents();
+      return {
+        students,seatOrder:students.map(student=>student.id),seatHistory:[],seatRules:[],
+        seatConfig:cloneData(d.seatConfig),classInfo:cloneData(d.classInfo),classCulture:cloneData(d.classCulture),
+        teachers:cloneData(d.teachers),cadres:cloneData(d.cadres),representatives:cloneData(d.representatives),
+        scheduleDays:d.scheduleDays.slice(),schedule:cloneData(d.schedule),
+        exams:[],activeExamId:"",gradeLines:{total:0,subjects:{}},gradeConfig:cloneData(d.gradeConfig),groupConfig:cloneData(d.groupConfig),
+        dormScores:[],dormRecords:[],pointsRecords:[],comments:[],footprints:[],todos:[],moduleTools:{},
+        selectedCommentStudent:"",commentLevel:"优秀",commentTags:[],commentDraft:""
+      };
+    }
+    function classFromTemplate(name,stage){
+      const template=stage==="senior"?hsClassProfile():juniorClassProfile(),profile=cloneData(template);
+      profile.classInfo=Object.assign({},profile.classInfo,{name,studentTarget:0});
+      profile.seatConfig=Object.assign({},profile.seatConfig,{name:name+"座位表"});
+      profile.students=[];profile.seatOrder=Array(seatCapacity(profile.seatConfig)).fill(null);
+      profile.seatHistory=[];profile.seatRules=[];profile.cadres={};profile.representatives={};
+      profile.exams=[];profile.activeExamId="";profile.dormScores=[];profile.dormRecords=[];profile.pointsRecords=[];profile.comments=[];profile.footprints=[];profile.todos=[];profile.moduleTools={};profile.gradeLines={total:0,subjects:{}};
+      profile.selectedCommentStudent="";profile.commentTags=[];profile.commentDraft="";
+      return profile;
+    }
+    function switchToClass(id){
+      if(!state.classes.some(item=>item.id===id))return;
+      if(id===state.activeClassId){closeModal();return}
+      syncActiveClass();state.activeClassId=id;
+      if(!applyClassData(id))return toast("班级数据读取失败");
+      state.page="dashboard";save();closeModal();renderNav();renderPage();toast("已切换到 "+state.classInfo.name);
+    }
+    function askDeleteClass(id){
+      const item=state.classes.find(item=>item.id===id);if(!item)return;
+      openModal("删除班级",`<p style="font-size:13px;line-height:1.8">确定要删除班级「${escapeHtml(item.name)}」吗？该班级的全部学生、成绩、座位、宿舍、积分与工作记录将被<b style="color:var(--red)">永久删除且无法恢复</b>。</p>`,"删除",()=>{
+        if(state.classes.length<=1){toast("至少需要保留一个班级");closeModal();return}
+        const wasActive=state.activeClassId===id;
+        state.classes=state.classes.filter(item=>item.id!==id);
+        delete state.classProfiles[id];
+        if(id==="class-demo"||id==="class-hs2")state.deletedBuiltinClasses=Array.from(new Set(state.deletedBuiltinClasses.concat([id])));
+        if(wasActive){state.activeClassId=state.classes[0].id;if(!applyClassData(state.activeClassId))state.classProfiles[state.activeClassId]=captureClassData()}
+        save();closeModal();renderNav();renderPage();toast("已删除班级「"+item.name+"」");
+      });
+    }
+    if(!state.classes.some(item=>item.id==="class-hs2")&&!state.deletedBuiltinClasses.includes("class-hs2")){state.classes.push({id:"class-hs2",name:"高一（2）班",stage:"senior"});state.classProfiles["class-hs2"]=hsClassProfile()}
     normalizeAcademicData(state,state.activeClassId==="class-demo",needsScheduleUpgrade);
     Object.entries(state.classProfiles).forEach(([id,profile])=>normalizeAcademicData(profile,id==="class-demo",needsScheduleUpgrade));
     state.scheduleSchemaVersion=3;
@@ -886,11 +930,17 @@
     }
     function studentOptions(selected=""){return `<option value="">待定 / 暂不安排</option>`+state.students.map(s=>`<option value="${s.id}" ${s.id===selected?"selected":""}>${s.name} · ${s.studentNo}</option>`).join("")}
     function openClassSwitch(){
-      openModal("切换或创建班级",`<div class="form-group"><label>已有班级</label><select class="select" id="switchClass" style="width:100%">${state.classes.map(c=>`<option value="${c.id}" ${c.id===state.activeClassId?"selected":""}>${escapeHtml(c.name)}${(c.id==="class-demo"||c.id==="class-hs2")?" · 内置试用班级":""}</option>`).join("")}</select></div><div class="form-group" style="margin-top:12px"><label>创建新班级</label><input class="input" id="newClassName" style="width:100%" placeholder="如：初二（1）班"></div><p style="font-size:12px;color:var(--muted);line-height:1.7">每个班级的学生、座位、成绩、宿舍、积分和记录相互独立。创建的新班级默认没有学生，可直接导入 Excel。</p>`,"确认",()=>{
-        syncActiveClass();const newName=el("newClassName").value.trim();let id=el("switchClass").value;
-        if(newName){id="class-"+Date.now();state.classes.push({id,name:newName});state.classProfiles[id]=emptyClassData(newName)}
-        state.activeClassId=id;if(!applyClassData(id))return toast("班级数据读取失败");
-        state.page="dashboard";save();closeModal();renderNav();renderPage();toast("已切换到 "+state.classInfo.name);
+      openModal("切换或创建班级",`<div class="form-group"><label>已有班级（点击切换）</label><div class="list">${state.classes.map(item=>`<div class="list-row" style="cursor:pointer" onclick="switchToClass('${item.id}')"><span class="bullet ${item.id===state.activeClassId?"":"amber"}"></span><div class="grow"><strong>${escapeHtml(item.name)}</strong><small>${item.stage==="senior"?"高中":"初中"}学段${(item.id==="class-demo"||item.id==="class-hs2")?" · 内置试用班级":""}${item.id===state.activeClassId?" · 当前":""}</small></div><button class="btn sm danger" onclick="event.stopPropagation();askDeleteClass('${item.id}')">删除</button></div>`).join("")}</div></div><div class="form-group" style="margin-top:12px"><label>创建新班级</label><input class="input" id="newClassName" style="width:100%" placeholder="如：高二（1）班"><div style="display:flex;gap:16px;margin-top:9px"><label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);cursor:pointer"><input type="radio" name="newClassStage" value="junior" checked> 初中</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);cursor:pointer"><input type="radio" name="newClassStage" value="senior"> 高中</label></div><p style="font-size:11px;color:var(--muted);line-height:1.7;margin-top:8px">创建的新班级默认没有学生，可直接导入 Excel。新班级将继承所选学段内置默认配置（学科种类、课程表时段、成绩口径等），初高中配置相互独立。</p></div>`,"创建班级",()=>{
+        const newName=el("newClassName").value.trim();
+        if(!newName)return toast("请填写班级名称");
+        const stage=document.querySelector('input[name="newClassStage"]:checked')?.value==="senior"?"senior":"junior";
+        syncActiveClass();
+        const id="class-"+Date.now();
+        state.classes.push({id,name:newName,stage});
+        state.classProfiles[id]=classFromTemplate(newName,stage);
+        state.activeClassId=id;
+        if(!applyClassData(id))return toast("班级数据读取失败");
+        state.page="dashboard";save();closeModal();renderNav();renderPage();toast("已创建并切换到 "+state.classInfo.name);
       });
     }
     function openClassInfoEditor(){
