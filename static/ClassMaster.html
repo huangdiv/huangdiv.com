@@ -139,7 +139,7 @@
   <script>
     const NAMES=["陈昱辰","林若溪","周子墨","许嘉宁","沈亦航","苏语桐","顾景然","宋知夏","江明远","叶书瑶","陆承宇","温以宁","唐浩然","夏安然","程予安","乔诗涵","韩睿哲","方雨欣","罗梓轩","魏可心","谢云舟","梁清妍","钟宇辰","邱思琪","杜文博","彭佳琪","范嘉树","姚念慈","袁致远","董静姝","潘奕铭","蔡欣妍","蒋星河","何婉清","余正阳","郑芷晴","曹嘉言","冯语嫣","曾书翰","章若彤"];
     const SURNAMES=["陈","林","周","许","沈","苏","顾","宋","江","叶","陆","温","唐","夏","程","乔","韩","方","罗","魏","谢","梁","钟","邱","杜","彭","范","姚","袁","董","潘","蔡","蒋","何","余","郑","曹","冯","曾","章"];
-    const SUBJECTS=["语文","数学","英语","物理","化学","生物","历史","政治","地理","体育","微机","音乐","美术","心理"];
+    const SUBJECTS=["语文","数学","英语","物理","化学","生物","历史","政治","地理","道法","体育","微机","音乐","美术","心理"];
     const SCALED_SUBJECTS=["化学","生物","政治","地理"];
     const DORM_CAPACITY=8;
     const DORM_BASE_ROOM=301;
@@ -150,11 +150,11 @@
       {id:"sch-1",label:"第1节",kind:"lesson",duration:45,start:"08:00",end:"08:45",courses:["语文","数学","英语","地理","语文","",""]},
       {id:"sch-2",label:"第2节",kind:"lesson",duration:45,start:"09:00",end:"09:45",courses:["数学","语文","生物","英语","数学","",""]},
       {id:"sch-break",label:"大课间",kind:"break",duration:30,start:"09:45",end:"10:15",courses:["大课间","大课间","大课间","大课间","大课间","",""]},
-      {id:"sch-3",label:"第3节",kind:"lesson",duration:45,start:"10:15",end:"11:00",courses:["英语","地理","语文","数学","道法","",""]},
+      {id:"sch-3",label:"第3节",kind:"lesson",duration:45,start:"10:15",end:"11:00",courses:["英语","历史","语文","数学","道法","",""]},
       {id:"sch-4",label:"第4节",kind:"lesson",duration:45,start:"11:15",end:"12:00",courses:["地理","生物","数学","语文","英语","",""]},
-      {id:"sch-5",label:"第5节",kind:"lesson",duration:45,start:"14:00",end:"14:45",courses:["生物","英语","体育","道法","地理","",""]},
+      {id:"sch-5",label:"第5节",kind:"lesson",duration:45,start:"14:00",end:"14:45",courses:["生物","英语","体育","道法","历史","",""]},
       {id:"sch-6",label:"第6节",kind:"lesson",duration:45,start:"15:00",end:"15:45",courses:["道法","班会","英语","生物","语文","",""]},
-      {id:"sch-7",label:"第7节",kind:"lesson",duration:45,start:"16:00",end:"16:45",courses:["自习","社团","自习","体育","心理","",""]},
+      {id:"sch-7",label:"第7节",kind:"lesson",duration:45,start:"16:00",end:"16:45",courses:["音乐","美术","心理","体育","微机","",""]},
       {id:"sch-8",label:"第8节",kind:"lesson",duration:45,start:"17:00",end:"17:45",courses:["语文","数学","英语","地理","生物","",""]}
     ];
     const HS_NAMES=["陈屿森","林听晚","周砚清","许星野","沈知白","苏以然","顾南舟","宋清和","江逾白","叶舒窈","陆行舟","温故辰","唐斯年","夏予安","程嘉树","乔语澜","韩牧之","方见微","罗云谏","魏南乔","谢归远","梁浅予","钟晚舟","邱静姝","杜若飞","彭晏清","范星然","姚知许","袁清渠","董砚书","潘景行","蔡宛之","蒋亦辰","何清野","余书亭","郑云舒","曹望津","冯知夏","曾子骞","章雪吟","汪砚舟","尹长安","施明轩","严清越","华予瞳","金思远","陶知微","姜屿川","戚若谷","邹清宁","喻星洲","柏文澜","窦明诚","云清让","葛修远","奚若水","郎清桐","鲁知非","韦星桥","马吟秋","苗以安","花向晚","柳青梧","雷听澜"];
@@ -364,24 +364,27 @@
       };
     }
     const initialState=()=>({
-      page:"dashboard",scheduleSchemaVersion:3,gradeSchemaVersion:2,subtabs:{class:"basic",grades:"overview",seats:"current",dorms:"男",dormView:"rooms",comments:"generate",footprints:"all"},
+      page:"dashboard",scheduleSchemaVersion:3,gradeSchemaVersion:2,juniorConfigVersion:1,subtabs:{class:"basic",grades:"overview",seats:"current",dorms:"男",dormView:"rooms",comments:"generate",footprints:"all"},
       classes:[{id:"class-demo",name:"初一（3）班",stage:"junior"}],activeClassId:"class-demo",classProfiles:{},deletedBuiltinClasses:[],
       students:seedStudents(),customPages:[],moduleTools:{},seatOrder:seedStudents().map(s=>s.id),seatHistory:[],seatRules:[],
       exams:seedExams(),activeExamId:"exam-demo-3",
       seatConfig:{name:"初一（3）班座位表",mode:"group",groups:4,colsPerGroup:2,rows:5,singleCols:7,singleRows:6,smallGroupSize:4,smallGroupParts:3,podium:"top",flipH:false,showLabels:true},
       gradeLines:{total:0,subjects:{}},
-      gradeConfig:{subjects:["语文","数学","英语","物理","化学","生物","历史","政治","地理"],scaledMode:false},
+      gradeConfig:{subjects:["语文","数学","英语","道法","历史","地理","生物","物理","化学"],scaledMode:false},
       groupConfig:{size:5},
       classInfo:{name:"初一（3）班",teacher:"林静",subject:"语文",classroom:"知行楼 403",grade:"初一年级",year:"2025—2026 学年",studentTarget:40},
       classCulture:{slogan:"知行合一 · 向光生长",description:"让每一位同学在诚实、勤奋、友爱与担当中发现自己的力量；既仰望星空，也认真完成今天的每一件小事。",motto:"明德、求真、笃行、致远",agreements:["提前两分钟安静候课","问题当天清，承诺认真做","尊重差异，彼此成就"],month:"七月",theme:"整理 · 告别 · 出发",themeDesc:"做好学期复盘，整理成长档案，带着清晰目标进入暑期。"},
       teachers:[
         {id:"t1",name:"林静",subject:"语文",role:"班主任",phone:"138****3011"},{id:"t2",name:"赵明远",subject:"数学",role:"备课组长",phone:"138****3012"},
-        {id:"t3",name:"沈知微",subject:"英语",role:"科任老师",phone:"138****3013"},{id:"t4",name:"周成蹊",subject:"地理",role:"科任老师",phone:"138****3014"},
-        {id:"t5",name:"许文博",subject:"生物",role:"科任老师",phone:"138****3015"},{id:"t6",name:"韩思齐",subject:"道法",role:"科任老师",phone:"138****3016"},
-        {id:"t7",name:"徐一凡",subject:"体育",role:"科任老师",phone:"138****3017"},{id:"t8",name:"唐书雅",subject:"心理",role:"心理辅导",phone:"138****3018"}
+        {id:"t3",name:"沈知微",subject:"英语",role:"科任老师",phone:"138****3013"},{id:"t4",name:"韩思齐",subject:"道法",role:"科任老师",phone:"138****3016"},
+        {id:"t5",name:"徐一凡",subject:"历史",role:"科任老师",phone:"138****3017"},{id:"t6",name:"周成蹊",subject:"地理",role:"科任老师",phone:"138****3014"},
+        {id:"t7",name:"许文博",subject:"生物",role:"科任老师",phone:"138****3015"},{id:"t8",name:"钱振宇",subject:"物理",role:"科任老师",phone:"138****3021"},
+        {id:"t9",name:"姚清和",subject:"化学",role:"科任老师",phone:"138****3022"},{id:"t10",name:"罗嘉言",subject:"体育",role:"科任老师",phone:"138****3023"},
+        {id:"t11",name:"毕思远",subject:"微机",role:"科任老师",phone:"138****3024"},{id:"t12",name:"孟宛之",subject:"音乐",role:"科任老师",phone:"138****3025"},
+        {id:"t13",name:"苏静澜",subject:"美术",role:"科任老师",phone:"138****3026"},{id:"t14",name:"唐书雅",subject:"心理",role:"心理辅导",phone:"138****3018"}
       ],
       cadres:{"班长":"stu-1","团支书":"stu-2","学习委员":"stu-3","体育委员":"stu-4"},
-      representatives:{"语文":"stu-5","数学":"stu-6","英语":"stu-7","地理":"stu-8","生物":"stu-9","道法":"stu-10"},
+      representatives:{"语文":"stu-5","数学":"stu-6","英语":"stu-7","地理":"stu-8","生物":"stu-9","道法":"stu-10","历史":"stu-11","物理":"stu-12","化学":"stu-13","体育":"stu-14","微机":"stu-15","音乐":"stu-16","美术":"stu-17","心理":"stu-18"},
       scheduleDays:SCHEDULE_DAYS.slice(0,5),
       schedule:JSON.parse(JSON.stringify(DEFAULT_SCHEDULE)),
       dormScores:[
@@ -519,6 +522,12 @@
       if(container.classInfo){if(container.classInfo.name==="高一（3）班")container.classInfo.name="初一（3）班";if(container.classInfo.grade==="高一年级")container.classInfo.grade="初一年级"}
       if(container.seatConfig?.name==="高一（3）班座位表")container.seatConfig.name="初一（3）班座位表";
     }
+    function normalizeJuniorStage(container){
+      container.teachers=cloneData(defaults.teachers);
+      container.schedule=JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
+      container.scheduleDays=SCHEDULE_DAYS.slice(0,5);
+      container.gradeConfig=Object.assign({},container.gradeConfig||{},{subjects:cloneData(defaults.gradeConfig.subjects),scaledMode:false});
+    }
     function normalizeModuleTools(collection){
       const tools=collection&&typeof collection==="object"?collection:{};
       Object.keys(tools).forEach(page=>{tools[page]=(tools[page]||[]).map((x,i)=>{if(x&&x.type&&Array.isArray(x.fields))return Object.assign({description:"",entries:[]},x,{entries:Array.isArray(x.entries)?x.entries:[]});const old=typeof x==="string"?{title:x}:x||{},field={id:"legacy-note",label:"原卡片内容",type:"textarea",options:[]};return {id:old.id||"tool-migrated-"+page+"-"+i,title:old.title||"自定义记录",type:"records",description:"由旧版自定义卡片升级而来。",fields:[field],entries:old.content?[{id:"entry-migrated-"+i,createdAt:old.date||"",done:false,values:{"legacy-note":old.content}}]:[]}})});return tools;
@@ -604,6 +613,12 @@
     Object.entries(state.classProfiles).forEach(([id,profile])=>normalizeGradeData(profile,needsGradeUpgrade,id==="class-demo"));
     state.gradeSchemaVersion=2;
     const demoClassItem=state.classes.find(x=>x.id==="class-demo");if(demoClassItem&&demoClassItem.name==="高一（3）班")demoClassItem.name="初一（3）班";
+    if(Object.keys(storedState).length&&Number(storedState.juniorConfigVersion||0)<1){
+      const isJuniorClass=id=>{const item=state.classes.find(c=>c.id===id);return !!item&&item.stage==="junior"};
+      if(isJuniorClass(state.activeClassId))normalizeJuniorStage(state);
+      Object.entries(state.classProfiles).forEach(([id,profile])=>{if(isJuniorClass(id))normalizeJuniorStage(profile)});
+      state.juniorConfigVersion=1;
+    }
     if(!state.classProfiles[state.activeClassId])state.classProfiles[state.activeClassId]=captureClassData();
     let modalAction=null,dragSeatIndex=null,moduleDraftFields=[];
     const el=id=>document.getElementById(id);
@@ -1027,7 +1042,7 @@
     function deleteExam(id){const exam=state.exams.find(item=>item.id===id);if(!exam||!confirm("确定删除“"+exam.name+"”及其全部成绩吗？"))return;state.exams=state.exams.filter(item=>item.id!==id);state.activeExamId=orderedExams().at(-1)?.id||"";applyActiveExamScores();save();closeModal();renderPage();toast("考试已删除")}
     function downloadGradeTemplate(){
       if(typeof XLSX==="undefined")return toast("Excel 组件未加载，请联网刷新后重试");
-      const templateSubjects=activeGradeSubjects(),scaledTemplateSubjects=SCALED_SUBJECTS.filter(subject=>templateSubjects.includes(subject)),rows=[["姓名","学号","考试号",...templateSubjects,...scaledTemplateSubjects.map(subject=>subject+"赋分"),"总分","班内排名","年级排名","成绩等级","进退"],...state.students.map(student=>[student.name,student.studentNo,student.examNo,...templateSubjects.map(()=>""),...scaledTemplateSubjects.map(()=>""),"","","","",""])],ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:14},{wch:16},{wch:16},...templateSubjects.map(()=>({wch:10})),...scaledTemplateSubjects.map(()=>({wch:12})),{wch:11},{wch:11},{wch:11},{wch:11},{wch:10}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"成绩导入模板");XLSX.writeFile(wb,safeExportName(state.classInfo.name)+"成绩导入模板.xlsx");toast("成绩模板已下载；也可直接使用学校现有成绩表");
+      const templateSubjects=activeGradeSubjects(),scaledTemplateSubjects=supportsScaledSubjects()?SCALED_SUBJECTS.filter(subject=>templateSubjects.includes(subject)):[],rows=[["姓名","学号","考试号",...templateSubjects,...scaledTemplateSubjects.map(subject=>subject+"赋分"),"总分","班内排名","年级排名","成绩等级","进退"],...state.students.map(student=>[student.name,student.studentNo,student.examNo,...templateSubjects.map(()=>""),...scaledTemplateSubjects.map(()=>""),"","","","",""])],ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:14},{wch:16},{wch:16},...templateSubjects.map(()=>({wch:10})),...scaledTemplateSubjects.map(()=>({wch:12})),{wch:11},{wch:11},{wch:11},{wch:11},{wch:10}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"成绩导入模板");XLSX.writeFile(wb,safeExportName(state.classInfo.name)+"成绩导入模板.xlsx");toast("成绩模板已下载；也可直接使用学校现有成绩表");
     }
     function openSubjectReport(subject){
       const analysis=analyzeExam(),stat=analysis?.subjectStats.find(item=>item.subject===subject);if(!analysis||!analysis.students.length||!stat)return toast("当前考试还没有可分析的成绩");
@@ -1105,7 +1120,10 @@
       const picked=active.filter(subject=>all.includes(subject));
       return picked.length?picked:all;
     }
-    function isScaledMode(){return !!(state.gradeConfig&&state.gradeConfig.scaledMode)}
+    function currentStage(){const item=state.classes.find(x=>x.id===state.activeClassId);return item&&item.stage==="senior"?"senior":"junior"}
+    function supportsScaledSubjects(){return currentStage()==="senior"}
+    function defaultGradeSubjectsForStage(){return supportsScaledSubjects()?["语文","数学","英语","物理","化学","生物","历史","政治","地理"]:["语文","数学","英语","道法","历史","地理","生物","物理","化学"]}
+    function isScaledMode(){return supportsScaledSubjects()&&!!(state.gradeConfig&&state.gradeConfig.scaledMode)}
     function rawSubjectScore(exam,student,subject){const index=examAllSubjects(exam).indexOf(subject),rows=exam?.scores?.[student?.id];if(index<0||!Array.isArray(rows))return null;const value=rows[index];return Number.isFinite(Number(value))?Number(value):null}
     function examSubjectValue(exam,student,subject){
       if(isScaledMode()&&SCALED_SUBJECTS.includes(subject)){
@@ -1124,7 +1142,7 @@
     }
     function examScaledScores(exam,student){const data=exam?.scaledScores?.[student?.id];return data&&typeof data==="object"?data:{}}
     function scaledExamValue(exam,student,subject){return cleanCell(examScaledScores(exam,student)[subject])}
-    function examScaledSubjects(exam,students){const found=new Set();(students||[]).forEach(student=>Object.keys(examScaledScores(exam,student)).forEach(subject=>{if(subject)found.add(subject)}));return [...found]}
+    function examScaledSubjects(exam,students){if(!supportsScaledSubjects())return [];const found=new Set();(students||[]).forEach(student=>Object.keys(examScaledScores(exam,student)).forEach(subject=>{if(subject)found.add(subject)}));return [...found]}
     function examStudentMeta(exam,student){return exam?.studentMeta?.[student?.id]||{}}
     function examParticipants(exam=currentExam()){return state.students.filter(student=>Array.isArray(exam?.scores?.[student.id])||Object.prototype.hasOwnProperty.call(exam?.studentMeta||{},student.id))}
     function numericScores(values){return (values||[]).filter(value=>Number.isFinite(Number(value))).map(Number)}
@@ -1160,16 +1178,16 @@
     function applyActiveExamScores(){const exam=currentExam();state.students.forEach(student=>{student.scores=examScores(exam,student)||examSubjects(exam).map(()=>0)})}
     function switchGradeExam(id){if(!state.exams.some(exam=>exam.id===id))return;state.activeExamId=id;applyActiveExamScores();save();renderPage()}
     function setGradeLine(subject,value){const lines=state.gradeLines||(state.gradeLines={total:0,subjects:{}});if(!lines.subjects||typeof lines.subjects!=="object")lines.subjects={};if(subject==="__total__")lines.total=Number(value)||0;else lines.subjects[subject]=Number(value)||0;save();renderPage()}
-    function activeGradeSubjects(){return (state.gradeConfig&&Array.isArray(state.gradeConfig.subjects)&&state.gradeConfig.subjects.length)?state.gradeConfig.subjects:["语文","数学","英语","物理","化学","生物","历史","政治","地理"]}
+    function activeGradeSubjects(){return (state.gradeConfig&&Array.isArray(state.gradeConfig.subjects)&&state.gradeConfig.subjects.length)?state.gradeConfig.subjects:defaultGradeSubjectsForStage()}
     function gradeSubjectPool(exam=currentExam()){const all=examAllSubjects(exam);return [...new Set([...all,...SUBJECTS])]}
     function toggleGradeSubject(subject,on){const list=new Set(activeGradeSubjects());if(on)list.add(subject);else list.delete(subject);state.gradeConfig=Object.assign({},state.gradeConfig||{},{subjects:SUBJECTS.filter(item=>list.has(item))});save();renderPage()}
-    function setGradeScaledMode(on){state.gradeConfig=Object.assign({},state.gradeConfig||{},{scaledMode:!!on});save();renderPage();toast(on?"已切换为赋分成绩口径":"已切换为原始成绩口径")}
-    function applyDefaultGradeSubjects(){state.gradeConfig=Object.assign({},state.gradeConfig||{},{subjects:["语文","数学","英语","物理","化学","生物","历史","政治","地理"]});save();renderPage();toast("已恢复默认 9 门学科")}
+    function setGradeScaledMode(on){if(!supportsScaledSubjects())return toast("初中学段不使用赋分成绩，已保持原始成绩口径");state.gradeConfig=Object.assign({},state.gradeConfig||{},{scaledMode:!!on});save();renderPage();toast(on?"已切换为赋分成绩口径":"已切换为原始成绩口径")}
+    function applyDefaultGradeSubjects(){state.gradeConfig=Object.assign({},state.gradeConfig||{},{subjects:defaultGradeSubjectsForStage()});save();renderPage();toast("已恢复默认 "+defaultGradeSubjectsForStage().length+" 门学科")}
     function selectAllGradeSubjects(){state.gradeConfig=Object.assign({},state.gradeConfig||{},{subjects:gradeSubjectPool()});save();renderPage()}
     function openGradeConfig(){
       const active=activeGradeSubjects(),pool=gradeSubjectPool(),exam=currentExam(),scaledMode=isScaledMode();
-      const checkbox=subject=>{const inExam=examAllSubjects(exam).includes(subject),isScaled=SCALED_SUBJECTS.includes(subject);return `<div class="list-row"><span class="bullet ${active.includes(subject)?"":"amber"}"></span><div class="grow"><strong>${escapeHtml(subject)}${isScaled?' <span class="badge green">可赋分</span>':""}</strong><small>${inExam?"本次考试已有成绩":"本次考试暂无成绩"}</small></div><button class="btn sm ${active.includes(subject)?"":"primary"}" onclick="toggleGradeSubject(decodeURIComponent('${encodeURIComponent(subject)}'),${active.includes(subject)?"false":"true"})">${active.includes(subject)?"移出":"加入"}</button></div>`};
-      openModal("学科与赋分设置",`<div class="section-label">成绩口径</div><div class="form-grid"><div class="form-group"><label>分析标的</label><select class="select" id="gradeCfgMode"><option value="raw" ${!scaledMode?"selected":""}>原始成绩（默认）</option><option value="scaled" ${scaledMode?"selected":""}>赋分成绩（化学/生物/政治/地理）</option></select></div><div class="form-group"><label>已选学科</label><input class="input" value="${active.length} / ${pool.length} 门" readonly></div></div><p class="module-field-help">${scaledMode?"当前：化学、生物、政治、地理按赋分计入总分、均分、排名与各项分析，其余学科用原始分。":"当前：全部参与学科均按原始分参与总分、均分、排名与各项分析。"}未勾选的学科不参与展示与计算，成绩数据仍完整保留。</p><div class="section-label">参与管理与展示的学科</div><div class="list">${pool.map(checkbox).join("")}</div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sm" onclick="applyDefaultGradeSubjects()">恢复默认 9 科</button><button class="btn sm" onclick="selectAllGradeSubjects()">全选全部学科</button></div>`,"保存设置",()=>{
+      const checkbox=subject=>{const inExam=examAllSubjects(exam).includes(subject),isScaled=supportsScaledSubjects()&&SCALED_SUBJECTS.includes(subject);return `<div class="list-row"><span class="bullet ${active.includes(subject)?"":"amber"}"></span><div class="grow"><strong>${escapeHtml(subject)}${isScaled?' <span class="badge green">可赋分</span>':""}</strong><small>${inExam?"本次考试已有成绩":"本次考试暂无成绩"}</small></div><button class="btn sm ${active.includes(subject)?"":"primary"}" onclick="toggleGradeSubject(decodeURIComponent('${encodeURIComponent(subject)}'),${active.includes(subject)?"false":"true"})">${active.includes(subject)?"移出":"加入"}</button></div>`};
+      openModal("学科与赋分设置",`<div class="section-label">成绩口径</div><div class="form-grid"><div class="form-group"><label>分析标的</label><select class="select" id="gradeCfgMode"><option value="raw" ${!scaledMode?"selected":""}>原始成绩（默认）</option>${supportsScaledSubjects()?`<option value="scaled" ${scaledMode?"selected":""}>赋分成绩（化学/生物/政治/地理）</option>`:""}</select></div><div class="form-group"><label>已选学科</label><input class="input" value="${active.length} / ${pool.length} 门" readonly></div></div><p class="module-field-help">${supportsScaledSubjects()?(scaledMode?"当前：化学、生物、政治、地理按赋分计入总分、均分、排名与各项分析，其余学科用原始分。":"当前：全部参与学科均按原始分参与总分、均分、排名与各项分析。"):"初中学段不使用赋分成绩，全部参与学科均按原始分参与总分、均分、排名与各项分析。"}未勾选的学科不参与展示与计算，成绩数据仍完整保留。</p><div class="section-label">参与管理与展示的学科</div><div class="list">${pool.map(checkbox).join("")}</div><div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sm" onclick="applyDefaultGradeSubjects()">恢复默认 9 科</button><button class="btn sm" onclick="selectAllGradeSubjects()">全选全部学科</button></div>`,"保存设置",()=>{
         const mode=el("gradeCfgMode")?.value;
         state.gradeConfig=Object.assign({},state.gradeConfig||{},{subjects:activeGradeSubjects(),scaledMode:mode==="scaled"});
         save();closeModal();renderPage();toast("成绩分析口径已更新");
@@ -1286,7 +1304,7 @@
       if(tab==="subjects")body=analysis.subjectStats.length?`<div class="grid three">${analysis.subjectStats.map((stat,index)=>{const encoded=encodeURIComponent(stat.subject);return `<div class="card"><div class="card-title"><h3>${escapeHtml(stat.subject)}</h3><span class="badge ${index%2?"blue":"green"}">均分 ${stat.avg}</span></div><div class="profile-grid" style="grid-template-columns:repeat(2,1fr)"><div class="info-cell"><small>最高 / 最低</small><strong>${stat.max} / ${stat.min}</strong></div><div class="info-cell"><small>中位数 / 标准差</small><strong>${stat.median} / ${stat.std}</strong></div></div><div class="score-line"><span>优秀率</span><div class="track"><div class="fill" style="width:${stat.excellentRate}%"></div></div><b>${stat.excellentRate}%</b></div><div class="score-line"><span>及格率</span><div class="track"><div class="fill" style="width:${stat.passRate}%"></div></div><b>${stat.passRate}%</b></div><p style="font-size:10px;color:var(--muted);line-height:1.7">${subjectAdvice(stat)}</p><button class="btn sm" onclick="openSubjectReport(decodeURIComponent('${encoded}'))">详细报告</button> <button class="btn sm" onclick="exportSubjectWorkbook(decodeURIComponent('${encoded}'))">导出 Excel</button></div>`}).join("")}</div>`:`<div class="card empty">本次导入只有总分、排名或综合等级，没有可单独分析的学科列。</div>`;
       if(tab==="personal"){
         const sid=analysis.students.some(student=>student.id===window.gradeStudent)?window.gradeStudent:analysis.ranked[0].id,student=state.students.find(item=>item.id===sid),history=orderedExams().filter(item=>examParticipants(item).some(person=>person.id===student.id)),change=analysis.changes.find(item=>item.student.id===student.id),subjectValues=analysis.subjects.map(subject=>({subject,value:examSubjectValue(exam,student,subject)})).filter(item=>item.value!==null),best=subjectValues.slice().sort((a,b)=>b.value-a.value)[0],weak=subjectValues.slice().sort((a,b)=>a.value-b.value)[0];
-        body=`<div class="filterbar"><select class="select" onchange="window.gradeStudent=this.value;renderPage()">${analysis.students.map(item=>`<option value="${item.id}" ${item.id===sid?"selected":""}>${item.name} · ${item.studentNo}</option>`).join("")}</select><button class="btn primary" onclick="downloadStudentReport('${student.id}')">导出个人分析.xlsx</button></div><div class="grid two"><div class="card"><div class="card-title"><h3>${escapeHtml(student.name)} · 当前成绩</h3><span class="badge green">班排 ${rankInExam(exam,student.id)}</span></div><div class="profile-grid"><div class="info-cell"><small>总分</small><strong>${studentExamTotal(exam,student)}</strong></div><div class="info-cell"><small>班内排名</small><strong>${rankInExam(exam,student.id)}</strong></div><div class="info-cell"><small>年级排名</small><strong>${gradeRankInExam(exam,student)}</strong></div><div class="info-cell"><small>排名进退</small><strong>${formatChange(change?.rankDelta)}</strong></div><div class="info-cell"><small>综合等级</small><strong>${escapeHtml(studentExamLevel(exam,student))}</strong></div></div>${analysis.subjects.map(subject=>{const value=examSubjectValue(exam,student,subject),prior=examSubjectValue(analysis.previous,student,subject),scaled=scaledExamValue(exam,student,subject),delta=value!==null&&prior!==null?Number((value-prior).toFixed(1)):null;return `<div class="score-line"><span>${escapeHtml(subject)}</span><div class="track"><div class="fill" style="width:${value===null?0:Math.min(100,Math.max(2,value))}%"></div></div><b>${escapeHtml(displayExamScore(exam,student,subject))}${scaled?` <small style="color:var(--pine)">赋分 ${escapeHtml(scaled)}</small>`:""}${delta!==null?` <small style="color:${delta>=0?"var(--pine)":"var(--red)"}">${formatChange(delta)}</small>`:""}</b></div>`}).join("")||'<div class="empty">没有单科列，已保留总分、排名和等级。</div>'}</div><div class="card"><div class="card-title"><h3>历次综合走势</h3><small>${history.length} 次考试</small></div><div class="list">${history.map(item=>`<div class="list-row"><span class="bullet"></span><div class="grow"><strong>${escapeHtml(item.name)}</strong><small>${item.date||"未设置日期"} · 班排 ${rankInExam(item,student.id)} · 年级排 ${gradeRankInExam(item,student)}</small></div><b>${studentExamTotal(item,student)}</b></div>`).join("")}</div><div class="section-label">个性化建议</div><p style="font-size:10px;color:var(--muted);line-height:1.8">${best&&weak?`优势学科为 ${escapeHtml(best.subject)}，薄弱学科为 ${escapeHtml(weak.subject)}。`:"可结合总分和名次变化设定下一阶段目标。"}建议持续记录错题归因、课堂表现和历次排名变化。</p></div></div>`;
+        body=`<div class="filterbar"><select class="select" onchange="window.gradeStudent=this.value;renderPage()">${analysis.students.map(item=>`<option value="${item.id}" ${item.id===sid?"selected":""}>${item.name} · ${item.studentNo}</option>`).join("")}</select><button class="btn primary" onclick="downloadStudentReport('${student.id}')">导出个人分析.xlsx</button></div><div class="grid two"><div class="card"><div class="card-title"><h3>${escapeHtml(student.name)} · 当前成绩</h3><span class="badge green">班排 ${rankInExam(exam,student.id)}</span></div><div class="profile-grid"><div class="info-cell"><small>总分</small><strong>${studentExamTotal(exam,student)}</strong></div><div class="info-cell"><small>班内排名</small><strong>${rankInExam(exam,student.id)}</strong></div><div class="info-cell"><small>年级排名</small><strong>${gradeRankInExam(exam,student)}</strong></div><div class="info-cell"><small>排名进退</small><strong>${formatChange(change?.rankDelta)}</strong></div><div class="info-cell"><small>综合等级</small><strong>${escapeHtml(studentExamLevel(exam,student))}</strong></div></div>${analysis.subjects.map(subject=>{const value=examSubjectValue(exam,student,subject),prior=examSubjectValue(analysis.previous,student,subject),scaled=supportsScaledSubjects()?scaledExamValue(exam,student,subject):null,delta=value!==null&&prior!==null?Number((value-prior).toFixed(1)):null;return `<div class="score-line"><span>${escapeHtml(subject)}</span><div class="track"><div class="fill" style="width:${value===null?0:Math.min(100,Math.max(2,value))}%"></div></div><b>${escapeHtml(displayExamScore(exam,student,subject))}${scaled?` <small style="color:var(--pine)">赋分 ${escapeHtml(scaled)}</small>`:""}${delta!==null?` <small style="color:${delta>=0?"var(--pine)":"var(--red)"}">${formatChange(delta)}</small>`:""}</b></div>`}).join("")||'<div class="empty">没有单科列，已保留总分、排名和等级。</div>'}</div><div class="card"><div class="card-title"><h3>历次综合走势</h3><small>${history.length} 次考试</small></div><div class="list">${history.map(item=>`<div class="list-row"><span class="bullet"></span><div class="grow"><strong>${escapeHtml(item.name)}</strong><small>${item.date||"未设置日期"} · 班排 ${rankInExam(item,student.id)} · 年级排 ${gradeRankInExam(item,student)}</small></div><b>${studentExamTotal(item,student)}</b></div>`).join("")}</div><div class="section-label">个性化建议</div><p style="font-size:10px;color:var(--muted);line-height:1.8">${best&&weak?`优势学科为 ${escapeHtml(best.subject)}，薄弱学科为 ${escapeHtml(weak.subject)}。`:"可结合总分和名次变化设定下一阶段目标。"}建议持续记录错题归因、课堂表现和历次排名变化。</p></div></div>`;
       }
       if(tab==="trends")body=`<div class="card"><div class="card-title"><h3>班级历次成绩对比</h3><small>${historyAnalyses.length} 次考试</small></div><div class="table-wrap"><table class="table"><thead><tr><th>考试</th><th>日期</th><th>参考人数</th><th>平均总分</th>${historySubjects.map(subject=>`<th>${escapeHtml(subject)}</th>`).join("")}</tr></thead><tbody>${historyAnalyses.map(item=>`<tr><td><b>${escapeHtml(item.exam.name)}</b></td><td>${item.exam.date||"—"}</td><td>${item.students.length}</td><td><b>${item.avgTotal}</b></td>${historySubjects.map(subject=>`<td>${item.subjectStats.find(stat=>stat.subject===subject)?.avg??"—"}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div><div class="grid two" style="margin-top:14px"><div class="card"><div class="card-title"><h3>本次排名进步榜</h3><small>按班内名次进退</small></div><div class="list">${topChanges.map(item=>`<div class="list-row"><span class="rank top">${item.rank}</span><div class="grow"><strong>${item.student.name}</strong><small>上次 ${item.priorRank??"—"} → 本次 ${item.rank} · 总分 ${formatChange(item.totalDelta)}</small></div><b>↑ ${item.rankDelta}</b></div>`).join("")||'<div class="empty">暂无进退数据</div>'}</div></div><div class="card"><div class="card-title"><h3>学科变化</h3><small>${analysis.previous?"对比 "+analysis.previous.name:"暂无上次考试"}</small></div>${analysis.subjectStats.length?analysis.subjectStats.map(stat=>`<div class="score-line"><span>${escapeHtml(stat.subject)}</span><div class="track"><div class="fill" style="width:${Math.min(100,Math.max(4,50+stat.delta*6))}%"></div></div><b style="color:${stat.delta>=0?"var(--pine)":"var(--red)"}">${formatChange(stat.delta)}</b></div>`).join(""):'<div class="empty">没有单科学科列</div>'}</div></div>`;
       if(tab==="passline"){
