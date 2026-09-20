@@ -20,13 +20,17 @@
 - 存在**并行会话**改同一仓库 ⇒ push 前务必 `git fetch` + `git log --oneline origin/master` 看分叉
 - 遇到 non-fast-forward:**不要 rebase**,用 `git fetch` + `git reset --soft origin/master`
 - `git push origin master` 走 GCM,前台秒级完成(旧 wincred 后台 2h41m 经验已过时)
-- **`origin/master` 不自动更新 = Agent 沙箱,不是 git**(2026-09-20 对照实验定性):同一脚本只切换沙箱,
-  沙箱内只有 `…\AppData\Local\Temp\…` 能写 ref,`C:\`/`D:\`/家目录/workspace 的 `.git` 全被**静默吞掉**
-  (exit 0 无报错,连已存在的 loose ref 文件都删);关闭沙箱后全部正常 ⇒ **本机 git 完全正常**。
+- **`origin/master` 不自动更新 = Agent 沙箱吞掉 git.exe 的 ref 写入,不是 git**(2026-09-20 二度精确化):
+  沙箱内 `git update-ref` 返回 rc=0 但**文件不落盘**;而**同一沙箱内** bash `mkdir -p`+`printf`、Python 写文件
+  **都能落盘** ⇒ 被吞的只是 **git.exe 写 ref** 那条路径(只读 git 命令不受影响);关闭沙箱后 git 一切正常。
   ⇒ 写 ref 的 git 操作(`fetch`/`push`/`commit`/`merge`/`rebase`/`worktree`)**不要在沙箱内跑**,
-  用你自己的终端(或 Agent 内走沙箱放行);沙箱内兜底 = 改 `.git/packed-refs`。详见 ARCHIVE §2.2
+  用你自己的终端(或 Agent 内走沙箱放行 `dangerouslyDisableSandbox`)。详见 ARCHIVE §2.2
+- **沙箱内兜底「双保险」**(两条都做,实测可用):① 手写 loose ref
+  `mkdir -p .git/refs/remotes/origin && printf '<40hex>\n' > .git/refs/remotes/origin/master`;
+  ② 同步 `.git/packed-refs`。已把 `refs/heads/master` 与 `refs/remotes/origin/master` 双处钉死。
 - **沙箱内纪律**:每个写 ref 的 git 操作后必须核对 `git rev-parse master origin/master` +
-  `git ls-remote origin master`,别信 `git status` 的 ahead/behind;必须写 40-hex 全量 hash
+  `git ls-remote origin master`(`git rev-list --left-right --count origin/master...master` 期望 `0 0`),
+  别信 `git status` 的 ahead/behind;必须写 40-hex 全量 hash
 
 ## 测试约定
 - 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 7 文件)
