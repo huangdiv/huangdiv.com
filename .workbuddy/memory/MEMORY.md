@@ -6,13 +6,13 @@
 ## 仓库布局(2026-09-20 更新:workspace 已转为健康独立仓库)
 - **开发目录 = 提交仓库(唯一)**:`C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3`
   - ⚡ 2026-09-20 修复:原先损坏的 worktree 指针已换成健康 clone 的 `.git` 真目录
-    ⇒ **`HEAD`=`master`=`origin/master`=`@{u}`=`8b5fdb3`,status 干净,直接 `git add/commit/push`**
+    ⇒ **`HEAD`=`master`=`origin/master`=`@{u}` 四者一致,status 干净,直接 `git add/commit/push`**
   - 绕行仓已隔离到 `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/`
     (含旧 `recover-huangdiv`/`recover-huangdiv2`/`_tmp_clone_huangdiv`/原主仓 `D:/Documents/GitHub/huangdiv.com`)
 - 远程:`https://github.com/huangdiv/huangdiv.com.git`(org = `huangdiv`,不是 xingz-io)
   - **公开仓库**;`.workbuddy/` 已纳入 git(知识文档 + 全量冒烟测试),便于换机/云端续开发
   - 同仓库还有别的工具:`static/ClassMaster.html`(班级管家,其他会话开发)、`static/jumpto.html`
-  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);当前 master tip = `8b5fdb3`
+  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);master tip 以 `git log --oneline -1` 为准(勿写死)
 - 行尾约定:workspace 文件为**混合 CRLF/LF**;已设本地 `git config core.autocrlf input`
   (检出不动、比较时把 CRLF 归一为 LF)以免出现大量假 `M`。勿改成 `true`(会让 LF 文件全变脏)
 

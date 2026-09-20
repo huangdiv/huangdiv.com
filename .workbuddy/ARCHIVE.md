@@ -3,7 +3,7 @@
 > **生成**：2026-09-20 ｜ **最近修订**：2026-09-20（**修复 workspace `.git` + 清理全部绕行产物**，见 §2.3）
 > **本文件已纳入 git**（`.workbuddy/`，公开仓库，便于换机/云端续开发）
 > **代码权威提交**：`fb4de80`（seats-generator.* 自此前未再改动）
-> **仓库 master tip**：`8b5fdb3`（2026-09-20 ref 根因更正+精确化；再往下 `2c3d79c`/`ca93199` 为经验同步提交，其后若干提交是 `ClassMaster.html` 的功能）
+> **仓库 master tip**：以 `git log --oneline -1` 为准（**本文件不写死 hash** —— 每次提交都会让 tip 前移）。2026-09-20 知识同步期的 tip 依次为 `ca93199`→`2c3d79c`→`8b5fdb3`→`119b6c5`。
 > **⚠️ 好消息**：本 workspace 的 `.git` 已修复为**健康独立仓库** ⇒ **直接在这里 commit/push**，不再需要绕行仓。
 > **用途**：把 2026-09-04 ~ 2026-09-20 全部开发会话压缩沉淀为**单一知识库**。
 > 新会话读这一份即可恢复上下文；需要逐日细节时再查 `.workbuddy/memory/YYYY-MM-DD.md`；
@@ -19,7 +19,7 @@
   `C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3`
   ⚡ **2026-09-20 已修复**：原先损坏的 worktree 指针（指向已消失的 `D:/.../.git/worktrees/...`）已被
   一份健康 clone 的 `.git` 整体替换 ⇒ 现在是**独立健康仓库**
-  （`HEAD`=`master`=`origin/master`=`@{u}`=`8b5fdb3`，`git status` 干净，`fsck` 无输出）。
+  （`HEAD`=`master`=`origin/master`=`@{u}` 四者一致，`git status` 干净，`fsck` 无输出）。
   ⇒ **直接 `git add/commit/push`，不再需要 `recover-huangdiv2` 那套绕行。**
 - **关于 `origin/master` 不自动更新**：2026-09-20 已查明**不是 git 缺陷**，而是 **Agent 命令行沙箱**
   把 **git.exe 的 ref 写入**静默吞掉（rc=0、无报错、不落盘）⇒ 写 ref 的 git 操作请在**你自己的终端**里跑
