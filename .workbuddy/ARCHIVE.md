@@ -21,8 +21,9 @@
   一份健康 clone 的 `.git` 整体替换 ⇒ 现在是**独立健康仓库**
   （`HEAD`=`master`=`origin/master`=`ca93199`，`git status` 干净，`fsck` 无输出）。
   ⇒ **直接 `git add/commit/push`，不再需要 `recover-huangdiv2` 那套绕行。**
-- **仅剩的环境怪癖**：本机 PortableGit 无法写 `refs/remotes/origin/*`
-  ⇒ `fetch`/`push` 后 `origin/master` 可能不自动更新，按 §2.2 直接改 `.git/packed-refs` 同步一次即可。
+- **关于 `origin/master` 不自动更新**：2026-09-20 已查明**不是 git 缺陷**，而是 **Agent 命令行沙箱**
+  在 Temp 之外静默吞掉了 ref 写入 ⇒ 写 ref 的 git 操作请在**你自己的终端**里跑（Agent 内则走沙箱放行）；
+  沙箱内可临时改 `.git/packed-refs` 兜底。详见 §2.2。
 - ★ **换机 / 云端使用**：直接 `git clone https://github.com/huangdiv/huangdiv.com.git` 作为 workspace ——
   同样是**`/.git` 健康**的完整副本，改完直接 `commit/push`；本 `ARCHIVE.md` 与 `memory/` 都在仓库里，经验随仓库走。
 - **三条铁律**：
@@ -76,30 +77,38 @@ git rev-parse HEAD master origin/master           # 期望三者一致
 ```
 > 旧的「worktree 改文件 → `cp` 到 `recover-huangdiv2` → 在那里提交」流程**已废弃**（该仓已隔离，见 §2.3）。
 
-### 2.2 ⚠️ 本机 git 无法写 `refs/remotes/origin/*`（PortableGit 2.55.0.windows.3，2026-09-20 探针实测）
-**精确根因（用 update-ref 探针逐条确认）**：
-- `git update-ref refs/heads/<单段名>`（如 `refs/heads/__probe`）→ **正常落盘**；
-- `git update-ref refs/remotes/origin/<任意名>` → **静默失败**（exit 0 但不落盘），
-  而且**会把已存在的 loose ref 文件连同空目录一起删掉**（即使先手工 `mkdir` + `printf` 预置也照样被删）；
-- `refs/heads/a/b`（多段名）同样失败 ⇒ 但**主分支 `master` 是单段名，提交本身不受影响**；
-- 推论：`git fetch`/`git push` 对 `refs/remotes/origin/master` 的**自动更新必然失败**
-  ⇒ `origin/master` 可能滞后 ⇒ `git status` 误报 ahead/behind、`git log master..origin/master` 失真。
+### 2.2 ⚠️ `refs/remotes/origin/*` 写不进去 —— 真根因是 **Agent 命令行沙箱**（2026-09-20 定位并更正）
+**旧结论已推翻**：此前记为「PortableGit 2.55 嵌套 ref bug」，**是错的**（与 git 版本无关）。
 
-**稳妥同步法（落到 packed-refs，别指望 loose ref 存活）**：
+**决定性实验**：同一脚本、同一 git，只切换是否沙箱隔离：
+
+| 路径 | 沙箱内 | 关闭沙箱 |
+|------|--------|----------|
+| `C:\Users\xingz\AppData\Local\Temp\…` | ✅ 落盘 | ✅ |
+| `C:\_probe` / `D:\_probe` / `C:\Users\xingz\_probe` / `…\WorkBuddy\_probe` | ❌ 静默失败 | ✅ |
+| **workspace 的 `.git/refs/remotes/origin/…`** | ❌ 静默失败 | ✅ 正常 |
+
+⇒ **本机 git 完全正常**。是 Agent 命令行沙箱的文件系统虚拟化层在 Temp 之外**静默吞掉**了 git 的 ref 写入
+（exit 0、无任何报错，甚至把已存在的 loose ref 文件连带目录一起删掉）。反证：同一沙箱内用 Python 做
+`makedirs` / 写文件 / `os.replace` **全部成功** ⇒ 被吞的只是 **git 写 ref 的那条路径**。
+
+**✅ 彻底修复**：凡会写 ref 的 git 操作（`clone`/`fetch`/`push`/`commit`/`merge`/`rebase`/`reset`/`worktree`）
+**不要在沙箱内执行** —— 用你自己的终端 / VS Code 集成终端 / Git Bash / GitHub Desktop；
+在 Agent 里则对这类命令**走沙箱放行**。
+
+**沙箱内兜底（改 `packed-refs`，已实测可用）**：
 ```bash
-# 1) 拿真实远端值（唯一可信来源）
-git ls-remote origin refs/heads/master            # 或 fetch 后读 .git/FETCH_HEAD
-# 2) 直接改 packed-refs（git 会把 loose ref 删掉，所以这里才是稳的）
+git ls-remote origin refs/heads/master            # 取真实远端值（唯一可信来源）
 sed -i "s|^<old40hex> refs/remotes/origin/master$|<new40hex> refs/remotes/origin/master|" .git/packed-refs
-sed -i '/^$/d' .git/packed-refs                   # sed 会留空行 → "unexpected line in packed-refs"
-# 3) 校验
+sed -i '/^$/d' .git/packed-refs                   # 空行 → "unexpected line in packed-refs"
 git rev-parse master origin/master                # 一致即可
 git status -sb                                    # 无 ahead/behind
 ```
-- 若某个 ref 不在 packed-refs，可手写 loose ref 应急（先 `mkdir -p`，末尾必须带 `\n`）；
-  但**知悉下一次 git 写该 ref 会把它删掉**，所以最终请落到 packed-refs。
+- **沙箱内的纪律**：每个写 ref 的 git 操作后**必须**核对 `git rev-parse master origin/master`
+  与 `git ls-remote origin master`；**不要相信 `git status` 的 ahead/behind**。
 - **必须写 40-hex 全量**；写 7 位短 hash 会导致 `fatal: bad object` / `branch appears to be broken`。
-- 预防：**主分支保持单段名 `master`**（本仓即如此），尽量不依赖 `refs/remotes/*` 的自动写入。
+- 历史推论：那几次「fetch/push 后 ref 不更新、`.git/refs` 目录消失、未推送提交被 GC」
+  很可能同源（在沙箱里跑写 ref 的 git 操作），而非仓库/磁盘真损坏 —— 别急着重建仓库，先做上面的判定实验。
 
 ### 2.3 其他 git 注意
 - **并行会话**：远程可能被其他会话/工具（如 trae）推送 ⇒ push 前务必 `git fetch` 看分叉。
@@ -297,8 +306,9 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - ✅ **环境已修复（2026-09-20）**：workspace `.git` 健康、可直接 commit/push；旧主仓与 3 个绕行仓、
   9/4 手工备份均已隔离（见 §2.3）。确认无碍后可整体删除隔离目录
   `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/`。
-- ⚠️ **仍存在（无法从仓内修复）**：本机 git 不能写 `refs/remotes/origin/*`
-  ⇒ 每次 `fetch`/`push` 后按 §2.2 同步一次 packed-refs。
+- ✅ **`origin/master` 不更新已定性**：**不是 git 缺陷**，是 Agent 沙箱吞掉 ref 写入（§2.2）。
+  ⇒ **本机正常使用（你自己的终端 / VS Code / Git Bash）完全没有这个问题**；
+  在 Agent 内跑写 ref 的 git 操作需**走沙箱放行**。
 
 ---
 

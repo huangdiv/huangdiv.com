@@ -20,12 +20,13 @@
 - 存在**并行会话**改同一仓库 ⇒ push 前务必 `git fetch` + `git log --oneline origin/master` 看分叉
 - 遇到 non-fast-forward:**不要 rebase**,用 `git fetch` + `git reset --soft origin/master`
 - `git push origin master` 走 GCM,前台秒级完成(旧 wincred 后台 2h41m 经验已过时)
-- **本机 git 写不了 `refs/remotes/origin/*`**(2026-09-20 探针确认):`update-ref refs/remotes/origin/x`
-  静默失败,且会删掉已存在的 loose ref 文件(连目录一起) ⇒ `fetch`/`push` 后 `origin/master` 可能不自动更新。
-  同步法:用 `git ls-remote origin master` / `.git/FETCH_HEAD` 取真实 40-hex,
-  直接改 `.git/packed-refs`(loose ref 会被 git 删,别指望它),再 `sed -i '/^$/d'` 清空行;
-  必须 40-hex 全量。详见 ARCHIVE §2.2
-- 主分支保持单段名 `master`(提交本身正常,只有 `refs/remotes/*` 写入受影响)
+- **`origin/master` 不自动更新 = Agent 沙箱,不是 git**(2026-09-20 对照实验定性):同一脚本只切换沙箱,
+  沙箱内只有 `…\AppData\Local\Temp\…` 能写 ref,`C:\`/`D:\`/家目录/workspace 的 `.git` 全被**静默吞掉**
+  (exit 0 无报错,连已存在的 loose ref 文件都删);关闭沙箱后全部正常 ⇒ **本机 git 完全正常**。
+  ⇒ 写 ref 的 git 操作(`fetch`/`push`/`commit`/`merge`/`rebase`/`worktree`)**不要在沙箱内跑**,
+  用你自己的终端(或 Agent 内走沙箱放行);沙箱内兜底 = 改 `.git/packed-refs`。详见 ARCHIVE §2.2
+- **沙箱内纪律**:每个写 ref 的 git 操作后必须核对 `git rev-parse master origin/master` +
+  `git ls-remote origin master`,别信 `git status` 的 ahead/behind;必须写 40-hex 全量 hash
 
 ## 测试约定
 - 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 7 文件)
