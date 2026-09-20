@@ -26,6 +26,7 @@
   （Agent 内尽量走沙箱放行 `dangerouslyDisableSandbox`，但该放行不保证被 grant）；沙箱内兜底见 §2.2。详见 §2.2。
 - ★ **换机 / 云端使用**：直接 `git clone https://github.com/huangdiv/huangdiv.com.git` 作为 workspace ——
   同样是**`/.git` 健康**的完整副本，改完直接 `commit/push`；本 `ARCHIVE.md` 与 `memory/` 都在仓库里，经验随仓库走。
+  ⇒ **云端（WorkBuddy Cloud）续开发 + 电脑端配合的完整步骤见 §9。**
 - **三条铁律**：
   1. 直接在本 workspace 提交推送（提交后按 §2.2 校验并同步 `origin/master`）；
   2. 测试分两层——单元 `bash .workbuddy/run_unit_tests.sh` + 冒烟 Playwright（先起 8123 端口）；
@@ -319,8 +320,9 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   该审查文档已归档到 `.workbuddy/archive/`）。
 - 可选后续模块化（边际收益递减）：`seat-data.js`（导入/CRUD）、`tag-system.js`（emoji 字典）、
   `checkin.js`、`statistics.js`。
-- 已知既有小问题（未修，影响小）：空座位也带空 `data-student` 属性；
-  `run_unit_tests.sh` 里写死 node `22.22.2-2`（实际 managed 是 `22.22.2-3`，靠 `command -v node` 兜底）。
+- 已知既有小问题（未修，影响小）：空座位也带空 `data-student` 属性。
+- ✅ `run_unit_tests.sh` **已跨平台化（2026-09-20）**：不再写死 Windows 盘符、不再无条件调 `cygpath`
+  （仅 Git Bash/msys 才用），Linux/macOS 直接用 PATH 里的 `node` ⇒ **云端 WorkBuddy 可直接跑单测**。
 - ✅ **环境已修复（2026-09-20）**：workspace `.git` 健康、可直接 commit/push；旧主仓与 3 个绕行仓、
   9/4 手工备份均已隔离（见 §2.3）。确认无碍后可整体删除隔离目录
   `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/`。
@@ -343,6 +345,50 @@ cd .workbuddy && python smoke_test_batchXX_*.py
    `git rev-parse master origin/master` 校验；若 `origin/master` 没自动跟上，按 §2.2「双保险」修 loose ref + packed-refs。
    （写 ref 的 git 命令尽量走沙箱放行 `dangerouslyDisableSandbox`，见 §2.2。）
 6. 收尾把当天工作追加到 `.workbuddy/memory/YYYY-MM-DD.md`（append-only）。
+
+---
+
+## 9. 云端（WorkBuddy Cloud）续开发 —— 电脑端怎么配合（2026-09-20 新增）
+
+> 前提：仓库**公开**（匿名 `git ls-remote` 即可读），`.workbuddy/`（本 `ARCHIVE.md` + `memory/` + 全部测试）
+> **已入库** ⇒ 云端 clone 下来就带齐了项目上下文与测试。
+
+**① 电脑端先归零**：把本机改动**全部提交推送**，保证远端是最新 tip（否则云端基于旧代码分叉）：
+```bash
+git add -A && git commit -m "..." && git push origin master
+git ls-remote origin master          # 应与本地 git rev-parse HEAD 一致
+```
+
+**② 云端会话拿仓库**（Linux 容器里）：
+```bash
+git clone https://github.com/huangdiv/huangdiv.com.git && cd huangdiv.com
+cat .workbuddy/ARCHIVE.md            # ★ 先读它恢复项目上下文（新会话必读）
+ls  .workbuddy/memory/               # 需要逐日细节时再翻
+```
+
+**③ 云端只改这些文件**：`static/seats-generator.html` / `seats-generator.js` / `seats-generator.css` / `static/modules/*`。
+**别碰** `static/ClassMaster.html`（别的会话在做）。
+
+**④ 云端测试能力**：
+- ✅ 单元测试：`bash .workbuddy/run_unit_tests.sh`（已跨平台，Linux 可直接用）。
+- ⚠️ 冒烟测试（Playwright `smoke_test_batch*.py`）需 Chromium，云端未必具备；跑不了就以单测 + 人工预览为准。
+- 本地预览：`cd static && python3 -m http.server 8123 --bind 127.0.0.1` → 浏览器开 `/seats-generator.html`。
+
+**⑤ 云端推送凭据**：HTTPS 推送需 **GitHub PAT**（`repo` 权限）或平台的 GitHub 连接器。
+**别把 PAT 写进仓库**（`.env` 已在 `.gitignore`）。
+
+**⑥ 部署是全自动的**：往 `master` push → `.github/workflows/build.yml`（`reuixiy/hugo-deploy@v1`）
+→ `huangdiv/huangdiv.github.io@build` → GitHub Pages → https://huangdiv.com/seats-generator.html
+—— **云端 push 即上线，无需手工部署**。
+
+**⑦ 回到电脑端收尾**（⚠️ 在**你自己的终端**做，避开 §2.2 的沙箱 ref 问题）：
+```bash
+git fetch origin
+git log --oneline master..origin/master      # 看云端多出的提交
+git merge --ff-only origin/master            # 无本地独有提交时快进
+# 若两端都改过且确实分叉：不要 rebase，用 git reset --soft origin/master 保持线性
+```
+**纪律**：同一时间**只在一端开发**（云端或本机）；两端同改一个文件必然冲突。
 
 ---
 

@@ -33,6 +33,14 @@
   `git ls-remote origin master`(`git rev-list --left-right --count origin/master...master` 期望 `0 0`),
   别信 `git status` 的 ahead/behind;必须写 40-hex 全量 hash
 
+## 云端(WorkBuddy Cloud)续开发
+- 仓库公开 + `.workbuddy/` 已入库 ⇒ 云端 `git clone https://github.com/huangdiv/huangdiv.com.git` 即拿到**全部上下文**
+  (完整步骤见 `ARCHIVE.md` **§9**);进云端会话**先读 `ARCHIVE.md`**。
+- 云端(Linux)可跑单测:`bash .workbuddy/run_unit_tests.sh`(2026-09-20 已**跨平台化**,不再依赖 Windows 盘符/`cygpath`)。
+- 冒烟测试(Playwright)云端未必有 Chromium;push 到 `master` 自动部署(GitHub Actions → Pages → huangdiv.com/seats-generator.html)。
+- **一次只在一端开发**(两端同改一个文件必冲突);电脑端收尾用 `git fetch` + `git merge --ff-only origin/master`(**在自己终端跑**)。
+- 云端推送需 GitHub PAT(`repo` 权限),勿入库(`.env` 已在 `.gitignore`)。
+
 ## 测试约定
 - 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 7 文件)
 - 冒烟:Playwright,`.workbuddy/smoke_test_batch*.py`,需先在 `static/` 起
