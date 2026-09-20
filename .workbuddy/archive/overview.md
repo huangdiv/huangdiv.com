@@ -458,3 +458,29 @@ A. 空 cfg → 全默认 / B. string[] students → 转对象 / C. id 缺失/重
 - commit `3a2181c`:`ux(p2): 批次7 用户文案集中层(i18n 雏形)+ exportSeatImage 作用域`
 - 嵌套 ref bug 第 8 次复发:`mkdir -p + printf` 写主仓 loose ref
 - push 后台跑(task_id `Wh3QQQ`,wincred 凭据慢推送,耐心等)
+
+---
+
+## 本轮(2026-09-07):默认 8×8 + 随机排座自动保存 + 切换模式/分组模式
+
+### 交付内容(3 项)
+1. **默认布局 8×8 + 30px 走道**(`state.js`/`migrate.js`,第 2/4/6 列后走道;新增 `unit_defaults.mjs`)
+2. **随机排座自动保存修复**:`random-arrange.js` 的 `state.seats = Array(...)` 重新赋值打断
+   顶层 `currentSeats` 别名 → 改就地 `seats.fill(null)` + `subscribe` 回调别名回同步
+3. **「切换模式」下拉 + 分组模式**:签到按钮 → 切换模式下拉(签到/分组互斥);
+   分组模式座位多选学生 → 分配到已有/新建分组;彻底删除"分配学生到分组"批量操作
+
+### 验证
+- 语法 `node --check` 全过;单元 86 全过;烟测 batch5/6/7/8/9/10 全过
+  (batch9 随机自动保存 9/9、batch10 切换模式/分组模式 16/16)
+
+### 提交与推送
+- 远程 `master` = **`6dd1680`**(父 = `1dc2e1e`,保留用户上传的 `static/ClassMaster.html`)
+- 9 文件 +509 / −274
+
+### ⚠️ git 对象库损坏事故(已恢复)
+- 在含斜杠 worktree 分支上 `git merge` 失败(`acfc0c45 not a valid object` + `stash failed`),
+  连带破坏主仓 `.git` 的 `refs/`、`worktrees/`、pack `.pack` 数据文件(fsck 报大量 missing blob)
+- **恢复**:我的 9 个改动文件磁盘完好 + 远程完好 → 浅 clone 到
+  `C:/Users/xingz/WorkBuddy/recover-huangdiv` → 覆盖 9 文件 → commit `6dd1680` → push 6 秒成功
+- 本地 worktree(C:)/主仓(D:)git 元数据仍损坏,建议后续重克隆修复

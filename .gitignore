@@ -3,3 +3,5 @@ public
 resources
 videos
 .env
+__pycache__/
+*.pyc

@@ -26,7 +26,7 @@ sys.path.insert(0, r"C:/Users/xingz/AppData/Local/Programs/Python/Python313/Lib/
 from playwright.async_api import async_playwright  # noqa: E402
 
 WORKTREE = Path(r"C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3")
-BASE_URL = "http://localhost:8123/seats-generator.html"
+BASE_URL = "http://127.0.0.1:8123/seats-generator.html"
 
 
 async def run():
@@ -77,11 +77,8 @@ async def run():
                 s.setAttribute('data-persist-test', 'orig-' + i);
             });
         """)
-        # 打开 random dropdown
-        await page.click("#randomBtn")
-        await page.wait_for_timeout(200)
-        # 触发「完全随机」
-        await page.click("[data-action='random']")
+        # 触发「智能排座」(开关全关 = 完全随机)
+        await page.click("#smartArrangeBtn")
         # confirm 弹窗可能弹出,等异步
         await page.wait_for_timeout(800)
 
@@ -109,7 +106,8 @@ async def run():
         # ========== 场景 3: 单学生签到切换(只 1 个座位变化) ==========
         print("\n=== 场景 3: 单座位签到切换 ===")
         # 先进入签到模式(结构变化 ⇒ fullRebuild ⇒ 标记会清空;这是预期的)
-        await page.click("#checkinModeBtn")
+        # 三态轮换按钮:普通 → 签到
+        await page.click("#modeSwitchBtn")
         await page.wait_for_timeout(300)
         # 重新标记
         await page.evaluate("""
@@ -181,7 +179,10 @@ async def run():
             });
         """)
         # 退出签到(否则 view 切换会和签到 banner 一起触发结构变化,但我们要测单独 view)
-        await page.click("#checkinModeBtn")
+        # 三态轮换按钮:签到 → 分组 → 普通
+        await page.click("#modeSwitchBtn")
+        await page.wait_for_timeout(200)
+        await page.click("#modeSwitchBtn")
         await page.wait_for_timeout(200)
         # 重新标记(退出签到也是结构变化)
         await page.evaluate("""
