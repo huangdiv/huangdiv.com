@@ -18,8 +18,11 @@
   它的 `.git` 历史上多次损坏（`git status` 常报 `not a git repository: (NULL)`）⇒ **不要在这里 commit/push**。
 - **唯一提交/推送仓库**：`C:/Users/xingz/WorkBuddy/recover-huangdiv2`（origin master）。
   流程：worktree 改文件 → `cp` 到 recover-huangdiv2 → `git add/commit/push`。
+- ★ **换机 / 云端使用**：直接 `git clone https://github.com/huangdiv/huangdiv.com.git` 作为 workspace ——
+  那是一份 **`.git` 健康**的完整副本，**直接 `git add/commit/push` 即可，无需 recover-huangdiv2 那套绕行**；
+  本 `ARCHIVE.md` 与 `memory/` 都已在仓库里，经验随仓库走。上面那套 worktree/推送仓流程是**仅本机**的绕行方案。
 - **三条铁律**：
-  1. 只通过 `recover-huangdiv2` 提交推送；
+  1. 本机上只通过 `recover-huangdiv2` 提交推送（换机/云端则直接 clone 后 `commit/push`，见上条 ★）；
   2. 测试分两层——单元 `bash .workbuddy/run_unit_tests.sh` + 冒烟 Playwright（先起 8123 端口）；
   3. **写完新测试必须回退验证**（把代码改回 buggy 写法，确认测试会红，再改回来）。
 
