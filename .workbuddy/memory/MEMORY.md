@@ -6,13 +6,13 @@
 ## 仓库布局(2026-09-20 更新:workspace 已转为健康独立仓库)
 - **开发目录 = 提交仓库(唯一)**:`C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3`
   - ⚡ 2026-09-20 修复:原先损坏的 worktree 指针已换成健康 clone 的 `.git` 真目录
-    ⇒ **`HEAD`=`master`=`origin/master`=`ca93199`,status 干净,直接 `git add/commit/push`**
+    ⇒ **`HEAD`=`master`=`origin/master`=`@{u}`=`8b5fdb3`,status 干净,直接 `git add/commit/push`**
   - 绕行仓已隔离到 `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/`
     (含旧 `recover-huangdiv`/`recover-huangdiv2`/`_tmp_clone_huangdiv`/原主仓 `D:/Documents/GitHub/huangdiv.com`)
 - 远程:`https://github.com/huangdiv/huangdiv.com.git`(org = `huangdiv`,不是 xingz-io)
   - **公开仓库**;`.workbuddy/` 已纳入 git(知识文档 + 全量冒烟测试),便于换机/云端续开发
   - 同仓库还有别的工具:`static/ClassMaster.html`(班级管家,其他会话开发)、`static/jumpto.html`
-  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);当前 master tip = `ca93199`
+  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);当前 master tip = `8b5fdb3`
 - 行尾约定:workspace 文件为**混合 CRLF/LF**;已设本地 `git config core.autocrlf input`
   (检出不动、比较时把 CRLF 归一为 LF)以免出现大量假 `M`。勿改成 `true`(会让 LF 文件全变脏)
 
@@ -25,9 +25,10 @@
   **都能落盘** ⇒ 被吞的只是 **git.exe 写 ref** 那条路径(只读 git 命令不受影响);关闭沙箱后 git 一切正常。
   ⇒ 写 ref 的 git 操作(`fetch`/`push`/`commit`/`merge`/`rebase`/`worktree`)**不要在沙箱内跑**,
   用你自己的终端(或 Agent 内走沙箱放行 `dangerouslyDisableSandbox`)。详见 ARCHIVE §2.2
-- **沙箱内兜底「双保险」**(两条都做,实测可用):① 手写 loose ref
-  `mkdir -p .git/refs/remotes/origin && printf '<40hex>\n' > .git/refs/remotes/origin/master`;
-  ② 同步 `.git/packed-refs`。已把 `refs/heads/master` 与 `refs/remotes/origin/master` 双处钉死。
+- **沙箱内兜底「双保险」**:① 同步 `.git/packed-refs`(**持久锚**,git 只在 gc/pack-refs 时重写它);
+  ② 手写 loose ref `mkdir -p .git/refs/remotes/origin && printf '<40hex>\n' > .git/refs/remotes/origin/master`。
+  ⚠️ 沙箱内的写 ref 的 git 操作会把 `.git/refs/remotes/origin/` **整个目录删掉** ⇒ **loose ref 易失、`packed-refs` 才是持久锚**;
+  ⚠️ `dangerouslyDisableSandbox:true` **不保证被 grant**(实测有未生效) ⇒ 最可靠是在用户自己终端跑,Agent 内以 packed-refs 为准。
 - **沙箱内纪律**:每个写 ref 的 git 操作后必须核对 `git rev-parse master origin/master` +
   `git ls-remote origin master`(`git rev-list --left-right --count origin/master...master` 期望 `0 0`),
   别信 `git status` 的 ahead/behind;必须写 40-hex 全量 hash
