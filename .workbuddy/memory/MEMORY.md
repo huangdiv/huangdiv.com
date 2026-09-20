@@ -3,25 +3,29 @@
 > 项目 = huangdiv.com(Hugo 静态博客)+ `static/seats-generator.html`(纯前端班级座位表工具)。
 > **完整经验归档见 `.workbuddy/ARCHIVE.md`**(2026-09-20 压缩沉淀,新会话优先读它)。
 
-## 仓库布局(2026-09-09 更新)
-- **开发目录(改代码)**:`C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3`
-  - 它是 worktree,`.git` 管理目录历史上多次损坏(`not a git repository: (NULL)`)
-    ⇒ **不在这里做提交/推送**,只改文件
-- **提交/推送仓库**:`C:/Users/xingz/WorkBuddy/recover-huangdiv2`
-  - 原 `recover-huangdiv` 的 `.git` 已于 2026-09-09 损坏,已废弃,不要再使用
-  - 流程:`cp` 开发目录改动文件 → recover-huangdiv2 → `git add/commit/push`
+## 仓库布局(2026-09-20 更新:workspace 已转为健康独立仓库)
+- **开发目录 = 提交仓库(唯一)**:`C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3`
+  - ⚡ 2026-09-20 修复:原先损坏的 worktree 指针已换成健康 clone 的 `.git` 真目录
+    ⇒ **`HEAD`=`master`=`origin/master`=`ca93199`,status 干净,直接 `git add/commit/push`**
+  - 绕行仓已隔离到 `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/`
+    (含旧 `recover-huangdiv`/`recover-huangdiv2`/`_tmp_clone_huangdiv`/原主仓 `D:/Documents/GitHub/huangdiv.com`)
 - 远程:`https://github.com/huangdiv/huangdiv.com.git`(org = `huangdiv`,不是 xingz-io)
   - **公开仓库**;`.workbuddy/` 已纳入 git(知识文档 + 全量冒烟测试),便于换机/云端续开发
   - 同仓库还有别的工具:`static/ClassMaster.html`(班级管家,其他会话开发)、`static/jumpto.html`
-  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);仓库 master 最新见 `git ls-remote`
+  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);当前 master tip = `ca93199`
+- 行尾约定:workspace 文件为**混合 CRLF/LF**;已设本地 `git config core.autocrlf input`
+  (检出不动、比较时把 CRLF 归一为 LF)以免出现大量假 `M`。勿改成 `true`(会让 LF 文件全变脏)
 
 ## 推送注意
 - 存在**并行会话**改同一仓库 ⇒ push 前务必 `git fetch` + `git log --oneline origin/master` 看分叉
 - 遇到 non-fast-forward:**不要 rebase**,用 `git fetch` + `git reset --soft origin/master`
 - `git push origin master` 走 GCM,前台秒级完成(旧 wincred 后台 2h41m 经验已过时)
-- **嵌套 ref bug**(间歇):commit/push 后 ref 可能不落盘甚至被删 ⇒ 用 `git fsck --no-reflogs`
-  取 `dangling commit <40hex>`,再 `mkdir -p + printf '<40hex>\n'` 手写 loose ref;
-  必须 40-hex 全量。`sed` packed-refs 后要 `sed -i '/^$/d'`。详见 ARCHIVE §2.2
+- **本机 git 写不了 `refs/remotes/origin/*`**(2026-09-20 探针确认):`update-ref refs/remotes/origin/x`
+  静默失败,且会删掉已存在的 loose ref 文件(连目录一起) ⇒ `fetch`/`push` 后 `origin/master` 可能不自动更新。
+  同步法:用 `git ls-remote origin master` / `.git/FETCH_HEAD` 取真实 40-hex,
+  直接改 `.git/packed-refs`(loose ref 会被 git 删,别指望它),再 `sed -i '/^$/d'` 清空行;
+  必须 40-hex 全量。详见 ARCHIVE §2.2
+- 主分支保持单段名 `master`(提交本身正常,只有 `refs/remotes/*` 写入受影响)
 
 ## 测试约定
 - 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 7 文件)

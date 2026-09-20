@@ -1,8 +1,10 @@
 # 座位表项目 · 会话经验归档
 
-> **生成**：2026-09-20 ｜ **本文件已纳入 git**（`.workbuddy/`，公开仓库，便于换机/云端续开发）
+> **生成**：2026-09-20 ｜ **最近修订**：2026-09-20（**修复 workspace `.git` + 清理全部绕行产物**，见 §2.3）
+> **本文件已纳入 git**（`.workbuddy/`，公开仓库，便于换机/云端续开发）
 > **代码权威提交**：`fb4de80`（seats-generator.* 自此前未再改动）
-> **仓库 master 最新**：`2ddcc18`（= 本经验同步提交；其上 7 个提交都是 `ClassMaster.html` 的功能）
+> **仓库 master tip**：`ca93199`（= 本经验同步提交；其上若干提交都是 `ClassMaster.html` 的功能）
+> **⚠️ 好消息**：本 workspace 的 `.git` 已修复为**健康独立仓库** ⇒ **直接在这里 commit/push**，不再需要绕行仓。
 > **用途**：把 2026-09-04 ~ 2026-09-20 全部开发会话压缩沉淀为**单一知识库**。
 > 新会话读这一份即可恢复上下文；需要逐日细节时再查 `.workbuddy/memory/YYYY-MM-DD.md`；
 > 2026-09-20 起的旧 overview / review 文档已归档到 `.workbuddy/archive/`（见其 README）。
@@ -13,16 +15,18 @@
 
 - **项目** = `huangdiv.com`（Hugo 静态博客，MemE 主题）+ `static/seats-generator.html`
   （纯前端「班级座位表」工具，localStorage 存储，无后端）。
-- **开发目录（= 本 workspace，只改文件）**：
+- **开发目录（= 本 workspace，改文件 + commit/push 都在这里）**：
   `C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3`
-  它的 `.git` 历史上多次损坏（`git status` 常报 `not a git repository: (NULL)`）⇒ **不要在这里 commit/push**。
-- **唯一提交/推送仓库**：`C:/Users/xingz/WorkBuddy/recover-huangdiv2`（origin master）。
-  流程：worktree 改文件 → `cp` 到 recover-huangdiv2 → `git add/commit/push`。
+  ⚡ **2026-09-20 已修复**：原先损坏的 worktree 指针（指向已消失的 `D:/.../.git/worktrees/...`）已被
+  一份健康 clone 的 `.git` 整体替换 ⇒ 现在是**独立健康仓库**
+  （`HEAD`=`master`=`origin/master`=`ca93199`，`git status` 干净，`fsck` 无输出）。
+  ⇒ **直接 `git add/commit/push`，不再需要 `recover-huangdiv2` 那套绕行。**
+- **仅剩的环境怪癖**：本机 PortableGit 无法写 `refs/remotes/origin/*`
+  ⇒ `fetch`/`push` 后 `origin/master` 可能不自动更新，按 §2.2 直接改 `.git/packed-refs` 同步一次即可。
 - ★ **换机 / 云端使用**：直接 `git clone https://github.com/huangdiv/huangdiv.com.git` 作为 workspace ——
-  那是一份 **`.git` 健康**的完整副本，**直接 `git add/commit/push` 即可，无需 recover-huangdiv2 那套绕行**；
-  本 `ARCHIVE.md` 与 `memory/` 都已在仓库里，经验随仓库走。上面那套 worktree/推送仓流程是**仅本机**的绕行方案。
+  同样是**`/.git` 健康**的完整副本，改完直接 `commit/push`；本 `ARCHIVE.md` 与 `memory/` 都在仓库里，经验随仓库走。
 - **三条铁律**：
-  1. 本机上只通过 `recover-huangdiv2` 提交推送（换机/云端则直接 clone 后 `commit/push`，见上条 ★）；
+  1. 直接在本 workspace 提交推送（提交后按 §2.2 校验并同步 `origin/master`）；
   2. 测试分两层——单元 `bash .workbuddy/run_unit_tests.sh` + 冒烟 Playwright（先起 8123 端口）；
   3. **写完新测试必须回退验证**（把代码改回 buggy 写法，确认测试会红，再改回来）。
 
@@ -46,10 +50,8 @@
 | 角色 | 路径 | 说明 |
 |------|------|------|
 | 远程 | `https://github.com/huangdiv/huangdiv.com.git` | org 是 `huangdiv`，**不是** xingz-io |
-| 开发 worktree | `C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3` | 本 workspace；`.git` 不可靠，只改文件 |
-| 提交/推送仓 | `C:/Users/xingz/WorkBuddy/recover-huangdiv2` | 单段分支 `master`，规避嵌套 ref bug |
-| 废弃 | `C:/Users/xingz/WorkBuddy/recover-huangdiv` | 2026-09-09 起 `.git` 损坏，**不要再用** |
-| 废弃 | 原主仓 `D:/Documents/GitHub/huangdiv.com` | git 元数据已损坏，仅作历史参考 |
+| ★ 开发+提交仓（唯一） | `C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3` | 本 workspace；**2026-09-20 起 `.git` 健康，直接 commit/push** |
+| 已隔离（可整体删除） | `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/` | 旧的 `recover-huangdiv`、`recover-huangdiv2`、`_tmp_clone_huangdiv`、原主仓 `D:/Documents/GitHub/huangdiv.com`、9/4 手工备份；见 §2.3 |
 
 ### 1.3 部署链路
 `huangdiv/huangdiv.com@master` → GitHub Actions（`reuixiy/hugo-deploy@v1`）→
@@ -62,44 +64,42 @@
 
 ## 2. Git 工作流与全部已知坑
 
-### 2.1 标准提交推送流程
+### 2.1 标准提交推送流程（2026-09-20 起：直接在本 workspace 操作）
 ```bash
-# 1) 在 worktree 改完文件后，复制到推送仓（精确路径，勿用 cp -r 整个目录）
-cp <worktree>/static/modules/xxx.js  C:/Users/xingz/WorkBuddy/recover-huangdiv2/static/modules/xxx.js
-cd C:/Users/xingz/WorkBuddy/recover-huangdiv2
+cd C:/Users/xingz/WorkBuddy/Worktrees/huangdiv.com/master-93f997c3
 git fetch origin                                  # 看是否与并行会话分叉
 git log --oneline master..origin/master           # 远端多出的提交
 git add <files> && git commit -m "..."
 git push origin master                            # GCM 凭据，前台秒级完成
-git rev-parse master origin/master                # 三方校验一致
+git rev-parse HEAD master origin/master           # 期望三者一致
+# 若 push 后 origin/master 没跟上（本机 git 写不了 refs/remotes/origin/*）→ 按 §2.2 改 packed-refs
 ```
+> 旧的「worktree 改文件 → `cp` 到 `recover-huangdiv2` → 在那里提交」流程**已废弃**（该仓已隔离，见 §2.3）。
 
-### 2.2 ⚠️ PortableGit 嵌套 ref bug（本机 git 2.55.0.windows.3 特有）
-**症状**（间歇复现，2026-09-11 那次就没触发）：
-- `git update-ref refs/heads/a/b`（含斜杠的名字）**静默失败**：exit 0 但不落盘、不建目录；
-- `git commit` 到嵌套分支：commit 对象建了，但 ref 不推进，**并把之前手写的 loose ref 整个删掉**；
-  worktree 内 `git log` 报 `branch does not have any commits yet`；
-- `git fetch`/`git push` 对 `refs/remotes/origin/master` 的自动更新同样静默失败
-  （不落盘，甚至删 loose ref 回退到 packed-refs 旧值 ⇒ `git status` 误报 ahead/behind）。
+### 2.2 ⚠️ 本机 git 无法写 `refs/remotes/origin/*`（PortableGit 2.55.0.windows.3，2026-09-20 探针实测）
+**精确根因（用 update-ref 探针逐条确认）**：
+- `git update-ref refs/heads/<单段名>`（如 `refs/heads/__probe`）→ **正常落盘**；
+- `git update-ref refs/remotes/origin/<任意名>` → **静默失败**（exit 0 但不落盘），
+  而且**会把已存在的 loose ref 文件连同空目录一起删掉**（即使先手工 `mkdir` + `printf` 预置也照样被删）；
+- `refs/heads/a/b`（多段名）同样失败 ⇒ 但**主分支 `master` 是单段名，提交本身不受影响**；
+- 推论：`git fetch`/`git push` 对 `refs/remotes/origin/master` 的**自动更新必然失败**
+  ⇒ `origin/master` 可能滞后 ⇒ `git status` 误报 ahead/behind、`git log master..origin/master` 失真。
 
-**绕过法**：
+**稳妥同步法（落到 packed-refs，别指望 loose ref 存活）**：
 ```bash
-# 1) 拿权威 40-hex hash（不要凭空把短 hash 补全！）
-git fsck --no-reflogs            # 找 "dangling commit <40hex>"
-# 2) 手写 loose ref（必须先建目录；末尾必须带 \n）
-mkdir -p .git/refs/heads/workbuddy
-printf '<40hex>\n' > .git/refs/heads/workbuddy/master-93f997c3
-# 3) 同步 origin/master
-mkdir -p .git/refs/remotes/origin
-printf '<40hex>\n' > .git/refs/remotes/origin/master
-sed -i "s|^<old> refs/remotes/origin/master$|<new> refs/remotes/origin/master|" .git/packed-refs
-sed -i '/^$/d' .git/packed-refs   # sed 会留空行 → "unexpected line in packed-refs"
-# 4) 校验
-git rev-parse master origin/master <branch>   # 必须全一致
-git status -sb                                # 无 ahead/behind
+# 1) 拿真实远端值（唯一可信来源）
+git ls-remote origin refs/heads/master            # 或 fetch 后读 .git/FETCH_HEAD
+# 2) 直接改 packed-refs（git 会把 loose ref 删掉，所以这里才是稳的）
+sed -i "s|^<old40hex> refs/remotes/origin/master$|<new40hex> refs/remotes/origin/master|" .git/packed-refs
+sed -i '/^$/d' .git/packed-refs                   # sed 会留空行 → "unexpected line in packed-refs"
+# 3) 校验
+git rev-parse master origin/master                # 一致即可
+git status -sb                                    # 无 ahead/behind
 ```
-- **必须写 40-hex 全量**；写 7 位短 hash 会导致 worktree `fatal: bad object` / `branch appears to be broken`。
-- 预防：**优先在单段分支（master）的干净 clone 上操作**，避开嵌套 ref 路径。
+- 若某个 ref 不在 packed-refs，可手写 loose ref 应急（先 `mkdir -p`，末尾必须带 `\n`）；
+  但**知悉下一次 git 写该 ref 会把它删掉**，所以最终请落到 packed-refs。
+- **必须写 40-hex 全量**；写 7 位短 hash 会导致 `fatal: bad object` / `branch appears to be broken`。
+- 预防：**主分支保持单段名 `master`**（本仓即如此），尽量不依赖 `refs/remotes/*` 的自动写入。
 
 ### 2.3 其他 git 注意
 - **并行会话**：远程可能被其他会话/工具（如 trae）推送 ⇒ push 前务必 `git fetch` 看分叉。
@@ -108,11 +108,25 @@ git status -sb                                # 无 ahead/behind
   旧的「wincred 挂起/后台 2h41m」经验**已过时**，不要后台跑 push。
 - `.workbuddy/` **已纳入 git** 并在公开仓库中：知识文档（`ARCHIVE.md`、`memory/`、`archive/`）、
   `run_unit_tests.sh`、全部 `smoke_test*.py`。目的是**换机 / 云端续开发时可直接拿到经验与测试**。
-  `.gitignore` 已忽略 `__pycache__/`、`*.pyc`。worktree 里的杂项脚本/截图/补丁**不入 git**（本地临时件）。
+  `.gitignore` 已忽略 `__pycache__/`、`*.pyc`。杂项脚本/截图/补丁**不入 git**；
+  2026-09-20 已把这类本地临时件清出 workspace（见 `memory/2026-09-20.md`）。
 - **跨机协作**：其他电脑/云端会话会往同一仓库推送 ⇒ 每次开工先 `git fetch`，
   并用 `git ls-remote origin master` 核对真实远端（本地跟踪 ref 常因 nested ref bug 失真）。
 - 事故史：`git pull --rebase` 被 SIGTERM 中断会删 `.git/refs` 并 GC 掉 commit；
   含斜杠分支上 `git merge` 也可能连带破坏对象库。详见 `memory/2026-09-07.md`、`2026-09-09.md`。
+- **2026-09-20 修复 + 清理（本 workspace 转健康）**：
+  - 坏因：workspace 是 worktree，其 `.git` 只是指针文件
+    （`gitdir: D:/Documents/GitHub/huangdiv.com/.git/worktrees/master-93f997c3`），
+    而该管理目录已消失、原主仓也损坏 ⇒ 任何 git 命令都报 `not a git repository: (NULL)`。
+  - 修法：确认 workspace **无任何独有内容**（与远端 `ca93199` 仅差 `.gitignore` 与缺 `ClassMaster.html`）后，
+    **用一份健康 clone 的 `.git` 真目录整体替换那个指针文件**，并补齐两个差异文件 ⇒ 变成独立健康仓库。
+  - 行尾陷阱：workspace 文件是**混合 CRLF/LF**，换成 clone 的 index 后一度出现 **64 个假 `M`**
+    （内容哈希其实完全一致，纯 stat 脏 + 换行策略冲突）。
+    解法：本地 `git config core.autocrlf input`（检出不动、比较时把 CRLF 归一为 LF）⇒ **零文件改写**即干净。
+  - 清理：`recover-huangdiv`、`recover-huangdiv2`、`_tmp_clone_huangdiv`、原主仓 `D:/Documents/GitHub/huangdiv.com`、
+    以及 9/4 手工备份 `_backup_huangdiv_working_*` 全部**隔离**（非删除，可回滚）到
+    `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/`。
+    删除前已逐项验证：两个恢复仓与 workspace **逐字节一致**；旧备份的补丁**反向应用干净通过**（改动已在库中）。
 
 ---
 
@@ -280,20 +294,24 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   `checkin.js`、`statistics.js`。
 - 已知既有小问题（未修，影响小）：空座位也带空 `data-student` 属性；
   `run_unit_tests.sh` 里写死 node `22.22.2-2`（实际 managed 是 `22.22.2-3`，靠 `command -v node` 兜底）。
-- 环境待办：worktree 与旧主仓的 git 元数据仍损坏，如需要可重新 clone 修复。
+- ✅ **环境已修复（2026-09-20）**：workspace `.git` 健康、可直接 commit/push；旧主仓与 3 个绕行仓、
+  9/4 手工备份均已隔离（见 §2.3）。确认无碍后可整体删除隔离目录
+  `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/`。
+- ⚠️ **仍存在（无法从仓内修复）**：本机 git 不能写 `refs/remotes/origin/*`
+  ⇒ 每次 `fetch`/`push` 后按 §2.2 同步一次 packed-refs。
 
 ---
 
 ## 8. 新会话快速上手 checklist
 
-1. 认准**只改本 workspace 文件**；提交推送一律走 `recover-huangdiv2`（§2.1）。
+1. **只改本 workspace 文件**；提交推送**直接在本 workspace 做**（§2.1，不再有绕行仓）。
 2. 改代码前先 `Grep` 定位模块（主 IIFE 在 `seats-generator.js`；渲染 `seat-grid.js`；
    排座/轮换/性别/配对 `random-arrange.js`；文案 `messages.js`；迁移 `migrate.js`）。
 3. 改完先 `node --check`，再 `bash .workbuddy/run_unit_tests.sh`。
 4. 涉及 UI 就写/跑对应 `smoke_test_batch*.py`（先起 `http.server 8123`，§5.2）；
    新测试**必须回退验证**（§5.4）。
-5. `cp` 到 `recover-huangdiv2` → `git fetch` 看分叉 → commit → `git push origin master` →
-   `git rev-parse master origin/master` 校验；命中嵌套 ref bug 按 §2.2 修。
+5. 在本 workspace：`git fetch` 看分叉 → `git add/commit` → `git push origin master` →
+   `git rev-parse master origin/master` 校验；若 `origin/master` 没自动跟上，按 §2.2 改 packed-refs。
 6. 收尾把当天工作追加到 `.workbuddy/memory/YYYY-MM-DD.md`（append-only）。
 
 ---
