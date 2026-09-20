@@ -112,6 +112,10 @@ sed -i '/^$/d' .git/packed-refs                   # 空行 → "unexpected line 
 mkdir -p .git/refs/remotes/origin
 printf '%s\n' "$NEW" > .git/refs/remotes/origin/master    # ⚠️ 必须 40-hex 全量 + 结尾换行
 ```
+> ⚠️ **先校验 `$NEW` 是 40-hex 再写 ref**：`git ls-remote` 遇网络故障（实测 GitHub 会回 408/502）会返回**空串**，
+> 此时 `printf '' > .git/refs/remotes/origin/master` 会写出**空 ref** ⇒ `warning: ignoring broken ref`、
+> 分支变 `[gone]`。**取不到合法值就完全不要动 ref**（等网络恢复再推，或保持上次已知远端值）。
+
 校验（四者一致 + 无 ahead/behind）：
 ```bash
 git rev-parse HEAD master origin/master '@{u}'
