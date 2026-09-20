@@ -1,6 +1,8 @@
 # 座位表项目 · 会话经验归档
 
-> **生成**：2026-09-20 ｜ **权威提交**：`fb4de80`(origin/master 已同步)
+> **生成**：2026-09-20 ｜ **本文件已纳入 git**（`.workbuddy/`，公开仓库，便于换机/云端续开发）
+> **代码权威提交**：`fb4de80`（seats-generator.* 自此前未再改动）
+> **仓库 master 最新**：`2ddcc18`（= 本经验同步提交；其上 7 个提交都是 `ClassMaster.html` 的功能）
 > **用途**：把 2026-09-04 ~ 2026-09-20 全部开发会话压缩沉淀为**单一知识库**。
 > 新会话读这一份即可恢复上下文；需要逐日细节时再查 `.workbuddy/memory/YYYY-MM-DD.md`；
 > 2026-09-20 起的旧 overview / review 文档已归档到 `.workbuddy/archive/`（见其 README）。
@@ -27,10 +29,15 @@
 
 ### 1.1 项目内容
 - **主体**：黄笛的个人博客 https://huangdiv.com（Hugo + MemE 主题 + Waline 评论 + GitHub Actions → GitHub Pages）。
+  **仓库是公开的**（`github.com/huangdiv/huangdiv.com`，含 `.workbuddy/`）。
 - **本会话主战场**：`static/seats-generator.html`——面向教师的班级座位表 Web 应用。
   - 功能面：班级多配置、行列/走道/讲台布局、学生导入与拖拽、智能排座、分组与分组轮换、
     签到模式、配对约束（强制同桌/回避同桌）、导出图片/CSV/打印、GitHub 云同步（PAT）。
   - 技术：vanilla JS（无框架）、localStorage、CDN 依赖 SheetJS + html2canvas。
+- **同仓库还有别的 `static/` 工具**（不要混淆）：
+  - `static/ClassMaster.html`（班级管家：宿舍/床位、成绩、学段、学生档案编辑…）——由**其他会话/机器**持续开发，与 seats-generator 相互独立。
+  - `static/jumpto.html`（书签工具）。
+  - ⇒ 改 seats-generator 只动 `static/seats-generator.*` 与 `static/modules/*`，别碰 `ClassMaster.html`。
 
 ### 1.2 仓库拓扑（关键，极易踩坑）
 | 角色 | 路径 | 说明 |
@@ -96,9 +103,11 @@ git status -sb                                # 无 ahead/behind
   遇到 non-fast-forward：**不要 rebase**，用 `git fetch` + `git reset --soft origin/master`。
 - **push 凭据**：credential helper 已是 GCM（`manager`），`git push origin master` 前台秒级完成。
   旧的「wincred 挂起/后台 2h41m」经验**已过时**，不要后台跑 push。
-- `.workbuddy/` 大多是本地文件（不入 git）；但推送仓里**已部分被跟踪**（`run_unit_tests.sh`、
-  部分 `smoke_test_batch*.py`、`memory/2026-09-06.md`，以及一份旧 `overview.md`）⇒ 别假设它被忽略。
-  （注：本地 `overview.md` 已于 2026-09-20 移入 `.workbuddy/archive/`，与推送仓的位置不再一致。）
+- `.workbuddy/` **已纳入 git** 并在公开仓库中：知识文档（`ARCHIVE.md`、`memory/`、`archive/`）、
+  `run_unit_tests.sh`、全部 `smoke_test*.py`。目的是**换机 / 云端续开发时可直接拿到经验与测试**。
+  `.gitignore` 已忽略 `__pycache__/`、`*.pyc`。worktree 里的杂项脚本/截图/补丁**不入 git**（本地临时件）。
+- **跨机协作**：其他电脑/云端会话会往同一仓库推送 ⇒ 每次开工先 `git fetch`，
+  并用 `git ls-remote origin master` 核对真实远端（本地跟踪 ref 常因 nested ref bug 失真）。
 - 事故史：`git pull --rebase` 被 SIGTERM 中断会删 `.git/refs` 并 GC 掉 commit；
   含斜杠分支上 `git merge` 也可能连带破坏对象库。详见 `memory/2026-09-07.md`、`2026-09-09.md`。
 

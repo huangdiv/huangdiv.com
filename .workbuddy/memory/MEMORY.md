@@ -11,7 +11,9 @@
   - 原 `recover-huangdiv` 的 `.git` 已于 2026-09-09 损坏,已废弃,不要再使用
   - 流程:`cp` 开发目录改动文件 → recover-huangdiv2 → `git add/commit/push`
 - 远程:`https://github.com/huangdiv/huangdiv.com.git`(org = `huangdiv`,不是 xingz-io)
-- 权威提交(2026-09-20):`fb4de80`
+  - **公开仓库**;`.workbuddy/` 已纳入 git(知识文档 + 全量冒烟测试),便于换机/云端续开发
+  - 同仓库还有别的工具:`static/ClassMaster.html`(班级管家,其他会话开发)、`static/jumpto.html`
+  - 提交基线:seats-generator 代码 = `fb4de80`(此后未改);仓库 master 最新见 `git ls-remote`
 
 ## 推送注意
 - 存在**并行会话**改同一仓库 ⇒ push 前务必 `git fetch` + `git log --oneline origin/master` 看分叉
