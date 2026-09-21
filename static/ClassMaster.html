@@ -713,6 +713,7 @@
     }
     function navButton(n,custom=false){return `<button class="nav-item ${state.page===n.id?"active":""}" data-page="${n.id}" onclick="navigate('${n.id}')"><span class="nav-icon">${iconSymbol(n.icon||"✦")}</span><span>${escapeHtml(n.label)}</span>${n.id==="todos"?'<span class="count">0</span>':""}${custom?`<span class="nav-delete" onclick="event.stopPropagation();deleteCustomPage('${n.id}')">×</span>`:""}</button>`}
     function navigate(page){state.page=page;save();renderNav();renderPage();el("sidebar").classList.remove("open");window.scrollTo({top:0,behavior:"smooth"})}
+    document.addEventListener("click",e=>{const sb=el("sidebar");if(sb&&sb.classList.contains("open")&&!sb.contains(e.target)&&!(e.target.closest&&e.target.closest(".mobile-float")))sb.classList.remove("open")});
     function setTab(group,value){state.subtabs[group]=value;save();renderPage()}
     function openAddCustomPage(){
       openModal("添加侧栏功能",`<div class="form-grid"><div class="form-group"><label>功能名称</label><input class="input" id="customName" placeholder="如：家长委员会"></div><div class="form-group"><label>功能图标</label><select class="select" id="customIcon"><option>✦</option><option>◇</option><option>▦</option><option>♧</option><option>◎</option><option>⌁</option><option>✎</option><option>≡</option></select></div><div class="form-group full"><label>功能说明</label><textarea class="textarea" id="customDesc" placeholder="这个功能主要用来管理什么？"></textarea></div></div>`,"创建",()=>{
