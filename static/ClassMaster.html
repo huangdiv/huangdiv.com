@@ -326,7 +326,7 @@
           {id:"ht13",name:"孟宛之",subject:"美术",role:"科任老师",phone:"138****5023"},{id:"ht14",name:"苏静澜",subject:"心理",role:"心理辅导",phone:"138****5024"}
         ],
         cadres:{"班长":"stu-h2-1","团支书":"stu-h2-2","学习委员":"stu-h2-3","体育委员":"stu-h2-4","生活委员":"stu-h2-5"},
-        representatives:Object.fromEntries(SUBJECTS.map((subject,index)=>[subject,"stu-h2-"+(index+6)])),
+        representatives:Object.fromEntries(SUBJECTS.map((subject,index)=>[subject,["stu-h2-"+(index+6)]])),
         scheduleDays:SCHEDULE_DAYS.slice(0,5),
         schedule:JSON.parse(JSON.stringify(HS_SCHEDULE)),
         exams:[
@@ -385,7 +385,7 @@
         {id:"t13",name:"苏静澜",subject:"美术",role:"科任老师",phone:"138****3026"},{id:"t14",name:"唐书雅",subject:"心理",role:"心理辅导",phone:"138****3018"}
       ],
       cadres:{"班长":"stu-1","团支书":"stu-2","学习委员":"stu-3","体育委员":"stu-4"},
-      representatives:{"语文":"stu-5","数学":"stu-6","英语":"stu-7","地理":"stu-8","生物":"stu-9","道法":"stu-10","历史":"stu-11","物理":"stu-12","化学":"stu-13","体育":"stu-14","微机":"stu-15","音乐":"stu-16","美术":"stu-17","心理":"stu-18"},
+      representatives:Object.fromEntries(["语文","数学","英语","地理","生物","道法","历史","物理","化学","体育","微机","音乐","美术","心理"].map(subject=>[subject,[subject==="语文"?"stu-5":subject==="数学"?"stu-6":subject==="英语"?"stu-7":subject==="地理"?"stu-8":subject==="生物"?"stu-9":subject==="道法"?"stu-10":subject==="历史"?"stu-11":subject==="物理"?"stu-12":subject==="化学"?"stu-13":subject==="体育"?"stu-14":subject==="微机"?"stu-15":subject==="音乐"?"stu-16":subject==="美术"?"stu-17":"stu-18"]])),
       scheduleDays:SCHEDULE_DAYS.slice(0,5),
       schedule:JSON.parse(JSON.stringify(DEFAULT_SCHEDULE)),
       dormScores:[
@@ -429,7 +429,7 @@
     state.classCulture=Object.assign({},defaults.classCulture,state.classCulture||{});
     state.teachers=Array.isArray(state.teachers)?state.teachers:defaults.teachers;
     state.cadres=Object.assign({},defaults.cadres,state.cadres||{});
-    state.representatives=Object.assign({},defaults.representatives,state.representatives||{});
+    state.representatives=normalizeRepresentatives(Object.assign({},defaults.representatives,state.representatives||{}));
     state.reminderSettings=Object.assign({},defaults.reminderSettings,state.reminderSettings||{});
     state.seatConfig=Object.assign({},defaults.seatConfig,state.seatConfig||{});
     state.gradeLines=Object.assign({},defaults.gradeLines,state.gradeLines||{});if(!state.gradeLines.subjects||typeof state.gradeLines.subjects!=="object")state.gradeLines.subjects={};
@@ -523,6 +523,11 @@
       if(container.classInfo){if(container.classInfo.name==="高一（3）班")container.classInfo.name="初一（3）班";if(container.classInfo.grade==="高一年级")container.classInfo.grade="初一年级"}
       if(container.seatConfig?.name==="高一（3）班座位表")container.seatConfig.name="初一（3）班座位表";
     }
+    function normalizeRepresentatives(data){
+      const source=data&&typeof data==="object"?data:{};
+      Object.entries(source).forEach(([subject,value])=>{if(value&&!Array.isArray(value))source[subject]=[value]});
+      return source;
+    }
     function normalizeJuniorStage(container){
       container.teachers=cloneData(defaults.teachers);
       container.schedule=JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
@@ -542,6 +547,7 @@
     function applyClassData(id){
       const data=state.classProfiles[id];if(!data)return false;
       CLASS_KEYS.forEach(k=>{if(k in data)state[k]=cloneData(data[k])});
+      state.representatives=normalizeRepresentatives(state.representatives);
       state.classInfo=Object.assign({},defaults.classInfo,state.classInfo||{});
       state.classCulture=Object.assign({},defaults.classCulture,state.classCulture||{});
       state.seatConfig=Object.assign({},defaults.seatConfig,state.seatConfig||{});
@@ -971,7 +977,7 @@
     function importAdaptiveClass(file,rows,info={}){
       let basicUpdated=0;const keyMap={"班级名称":[state.classInfo,"name"],"班级":[state.classInfo,"name"],"年级":[state.classInfo,"grade"],"班主任":[state.classInfo,"teacher"],"任教学科":[state.classInfo,"subject"],"教室":[state.classInfo,"classroom"],"学年":[state.classInfo,"year"],"班级口号":[state.classCulture,"slogan"],"班训":[state.classCulture,"motto"],"文化说明":[state.classCulture,"description"]};rows.forEach(row=>{const key=compactHeader(row?.[0]),value=cleanCell(row?.[1]);const target=keyMap[key];if(target&&value){target[0][target[1]]=value;basicUpdated++}});
       const candidates=["teachers","roles","schedule"].map(type=>({type,layout:detectAdaptiveLayout(rows,IMPORT_SCHEMAS[type]),quality:adaptiveQuality(rows,IMPORT_SCHEMAS[type],type==="teachers"?["name","subject"]:type==="roles"?["role","student"]:["label"])})).sort((a,b)=>b.quality-a.quality),best=candidates[0];if(best.type==="schedule"&&best.layout.roles.includes("label")&&best.quality>=30)return importAdaptiveSchedule(file,rows,info);
-      let imported=0,created=0;if(best.type==="teachers"&&best.layout.roles.includes("name")){best.layout.dataRows.forEach((row,index)=>{const name=adaptiveValue(row,best.layout,"name"),subject=adaptiveValue(row,best.layout,"subject");if(!name||!subject)return;const existing=state.teachers.find(teacher=>teacher.name===name&&teacher.subject===subject),data={name,subject,role:adaptiveValue(row,best.layout,"role")||"科任老师",phone:adaptiveValue(row,best.layout,"phone"),sourceData:adaptiveSource(row,best.layout)};if(existing)Object.assign(existing,data);else state.teachers.push({id:"t-adaptive-"+Date.now()+"-"+index,...data});imported++})}else if(best.type==="roles"&&best.layout.roles.includes("role")){best.layout.dataRows.forEach((row,index)=>{const role=adaptiveValue(row,best.layout,"role"),studentName=adaptiveValue(row,best.layout,"student"),studentNo=adaptiveValue(row,best.layout,"studentNo");if(!role||(!studentName&&!studentNo))return;let student=findStudentFlexible({name:studentName,studentNo});if(!student){student=createImportedStudent({name:studentName,studentNo},index);created++}const category=adaptiveValue(row,best.layout,"category"),isRepresentative=/课代表|科代表|学科/.test(category)||SUBJECTS.includes(role)||state.teachers.some(teacher=>teacher.subject===role);if(isRepresentative)state.representatives[role]=student.id;else state.cadres[role]=student.id;imported++})}
+      let imported=0,created=0;if(best.type==="teachers"&&best.layout.roles.includes("name")){best.layout.dataRows.forEach((row,index)=>{const name=adaptiveValue(row,best.layout,"name"),subject=adaptiveValue(row,best.layout,"subject");if(!name||!subject)return;const existing=state.teachers.find(teacher=>teacher.name===name&&teacher.subject===subject),data={name,subject,role:adaptiveValue(row,best.layout,"role")||"科任老师",phone:adaptiveValue(row,best.layout,"phone"),sourceData:adaptiveSource(row,best.layout)};if(existing)Object.assign(existing,data);else state.teachers.push({id:"t-adaptive-"+Date.now()+"-"+index,...data});imported++})}else if(best.type==="roles"&&best.layout.roles.includes("role")){best.layout.dataRows.forEach((row,index)=>{const role=adaptiveValue(row,best.layout,"role"),studentName=adaptiveValue(row,best.layout,"student"),studentNo=adaptiveValue(row,best.layout,"studentNo");if(!role||(!studentName&&!studentNo))return;let student=findStudentFlexible({name:studentName,studentNo});if(!student){student=createImportedStudent({name:studentName,studentNo},index);created++}const category=adaptiveValue(row,best.layout,"category"),isRepresentative=/课代表|科代表|学科/.test(category)||SUBJECTS.includes(role)||state.teachers.some(teacher=>teacher.subject===role);if(isRepresentative){state.representatives[role]=state.representatives[role]||[];if(!state.representatives[role].includes(student.id))state.representatives[role].push(student.id)}else state.cadres[role]=student.id;imported++})}
       save();renderPage();toast(`已自动识别班级资料，更新 ${basicUpdated} 项基本信息，导入 ${imported} 条${best.type==="teachers"?"教师":"班级分工"}${created?"，新建 "+created+" 名学生":""}`)
     }
     function importAdaptiveGlobal(file,rows,info={}){
@@ -1008,7 +1014,7 @@
       next.classCulture=Object.assign({},defaults.classCulture,next.classCulture||{});
       next.teachers=Array.isArray(next.teachers)?next.teachers:defaults.teachers;
       next.cadres=Object.assign({},defaults.cadres,next.cadres||{});
-      next.representatives=Object.assign({},defaults.representatives,next.representatives||{});
+      next.representatives=normalizeRepresentatives(Object.assign({},defaults.representatives,next.representatives||{}));
       next.reminderSettings=Object.assign({},defaults.reminderSettings,next.reminderSettings||{});
       next.seatConfig=Object.assign({},defaults.seatConfig,next.seatConfig||{});
       next.gradeLines=Object.assign({},defaults.gradeLines,next.gradeLines||{});if(!next.gradeLines.subjects||typeof next.gradeLines.subjects!=="object")next.gradeLines.subjects={};
@@ -1029,7 +1035,7 @@
       }
       const needsScheduleUpgrade=Number(next.scheduleSchemaVersion||0)<3,needsGradeUpgrade=Number(next.gradeSchemaVersion||0)<2;
       normalizeAcademicData(next,next.activeClassId==="class-demo",needsScheduleUpgrade);
-      Object.entries(next.classProfiles).forEach(([id,profile])=>normalizeAcademicData(profile,id==="class-demo",needsScheduleUpgrade));
+      Object.entries(next.classProfiles).forEach(([id,profile])=>{normalizeAcademicData(profile,id==="class-demo",needsScheduleUpgrade);if(profile&&typeof profile==="object")profile.representatives=normalizeRepresentatives(profile.representatives)});
       next.scheduleSchemaVersion=3;
       normalizeGradeData(next,needsGradeUpgrade,next.activeClassId==="class-demo");
       Object.entries(next.classProfiles).forEach(([id,profile])=>normalizeGradeData(profile,needsGradeUpgrade,id==="class-demo"));
@@ -1090,16 +1096,20 @@
     }
     function deleteTeacher(id){if(!confirm("确定删除这位科任老师吗？"))return;state.teachers=state.teachers.filter(x=>x.id!==id);save();closeModal();renderPage();toast("老师已删除")}
     function openRoleEditor(type,encodedRole=""){
-      const isCadre=type==="cadres",data=isCadre?state.cadres:state.representatives,oldRole=encodedRole?decodeURIComponent(encodedRole):"",oldStudent=data[oldRole]||"";
-      openModal((oldRole?"编辑":"新增")+(isCadre?"班干部":"课代表"),`<div class="form-grid"><div class="form-group"><label>${isCadre?"职务名称":"学科或岗位"}</label><input class="input" id="roleName" value="${escapeHtml(oldRole)}" placeholder="${isCadre?"如：纪律委员":"如：地理、实验课"}"></div><div class="form-group"><label>学生</label><select class="select" id="roleStudent">${studentOptions(oldStudent)}</select></div></div>`,"保存",()=>{
-        const role=el("roleName").value.trim(),studentId=el("roleStudent").value;if(!role)return toast("请填写职务或学科名称");
-        if(oldRole&&oldRole!==role)delete data[oldRole];data[role]=studentId;
-        if(oldStudent){const old=state.students.find(s=>s.id===oldStudent);if(old&&old.role===(isCadre?oldRole:oldRole+"课代表"))old.role=""}
-        const student=state.students.find(s=>s.id===studentId);if(student)student.role=isCadre?role:role+"课代表";
+      const isCadre=type==="cadres",data=isCadre?state.cadres:state.representatives,oldRole=encodedRole?decodeURIComponent(encodedRole):"",oldValue=data[oldRole],oldIds=isCadre?(oldValue?[oldValue]:[]):(Array.isArray(oldValue)?oldValue:(oldValue?[oldValue]:[]));
+      openModal((oldRole?"编辑":"新增")+(isCadre?"班干部":"课代表"),`<div class="form-grid"><div class="form-group"><label>${isCadre?"职务名称":"学科或岗位"}</label><input class="input" id="roleName" value="${escapeHtml(oldRole)}" placeholder="${isCadre?"如：纪律委员":"如：地理、实验课"}"></div>${isCadre?`<div class="form-group"><label>学生</label><select class="select" id="roleStudent">${studentOptions(oldIds[0]||"")}</select></div>`:`<div class="form-group"><label>课代表（可多选）</label><div id="roleStudents" style="max-height:260px;overflow:auto;border:1px solid var(--line,#e5e7eb);border-radius:8px;padding:6px 10px">${state.students.map(s=>`<label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;cursor:pointer"><input type="checkbox" value="${s.id}" ${oldIds.includes(s.id)?"checked":""}> ${escapeHtml(s.name)} <span style="color:var(--muted);font-size:11px">${escapeHtml(s.studentNo)}</span></label>`).join("")||'<div class="empty">还没有学生</div>'}</div></div>`}</div>`,"保存",()=>{
+        const role=el("roleName").value.trim();if(!role)return toast("请填写职务或学科名称");
+        let studentIds;
+        if(isCadre){const id=el("roleStudent").value;if(!id)return toast("请选择学生");studentIds=[id]}
+        else{studentIds=[...document.querySelectorAll("#roleStudents input:checked")].map(x=>x.value);if(!studentIds.length)return toast("请选择至少一名课代表")}
+        if(oldRole&&oldRole!==role){delete data[oldRole];oldIds.forEach(id=>{const s=state.students.find(x=>x.id===id);if(s&&s.role===(isCadre?oldRole:oldRole+"课代表"))s.role=""})}
+        oldIds.forEach(id=>{if(!studentIds.includes(id)){const s=state.students.find(x=>x.id===id);if(s&&s.role===(isCadre?role:role+"课代表"))s.role=""}});
+        if(isCadre){data[role]=studentIds[0];const s=state.students.find(x=>x.id===studentIds[0]);if(s)s.role=role}
+        else{data[role]=studentIds;studentIds.forEach(id=>{const s=state.students.find(x=>x.id===id);if(s)s.role=role+"课代表"})}
         save();closeModal();renderPage();toast((isCadre?"班干部":"课代表")+"已保存");
       });
     }
-    function removeRole(type,encodedRole){const role=decodeURIComponent(encodedRole),data=type==="cadres"?state.cadres:state.representatives,id=data[role];if(!confirm("确定删除“"+role+"”吗？"))return;delete data[role];const s=state.students.find(x=>x.id===id);if(s&&s.role===(type==="cadres"?role:role+"课代表"))s.role="";save();renderPage();toast("分工已删除")}
+    function removeRole(type,encodedRole){const role=decodeURIComponent(encodedRole),data=type==="cadres"?state.cadres:state.representatives,value=data[role],ids=Array.isArray(value)?value:(value?[value]:[]);if(!confirm("确定删除“"+role+"”吗？"))return;delete data[role];ids.forEach(id=>{const s=state.students.find(x=>x.id===id);if(s&&s.role===(type==="cadres"?role:role+"课代表"))s.role=""});save();renderPage();toast("分工已删除")}
     function openScheduleItem(id=""){
       const days=currentScheduleDays(),old=state.schedule.find(x=>x.id===id),item=old||{label:"自定义时段",kind:"custom",duration:0,start:"",end:"",courses:Array(days.length).fill("")};
       openModal((old?"编辑":"新增")+"课程时间段",`<div class="form-grid"><div class="form-group"><label>时段名称</label><input class="input" id="scheduleLabel" value="${escapeHtml(item.label)}" placeholder="如：午间阅读、社团活动"></div><div class="form-group"><label>时段类型</label><select class="select" id="scheduleKind" onchange="updateScheduleEnd()"><option value="lesson" ${item.kind==="lesson"?"selected":""}>正式课程</option><option value="reading" ${item.kind==="reading"?"selected":""}>早读</option><option value="break" ${item.kind==="break"?"selected":""}>大课间</option><option value="custom" ${item.kind==="custom"?"selected":""}>自定义时段</option></select></div><div class="form-group"><label>开始时间</label><input class="input" type="time" id="scheduleStart" value="${item.start||""}" onchange="updateScheduleEnd()"></div><div class="form-group"><label>结束时间</label><input class="input" type="time" id="scheduleEnd" value="${item.end||""}"></div>${days.map((day,i)=>`<div class="form-group"><label>${day}内容</label>${item.kind==="reading"?`<select class="select" id="scheduleCourse${i}"><option value="">不安排</option><option ${item.courses[i]==="语文"?"selected":""}>语文</option><option ${item.courses[i]==="英语"?"selected":""}>英语</option></select>`:`<input class="input" id="scheduleCourse${i}" value="${escapeHtml(item.courses[i]||"")}" placeholder="课程或活动名称">`}</div>`).join("")}</div>`,"保存时段",()=>{
@@ -1209,7 +1219,7 @@
       </div>
       <div class="card" style="margin-top:14px">
         <div class="card-title"><h3>班级榜样</h3><small>综合成绩前 5 名</small></div>
-        <div class="table-wrap"><table class="table"><thead><tr><th>名次</th><th>学生</th><th>班级职务</th><th>总均分</th><th>德育积分</th><th>出勤率</th><th>状态</th></tr></thead><tbody>${top.map((s,i)=>`<tr><td><span class="rank ${i<3?"top":""}">${i+1}</span></td><td>${studentCell(s)}</td><td>${s.role||"—"}</td><td><b>${avgScore(s)}</b></td><td>${s.points}</td><td>${s.attendance}%</td><td><span class="badge green">稳步成长</span></td></tr>`).join("")}</tbody></table></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>名次</th><th>学生</th><th>班级职务</th><th>总均分</th><th>德育积分</th><th>出勤率</th><th>状态</th></tr></thead><tbody>${top.map((s,i)=>`<tr><td><span class="rank ${i<3?"top":""}">${i+1}</span></td><td>${studentCell(s)}</td><td>${roleBadgeHTML(s)}</td><td><b>${avgScore(s)}</b></td><td>${s.points}</td><td>${s.attendance}%</td><td><span class="badge green">稳步成长</span></td></tr>`).join("")}</tbody></table></div>
       </div>`;
     }
     const ICON_MAP={"生":"♙","绩":"▥","关":"◇","全":"♙","住":"⌂","干":"♜","班":"▦","人":"♙","到":"✓","均":"∿","高":"↑","优":"★","及":"✓","换":"↻","近":"◉","模":"▦","空":"□","舍":"⌂","分":"◇","扣":"−","加":"+","零":"○","急":"!","今":"◷","周":"⌁","成":"✓"};
@@ -1217,6 +1227,15 @@
     function metric(icon,val,label,sub,trend,cls=""){return `<div class="card metric"><div class="mi">${iconSymbol(icon)}</div><strong>${val}<span class="trend ${cls}">${trend||""}</span></strong><div class="label">${label} · ${sub}</div></div>`}
     function avgScore(s){return s&&Array.isArray(s.scores)&&s.scores.length?Math.round(s.scores.reduce((a,b)=>a+b,0)/s.scores.length):0}
     function studentCell(s){return `<div class="student-cell"><span class="mini-avatar ${s.gender==="女"?"girl":""}">${s.name.slice(-1)}</span><div><b>${s.name}</b><div style="font-size:8px;color:var(--muted)">${s.studentNo}</div></div></div>`}
+    function studentRoles(s){
+      if(!s)return[];
+      const roles=[];
+      Object.entries(state.cadres||{}).forEach(([role,id])=>{if(id===s.id)roles.push(role)});
+      Object.entries(state.representatives||{}).forEach(([subject,ids])=>{(Array.isArray(ids)?ids:[ids]).forEach(id=>{if(id===s.id)roles.push(subject+"课代表")})});
+      if(s.role&&!roles.includes(s.role))roles.push(s.role);
+      return roles;
+    }
+    function roleBadgeHTML(s){const roles=studentRoles(s);return roles.length?roles.map(escapeHtml).join("、"):"—"}
     function currentExam(){return state.exams?.find(exam=>exam.id===state.activeExamId)||null}
     function orderedExams(){return (state.exams||[]).slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")||(state.exams.indexOf(a)-state.exams.indexOf(b)))}
     function previousExam(exam=currentExam()){const exams=orderedExams(),index=exams.findIndex(item=>item.id===exam?.id);return index>0?exams[index-1]:null}
@@ -1424,7 +1443,7 @@
       if(tab==="people"){
         const duties={"班长":"统筹班务","团支书":"团务活动","学习委员":"学习互助","体育委员":"两操与活动"};
         body=`<div class="card"><div class="card-title"><h3>科任老师</h3><button class="btn primary sm" onclick="openTeacherForm()">＋ 添加老师</button></div><div class="teacher-grid">${state.teachers.map((t,i)=>`<div class="teacher"><span class="mini-avatar ${i%2?"girl":""}">${t.name.slice(-1)}</span><div class="grow"><strong>${escapeHtml(t.name)}</strong><small>${escapeHtml(t.subject)} · ${escapeHtml(t.role)}</small></div><button class="btn sm" onclick="openTeacherDetail('${t.id}')">编辑</button><button class="btn sm danger" onclick="deleteTeacher('${t.id}')">删除</button></div>`).join("")||'<div class="empty" style="grid-column:1/-1">还没有科任老师，点击“添加老师”开始录入。</div>'}</div></div>
-        <div class="grid two" style="margin-top:14px"><div class="card"><div class="card-title"><h3>班干部</h3><button class="btn sm primary" onclick="openRoleEditor('cadres')">＋ 新增职务</button></div><div class="table-wrap"><table class="table" style="min-width:0"><thead><tr><th>职务</th><th>学生</th><th>主要职责</th><th>操作</th></tr></thead><tbody>${Object.entries(state.cadres).map(([role,id])=>`<tr><td>${escapeHtml(role)}</td><td>${state.students.find(s=>s.id===id)?.name||"待定"}</td><td>${duties[role]||"班级服务"}</td><td><button class="btn sm" onclick="openRoleEditor('cadres','${encodeURIComponent(role)}')">编辑</button> <button class="btn sm danger" onclick="removeRole('cadres','${encodeURIComponent(role)}')">删除</button></td></tr>`).join("")||'<tr><td colspan="4">暂无班干部职务</td></tr>'}</tbody></table></div></div><div class="card"><div class="card-title"><h3>课代表</h3><button class="btn sm primary" onclick="openRoleEditor('representatives')">＋ 新增课代表</button></div><div class="table-wrap"><table class="table" style="min-width:0"><thead><tr><th>学科</th><th>课代表</th><th>协作老师</th><th>操作</th></tr></thead><tbody>${Object.entries(state.representatives).map(([subject,id])=>`<tr><td>${escapeHtml(subject)}</td><td>${state.students.find(s=>s.id===id)?.name||"待定"}</td><td>${state.teachers.find(t=>t.subject===subject)?.name||"待定"}</td><td><button class="btn sm" onclick="openRoleEditor('representatives','${encodeURIComponent(subject)}')">编辑</button> <button class="btn sm danger" onclick="removeRole('representatives','${encodeURIComponent(subject)}')">删除</button></td></tr>`).join("")||'<tr><td colspan="4">暂无课代表</td></tr>'}</tbody></table></div></div></div>`;
+        <div class="grid two" style="margin-top:14px"><div class="card"><div class="card-title"><h3>班干部</h3><button class="btn sm primary" onclick="openRoleEditor('cadres')">＋ 新增职务</button></div><div class="table-wrap"><table class="table" style="min-width:0"><thead><tr><th>职务</th><th>学生</th><th>主要职责</th><th>操作</th></tr></thead><tbody>${Object.entries(state.cadres).map(([role,id])=>`<tr><td>${escapeHtml(role)}</td><td>${state.students.find(s=>s.id===id)?.name||"待定"}</td><td>${duties[role]||"班级服务"}</td><td><button class="btn sm" onclick="openRoleEditor('cadres','${encodeURIComponent(role)}')">编辑</button> <button class="btn sm danger" onclick="removeRole('cadres','${encodeURIComponent(role)}')">删除</button></td></tr>`).join("")||'<tr><td colspan="4">暂无班干部职务</td></tr>'}</tbody></table></div></div><div class="card"><div class="card-title"><h3>课代表</h3><button class="btn sm primary" onclick="openRoleEditor('representatives')">＋ 新增课代表</button></div><div class="table-wrap"><table class="table" style="min-width:0"><thead><tr><th>学科</th><th>课代表</th><th>协作老师</th><th>操作</th></tr></thead><tbody>${Object.entries(state.representatives).map(([subject,ids])=>{const idList=Array.isArray(ids)?ids:(ids?[ids]:[]),names=idList.map(id=>state.students.find(s=>s.id===id)?.name).filter(Boolean);return `<tr><td>${escapeHtml(subject)}</td><td>${names.length?names.map(escapeHtml).join("、"):"待定"}</td><td>${state.teachers.find(t=>t.subject===subject)?.name||"待定"}</td><td><button class="btn sm" onclick="openRoleEditor('representatives','${encodeURIComponent(subject)}')">编辑</button> <button class="btn sm danger" onclick="removeRole('representatives','${encodeURIComponent(subject)}')">删除</button></td></tr>`}).join("")||'<tr><td colspan="4">暂无课代表</td></tr>'}</tbody></table></div></div></div>`;
       }
       if(tab==="groups"){
         const names=groupNames(),buckets=groupBuckets(),badges=["green","blue","amber"],tags=["砺行","星火","向阳"];
@@ -1444,11 +1463,11 @@
       +`<div class="grid four">
         ${metric("全",state.students.length,"学生总数","男 "+state.students.filter(s=>s.gender==="男").length+" · 女 "+state.students.filter(s=>s.gender==="女").length,"")}
         ${metric("住",state.students.filter(s=>s.dorm!=="走读").length,"住宿学生","男女分区管理","")}
-        ${metric("干",state.students.filter(s=>s.role).length,"班级骨干","含课代表","")}
+        ${metric("干",state.students.filter(s=>studentRoles(s).length).length,"班级骨干","含课代表","")}
         ${metric("关",state.students.filter(s=>s.special).length,"特殊关注","信息已加密展示","")}
       </div>
       <div class="card" style="margin-top:14px"><div class="filterbar"><input class="input search-in" placeholder="搜索姓名 / 学号 / 考试号" value="${escapeHtml(q)}" oninput="window.studentQuery=this.value" onkeydown="if(event.key==='Enter')renderPage()"><button class="btn sm" onclick="renderPage()">搜索</button><select class="select" onchange="window.studentGender=this.value;renderPage()"><option value="">全部性别</option><option ${gender==="男"?"selected":""}>男</option><option ${gender==="女"?"selected":""}>女</option></select><select class="select" onchange="window.studentSpecial=this.value;renderPage()"><option value="">全部学生</option><option ${special==="有特殊情况"?"selected":""}>有特殊情况</option><option ${special==="无特殊情况"?"selected":""}>无特殊情况</option></select><span class="badge">共 ${rows.length} 条</span></div>
-      <div class="table-wrap"><table class="table"><thead><tr><th>学生</th><th>性别</th><th>身份证号</th><th>学号</th><th>考试号</th><th>家庭联系人</th><th>班级职务</th><th>特殊情况</th><th>操作</th></tr></thead><tbody>${rows.map(s=>`<tr><td>${studentCell(s)}</td><td>${s.gender}</td><td>${s.idCard||"—"}</td><td>${s.studentNo}</td><td>${s.examNo}</td><td>${s.guardian} · ${s.phone}</td><td>${s.role||"—"}</td><td>${s.special?`<span class="badge amber">${s.special}</span>`:`<span class="badge">无</span>`}</td><td><button class="btn sm" onclick="openStudent('${s.id}')">查看档案</button></td></tr>`).join("")||'<tr><td colspan="9" style="text-align:center;padding:35px">当前班级还没有学生，可新增或导入 Excel。</td></tr>'}</tbody></table></div></div>`;
+      <div class="table-wrap"><table class="table"><thead><tr><th>学生</th><th>性别</th><th>身份证号</th><th>学号</th><th>考试号</th><th>家庭联系人</th><th>班级职务</th><th>特殊情况</th><th>操作</th></tr></thead><tbody>${rows.map(s=>`<tr><td>${studentCell(s)}</td><td>${s.gender}</td><td>${s.idCard||"—"}</td><td>${s.studentNo}</td><td>${s.examNo}</td><td>${s.guardian} · ${s.phone}</td><td>${roleBadgeHTML(s)}</td><td>${s.special?`<span class="badge amber">${s.special}</span>`:`<span class="badge">无</span>`}</td><td><button class="btn sm" onclick="openStudent('${s.id}')">查看档案</button></td></tr>`).join("")||'<tr><td colspan="9" style="text-align:center;padding:35px">当前班级还没有学生，可新增或导入 Excel。</td></tr>'}</tbody></table></div></div>`;
     }
     function clearAllStudents(){if(!state.students.length)return toast("当前班级没有学生");if(!confirm("确定清空当前班级的全部学生吗？相关座位、职务、评语、积分和历次成绩也会一并清空。"))return;state.students=[];state.seatOrder=Array(seatCapacity()).fill(null);state.seatHistory=[];state.cadres={};state.representatives={};state.comments=[];state.pointsRecords=[];state.dormRecords=[];(state.exams||[]).forEach(exam=>{exam.scores={};exam.rawScores={};exam.studentMeta={};exam.extraFields={}});state.selectedCommentStudent="";state.commentTags=[];state.commentDraft="";save();renderNav();renderPage();toast("当前班级学生信息已清空")}
     function isTouchDevice(){return /Mobi|Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent)}
@@ -1488,7 +1507,7 @@
       state.students=state.students.filter(x=>x.id!==id);
       state.seatOrder=state.seatOrder.map(x=>x===id?null:x);
       Object.keys(state.cadres).forEach(role=>{if(state.cadres[role]===id)delete state.cadres[role]});
-      Object.keys(state.representatives).forEach(role=>{if(state.representatives[role]===id)delete state.representatives[role]});
+      Object.keys(state.representatives).forEach(role=>{const ids=state.representatives[role];if(Array.isArray(ids)){state.representatives[role]=ids.filter(x=>x!==id);if(!state.representatives[role].length)delete state.representatives[role]}else if(ids===id)delete state.representatives[role]});
       state.comments=state.comments.filter(x=>x.studentId!==id);
       state.pointsRecords=state.pointsRecords.filter(x=>x.student!==s.name);
       state.dormRecords=state.dormRecords.filter(x=>x.student!==s.name);
@@ -1813,9 +1832,9 @@
     function downloadBlob(content,type,name){const blob=new Blob(["\ufeff",content],{type});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
     function downloadWord(title,body,name){downloadBlob(`<html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:宋体;line-height:1.8;padding:30px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:6px;text-align:center}h1{text-align:center}</style></head><body>${body}</body></html>`,"application/msword",name)}
     function tableHTML(headers,rows,textCols){const force=index=>textCols&&textCols.has(index)?` style="mso-number-format:'\\@'"`:"";return `<table><thead><tr>${headers.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((x,i)=>`<td${force(i)}>${escapeHtml(x)}</td>`).join("")}</tr>`).join("")}</tbody></table>`}
-    function exportStudentsExcel(){const baseHeaders=["姓名","性别","学籍号","学号","考试号","身份证号","监护人","联系电话","家庭住址","班级职务","学习小组","宿舍","床位","德育分","出勤率","特殊情况"],extraHeaders=[...new Set(state.students.flatMap(student=>Object.keys(student.extraInfo||{})))].filter(header=>{const role=adaptiveRole(header,IMPORT_SCHEMAS.students);return !role||role==="fatherName"||role==="fatherPhone"||role==="motherName"||role==="motherPhone"}),rows=state.students.map(s=>[s.name,s.gender,s.schoolNo,s.studentNo,s.examNo,s.idCard||"",s.guardian,s.phone,s.address,s.role,s.group,s.dorm,s.bed,s.points,s.attendance,s.special,...extraHeaders.map(header=>s.extraInfo?.[header]??"")]);downloadBlob(`<html><head><meta charset="utf-8"></head><body>${tableHTML([...baseHeaders,...extraHeaders],rows,new Set([baseHeaders.indexOf("身份证号")]))}</body></html>`,"application/vnd.ms-excel",safeExportName(state.classInfo.name)+"学生信息.xls");toast(`学生信息已导出${extraHeaders.length?"，含 "+extraHeaders.length+" 个原表附加字段":""}`)}
+    function exportStudentsExcel(){const baseHeaders=["姓名","性别","学籍号","学号","考试号","身份证号","监护人","联系电话","家庭住址","班级职务","学习小组","宿舍","床位","德育分","出勤率","特殊情况"],extraHeaders=[...new Set(state.students.flatMap(student=>Object.keys(student.extraInfo||{})))].filter(header=>{const role=adaptiveRole(header,IMPORT_SCHEMAS.students);return !role||role==="fatherName"||role==="fatherPhone"||role==="motherName"||role==="motherPhone"}),rows=state.students.map(s=>[s.name,s.gender,s.schoolNo,s.studentNo,s.examNo,s.idCard||"",s.guardian,s.phone,s.address,studentRoles(s).join("、"),s.group,s.dorm,s.bed,s.points,s.attendance,s.special,...extraHeaders.map(header=>s.extraInfo?.[header]??"")]);downloadBlob(`<html><head><meta charset="utf-8"></head><body>${tableHTML([...baseHeaders,...extraHeaders],rows,new Set([baseHeaders.indexOf("身份证号")]))}</body></html>`,"application/vnd.ms-excel",safeExportName(state.classInfo.name)+"学生信息.xls");toast(`学生信息已导出${extraHeaders.length?"，含 "+extraHeaders.length+" 个原表附加字段":""}`)}
     function exportBackup(){downloadBlob(JSON.stringify(state,null,2),"application/json","班主任工作台完整备份.json")}
-    function exportClassWord(){downloadWord(state.classInfo.name+"班级档案",`<h1>${escapeHtml(state.classInfo.name)}班级档案</h1><p>班主任：${escapeHtml(state.classInfo.teacher)}　学生人数：${state.students.length}　教室：${escapeHtml(state.classInfo.classroom)}</p>${tableHTML(["姓名","学号","班级职务","学习小组"],state.students.map(s=>[s.name,s.studentNo,s.role,s.group]))}`,safeExportName(state.classInfo.name)+"班级档案.doc")}
+    function exportClassWord(){downloadWord(state.classInfo.name+"班级档案",`<h1>${escapeHtml(state.classInfo.name)}班级档案</h1><p>班主任：${escapeHtml(state.classInfo.teacher)}　学生人数：${state.students.length}　教室：${escapeHtml(state.classInfo.classroom)}</p>${tableHTML(["姓名","学号","班级职务","学习小组"],state.students.map(s=>[s.name,s.studentNo,studentRoles(s).join("、"),s.group]))}`,safeExportName(state.classInfo.name)+"班级档案.doc")}
     function exportTableExcel(name){
       if(name==="课程表"){const days=currentScheduleDays(),rows=[["时段","开始时间","结束时间",...days],...state.schedule.map(x=>[x.label,x.start,x.end,...x.courses.slice(0,days.length)])];if(typeof XLSX!=="undefined"){const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:14},{wch:11},{wch:11},...Array(days.length).fill({wch:13})];XLSX.utils.book_append_sheet(wb,ws,"课程表");XLSX.writeFile(wb,safeExportName(state.classInfo.name)+"课程表.xlsx");toast("课程表已导出");return}downloadBlob(`<html><body>${tableHTML(rows[0],rows.slice(1))}</body></html>`,"application/vnd.ms-excel",name+".xls");return}
       downloadBlob(`<html><body><h2>${name}</h2><p>请在工作台查看完整内容。</p></body></html>`,"application/vnd.ms-excel",name+".xls");
