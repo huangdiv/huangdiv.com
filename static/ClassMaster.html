@@ -765,16 +765,15 @@
       const original=compactHeader(header);if(!original||gradeColumnRole(original))return "";
       const title=original.replace(/满分\d+(?:\.\d+)?|百分制|原始分|折算分|标准分/g,"").replace(/成绩|分数|得分|等级|等第|科目/g,"").replace(/[:：]/g,"");
       for(const [subject,aliases] of Object.entries(GRADE_SUBJECT_ALIASES))if(aliases.some(alias=>title===compactHeader(alias)||original===compactHeader(alias)))return subject;
-      if(/成绩|分数|得分|等级|等第/.test(original)&&title&&!/^(单科|各科|考试|期末|期中|月考)$/.test(title))return title;
       return "";
     }
-    function scaledSubjectFromHeader(header){
+    function scaledSubjectFromHeader(header,exam=currentExam()){
       const original=compactHeader(header);if(!original||gradeColumnRole(original))return "";
       if(!/赋分|标准分|折算分/.test(original))return "";
       const title=original.replace(/赋分成绩|等级赋分|选考赋分|赋分|标准分|折算分/g,"").replace(/成绩|分数|得分|等级|等第|科目/g,"").replace(/[:：]/g,"");
       if(!title)return "";
       for(const [subject,aliases] of Object.entries(GRADE_SUBJECT_ALIASES))if(aliases.some(alias=>title===compactHeader(alias)||title===compactHeader(subject)))return subject;
-      return /^[一-龥]{1,6}$/.test(title)?title:"";
+      return /^[一-龥]{1,6}$/.test(title)&&isKnownGradeSubject(title,exam)?title:"";
     }
     function gradeLikeValue(value){
       const text=cleanCell(value);if(!text)return false;
@@ -784,7 +783,7 @@
     function uniqueHeaders(values){
       const seen={};return values.map((value,index)=>{const base=cleanCell(value)||`未命名列${index+1}`;seen[base]=(seen[base]||0)+1;return seen[base]===1?base:`${base}_${seen[base]}`});
     }
-    function detectGradeLayout(rows){
+    function detectGradeLayout(rows,exam=currentExam()){
       const limit=Math.min(12,rows.length);let headerRow=0,best=-1;
       for(let rowIndex=0;rowIndex<limit;rowIndex++){
         const cells=(rows[rowIndex]||[]).map(cleanCell),roles=cells.map(gradeColumnRole),identity=roles.filter(role=>["name","studentNo","examNo","schoolNo"].includes(role)).length,meta=roles.filter(Boolean).length-identity,subjects=cells.filter(subjectFromHeader).length,nonempty=cells.filter(Boolean).length;
@@ -802,19 +801,20 @@
       const roles=headers.map(gradeColumnRole),subjectCandidates=[],scaledCandidates=[];
       headers.forEach((header,index)=>{
         if(roles[index])return;
-        const scaled=scaledSubjectFromHeader(header);if(scaled){scaledCandidates.push({index,subject:scaled,header});return}
+        const scaled=scaledSubjectFromHeader(header,exam);if(scaled){scaledCandidates.push({index,subject:scaled,header});return}
         let subject=subjectFromHeader(header);
         if(!subject&&!/序号|编号|班级|年级|学校|考场|座位|性别|姓名|学号|学籍|考号|日期|备注|评语|出勤|缺考|状态/.test(compactHeader(header))){
           const samples=dataRows.slice(0,40).map(row=>row[index]).filter(value=>cleanCell(value)),ratio=samples.length?samples.filter(gradeLikeValue).length/samples.length:0;
-          if(samples.length>=2&&ratio>=0.72)subject=compactHeader(header).replace(/成绩|分数|得分|等级|等第/g,"");
+          if(samples.length>=2&&ratio>=0.72){const guess=compactHeader(header).replace(/成绩|分数|得分|等级|等第/g,"");if(isKnownGradeSubject(guess,exam))subject=guess}
         }
-        if(subject)subjectCandidates.push({index,subject,header});
+        if(subject&&isKnownGradeSubject(subject,exam))subjectCandidates.push({index,subject,header});
       });
       const chosen=new Map();
       subjectCandidates.forEach(item=>{const existing=chosen.get(item.subject);if(!existing||(/等级|等第/.test(existing.header)&&!/等级|等第/.test(item.header)))chosen.set(item.subject,item)});
       const chosenScaled=new Map();
       scaledCandidates.forEach(item=>{if(!chosenScaled.has(item.subject))chosenScaled.set(item.subject,item)});
-      return {headerRow,headers,dataRows,roles,subjects:[...chosen.values()],scaledSubjects:[...chosenScaled.values()]};
+      const scaledOnly=[...chosenScaled.values()].filter(item=>!chosen.has(item.subject)&&isKnownGradeSubject(item.subject,exam));
+      return {headerRow,headers,dataRows,roles,subjects:[...chosen.values(),...scaledOnly],scaledSubjects:[...chosenScaled.values()]};
     }
     function normalizedIdentity(value){return cleanCell(value).replace(/\s+/g,"").replace(/\.0$/,"").toLowerCase()}
     function findImportedStudent(row,layout){
@@ -828,7 +828,7 @@
     }
     function importAdaptiveGrades(file,rows,exam,sheetName=""){
       if(!Array.isArray(rows)||!rows.length)return toast("成绩表没有可读取的数据");
-      const layout=detectGradeLayout(rows),identityRoles=layout.roles.filter(role=>["name","studentNo","examNo","schoolNo"].includes(role));
+      const layout=detectGradeLayout(rows,exam),identityRoles=layout.roles.filter(role=>["name","studentNo","examNo","schoolNo"].includes(role));
       if(!identityRoles.length)return toast("未识别到姓名、学号、考试号或学籍号列，请检查表头");
       if(!layout.subjects.length&&!layout.roles.some(role=>["total","average","level","classRank","gradeRank"].includes(role)))return toast("未识别到学科、总分、排名或等级成绩列");
       exam.subjects=layout.subjects.map(item=>item.subject);exam.scores={};exam.rawScores={};exam.scaledScores={};exam.studentMeta={};exam.extraFields={};exam.importHeaders=layout.headers.slice();exam.importFileName=file.name;exam.importSheetName=sheetName;exam.headerRow=layout.headerRow+1;
@@ -879,7 +879,7 @@
     function adaptiveSource(row,layout){return Object.fromEntries(layout.headers.map((header,index)=>[header,cleanCell(row[index])]))}
     function adaptiveQuality(rows,schema,required=[]){const layout=detectAdaptiveLayout(rows,schema),requiredHits=required.filter(role=>layout.roles.includes(role)).length;return layout.recognized*10+requiredHits*18+Math.min(layout.dataRows.length,50)/10}
     function adaptiveQualityForContext(context,rows){
-      if(context==="grades"){const layout=detectGradeLayout(rows),identity=layout.roles.filter(role=>["name","studentNo","examNo","schoolNo"].includes(role)).length;return identity*20+layout.subjects.length*5+layout.roles.filter(Boolean).length*3+Math.min(layout.dataRows.length,60)/10}
+      if(context==="grades"){const layout=detectGradeLayout(rows,currentExam()),identity=layout.roles.filter(role=>["name","studentNo","examNo","schoolNo"].includes(role)).length;return identity*20+layout.subjects.length*5+layout.roles.filter(Boolean).length*3+Math.min(layout.dataRows.length,60)/10}
       const required={students:["name"],schedule:["label"],dormBeds:["room"],dormScores:["room"],points:["student","score"],footprints:["detail"],todos:["title"],comments:["student","text"],seats:["name"],teachers:["name","subject"],roles:["role","student"]};
       if(context==="class")return Math.max(adaptiveQuality(rows,IMPORT_SCHEMAS.teachers,required.teachers),adaptiveQuality(rows,IMPORT_SCHEMAS.roles,required.roles),adaptiveQuality(rows,IMPORT_SCHEMAS.schedule,required.schedule));
       if(context==="global"){const values=["students","schedule","dormBeds","dormScores","points","footprints","todos","comments","seats"].map(key=>adaptiveQuality(rows,IMPORT_SCHEMAS[key],required[key]));values.push(Math.max(adaptiveQuality(rows,IMPORT_SCHEMAS.teachers,required.teachers),adaptiveQuality(rows,IMPORT_SCHEMAS.roles,required.roles)));if(currentExam())values.push(adaptiveQualityForContext("grades",rows));return Math.max(...values)}
@@ -1205,6 +1205,12 @@
     function currentStage(){const item=state.classes.find(x=>x.id===state.activeClassId);return item&&item.stage==="senior"?"senior":"junior"}
     function supportsScaledSubjects(){return currentStage()==="senior"}
     function defaultGradeSubjectsForStage(){return supportsScaledSubjects()?["语文","数学","英语","物理","化学","生物","历史","政治","地理"]:["语文","数学","英语","道法","历史","地理","生物","物理","化学"]}
+    function knownGradeSubjects(exam=currentExam()){
+      const stage=supportsScaledSubjects()?["语文","数学","英语","物理","化学","生物","历史","政治","道法","地理"]:["语文","数学","英语","道法","政治","历史","地理","生物","物理","化学"];
+      const existing=exam&&Array.isArray(exam.subjects)?exam.subjects:[];
+      return [...new Set([...stage,...existing])];
+    }
+    function isKnownGradeSubject(subject,exam=currentExam()){return !!subject&&knownGradeSubjects(exam).includes(subject)}
     function isScaledMode(){return supportsScaledSubjects()&&!!(state.gradeConfig&&state.gradeConfig.scaledMode)}
     function rawSubjectScore(exam,student,subject){const index=examAllSubjects(exam).indexOf(subject),rows=exam?.scores?.[student?.id];if(index<0||!Array.isArray(rows))return null;const value=rows[index];return Number.isFinite(Number(value))?Number(value):null}
     function examSubjectValue(exam,student,subject){
