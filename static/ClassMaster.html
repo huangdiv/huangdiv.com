@@ -723,12 +723,13 @@
     }
     function deleteCustomPage(id){if(!confirm("确定删除这个自定义功能及其卡片吗？"))return;state.customPages=state.customPages.filter(x=>x.id!==id);delete state.customCards[id];if(state.page===id)state.page="dashboard";save();renderNav();renderPage()}
     function openExportCenter(){
-      openModal("导出中心",`<div class="grid two">
+      openModal("备份与导出",`<div class="grid two">
         <button class="quick" onclick="exportBackup()"><span>⌁</span>完整数据备份（JSON）</button>
+        <button class="quick" onclick="triggerImport('backup')"><span>⇪</span>导入完整备份（JSON）</button>
         <button class="quick" onclick="exportStudentsExcel()"><span>▥</span>学生信息（Excel）</button>
         <button class="quick" onclick="exportClassWord()"><span>▤</span>班级档案（Word）</button>
         <button class="quick" onclick="exportGradeWorkbook()"><span>▥</span>成绩分析（Excel）</button>
-      </div><p style="font-size:10px;color:var(--muted);margin-top:14px">成绩分析将导出为包含多个工作表的 .xlsx 文件。</p>`,"关闭",closeModal);
+      </div><p style="font-size:10px;color:var(--muted);margin-top:14px">导入完整备份将<b style="color:var(--red)">完全覆盖</b>应用当前全部数据（含内置班级），导入前会再次确认。成绩分析将导出为包含多个工作表的 .xlsx 文件。</p>`,"关闭",closeModal);
     }
     function triggerImport(context){state.importContext=context;el("fileInput").value="";el("fileInput").click()}
     function readImportRows(file,done){
@@ -951,10 +952,71 @@
       const contexts=["students","schedule","dormBeds","dormScores","points","footprints","todos","comments","seats"],scores=contexts.map(context=>({context,score:adaptiveQualityForContext(context,rows)}));if(currentExam())scores.push({context:"grades",score:adaptiveQualityForContext("grades",rows)});scores.push({context:"class",score:adaptiveQualityForContext("class",rows)});const best=scores.sort((a,b)=>b.score-a.score)[0];if(!best||best.score<20)return toast("未能判断这张表属于哪个功能，请进入对应功能后再导入");const handlers={students:importAdaptiveStudents,schedule:importAdaptiveSchedule,dormBeds:importAdaptiveDormBeds,dormScores:importAdaptiveDormScores,points:importAdaptivePoints,footprints:importAdaptiveFootprints,todos:importAdaptiveTodos,comments:importAdaptiveComments,seats:importAdaptiveSeats,class:importAdaptiveClass,grades:(f,r,i)=>importAdaptiveGrades(f,r,currentExam(),i.sheetName||"")};handlers[best.context](file,rows,info)
     }
     function handleFile(event){
-      const file=event.target.files[0];if(!file)return;const spreadsheet=/\.(xlsx|xls|csv)$/i.test(file.name);
+      const file=event.target.files[0];if(!file)return;
+      if(/\.json$/i.test(file.name)){readBackupFile(file);return}
+      const spreadsheet=/\.(xlsx|xls|csv)$/i.test(file.name);
       if(!spreadsheet){state.footprints.unshift({id:Date.now(),type:"文件上传",date:new Date().toISOString().slice(0,10),student:"全班",title:"上传文件："+file.name,detail:`文件大小 ${(file.size/1024).toFixed(1)} KB，已登记到工作留痕。`,files:[file.name]});save();renderPage();toast("文件已接收并登记");return}
       if(state.importContext==="grades"&&!currentExam())return toast("请先创建考试名称");
       const handlers={grades:(rows,info)=>importAdaptiveGrades(file,rows,currentExam(),info?.sheetName||""),students:(rows,info)=>importAdaptiveStudents(file,rows,info),schedule:(rows,info)=>importAdaptiveSchedule(file,rows,info),dormBeds:(rows,info)=>importAdaptiveDormBeds(file,rows,info),dormScores:(rows,info)=>importAdaptiveDormScores(file,rows,info),points:(rows,info)=>importAdaptivePoints(file,rows,info),footprints:(rows,info)=>importAdaptiveFootprints(file,rows,info),todos:(rows,info)=>importAdaptiveTodos(file,rows,info),comments:(rows,info)=>importAdaptiveComments(file,rows,info),seats:(rows,info)=>importAdaptiveSeats(file,rows,info),class:(rows,info)=>importAdaptiveClass(file,rows,info),global:(rows,info)=>importAdaptiveGlobal(file,rows,info)},handler=handlers[state.importContext]||handlers.global;readImportRows(file,(rows,info)=>handler(rows,info||{}));
+    }
+    function readBackupFile(file){
+      const reader=new FileReader();
+      reader.onload=e=>{
+        let data;
+        try{data=JSON.parse(String(e.target.result||"").replace(/^\uFEFF/,""))}catch(err){toast("备份文件解析失败，请确认是「完整数据备份（JSON）」导出的文件");return}
+        if(!data||typeof data!=="object"||Array.isArray(data)){toast("备份文件格式不正确");return}
+        if(!Array.isArray(data.classes)&&!data.classProfiles&&!data.classInfo&&!Array.isArray(data.students)){toast("这不是本应用的完整数据备份文件");return}
+        const classes=(Array.isArray(data.classes)&&data.classes.length?data.classes:[{id:"class-demo",name:(data.classInfo&&data.classInfo.name)||"未命名班级",stage:"junior"}]).map(item=>({id:item.id,name:item.name,stage:item.stage||(item.id==="class-hs2"?"senior":/高/.test(item.name)?"senior":"junior")}));
+        const active=data.activeClassId&&classes.some(item=>item.id===data.activeClassId)?data.activeClassId:classes[0].id;
+        const activeItem=classes.find(item=>item.id===active),profile=data.classProfiles&&data.classProfiles[active];
+        const studentCount=profile&&Array.isArray(profile.students)?profile.students.length:Array.isArray(data.students)?data.students.length:0;
+        const examCount=profile&&Array.isArray(profile.exams)?profile.exams.length:Array.isArray(data.exams)?data.exams.length:0;
+        openModal("导入完整数据备份",`<p style="font-size:13px;line-height:1.9">将<b style="color:var(--pine)">完全按照备份文件</b>重新设置整个应用，覆盖现有全部数据（含内置班级及其学生、成绩、座位、宿舍、积分与记录）。</p><div class="form-grid"><div class="form-group"><label>备份中的班级数</label><strong>${classes.length} 个</strong></div><div class="form-group"><label>备份当前班级</label><strong>${escapeHtml(activeItem?activeItem.name:"")}</strong></div><div class="form-group"><label>当前班级学生</label><strong>${studentCount} 人</strong></div><div class="form-group"><label>当前班级考试</label><strong>${examCount} 次</strong></div></div><p style="font-size:11px;color:var(--red);line-height:1.8">此操作不可撤销。应用现有数据将被<b>完全覆盖</b>，如需保留请先导出当前备份。</p>`,"确认导入",()=>{applyBackup(data);closeModal()});
+      };
+      reader.onerror=()=>toast("读取备份文件失败");
+      reader.readAsText(file,"UTF-8");
+    }
+    function applyBackup(data){
+      const next=Object.assign(JSON.parse(JSON.stringify(defaults)),data);
+      next.classInfo=Object.assign({},defaults.classInfo,next.classInfo||{});
+      next.classCulture=Object.assign({},defaults.classCulture,next.classCulture||{});
+      next.teachers=Array.isArray(next.teachers)?next.teachers:defaults.teachers;
+      next.cadres=Object.assign({},defaults.cadres,next.cadres||{});
+      next.representatives=Object.assign({},defaults.representatives,next.representatives||{});
+      next.reminderSettings=Object.assign({},defaults.reminderSettings,next.reminderSettings||{});
+      next.seatConfig=Object.assign({},defaults.seatConfig,next.seatConfig||{});
+      next.gradeLines=Object.assign({},defaults.gradeLines,next.gradeLines||{});if(!next.gradeLines.subjects||typeof next.gradeLines.subjects!=="object")next.gradeLines.subjects={};
+      next.gradeConfig=Object.assign({},defaults.gradeConfig,next.gradeConfig||{});if(!Array.isArray(next.gradeConfig.subjects)||!next.gradeConfig.subjects.length)next.gradeConfig.subjects=JSON.parse(JSON.stringify(defaults.gradeConfig.subjects));
+      next.groupConfig=Object.assign({},defaults.groupConfig,next.groupConfig||{});next.groupConfig.size=Math.max(1,Number(next.groupConfig.size)||5);
+      next.seatRules=Array.isArray(next.seatRules)?next.seatRules.filter(rule=>rule&&rule.a&&rule.b):[];
+      next.schedule=Array.isArray(next.schedule)?next.schedule:JSON.parse(JSON.stringify(defaults.schedule));
+      next.dormScores=Array.isArray(next.dormScores)?next.dormScores:JSON.parse(JSON.stringify(defaults.dormScores));
+      next.dormRecords=Array.isArray(next.dormRecords)?next.dormRecords:JSON.parse(JSON.stringify(defaults.dormRecords));
+      next.classes=(Array.isArray(next.classes)&&next.classes.length?next.classes:[{id:"class-demo",name:next.classInfo.name,stage:"junior"}]).map(item=>({id:item.id,name:item.name,stage:item.stage||(item.id==="class-hs2"?"senior":/高/.test(item.name)?"senior":"junior")}));
+      next.activeClassId=next.activeClassId&&next.classes.some(item=>item.id===next.activeClassId)?next.activeClassId:next.classes[0].id;
+      if(!Array.isArray(next.deletedBuiltinClasses))next.deletedBuiltinClasses=[];
+      next.classProfiles=next.classProfiles&&typeof next.classProfiles==="object"?next.classProfiles:{};
+      next.moduleTools=normalizeModuleTools(next.moduleTools);
+      if(!next.classProfiles[next.activeClassId]){
+        const profile={};CLASS_KEYS.forEach(k=>{if(k in next)profile[k]=cloneData(next[k])});
+        next.classProfiles[next.activeClassId]=profile;
+      }
+      const needsScheduleUpgrade=Number(next.scheduleSchemaVersion||0)<3,needsGradeUpgrade=Number(next.gradeSchemaVersion||0)<2;
+      normalizeAcademicData(next,next.activeClassId==="class-demo",needsScheduleUpgrade);
+      Object.entries(next.classProfiles).forEach(([id,profile])=>normalizeAcademicData(profile,id==="class-demo",needsScheduleUpgrade));
+      next.scheduleSchemaVersion=3;
+      normalizeGradeData(next,needsGradeUpgrade,next.activeClassId==="class-demo");
+      Object.entries(next.classProfiles).forEach(([id,profile])=>normalizeGradeData(profile,needsGradeUpgrade,id==="class-demo"));
+      next.gradeSchemaVersion=2;
+      if(Number(next.juniorConfigVersion||0)<1){
+        const isJuniorClass=id=>{const item=next.classes.find(c=>c.id===id);return !!item&&item.stage==="junior"};
+        if(isJuniorClass(next.activeClassId))normalizeJuniorStage(next);
+        Object.entries(next.classProfiles).forEach(([id,profile])=>{if(isJuniorClass(id))normalizeJuniorStage(profile)});
+        next.juniorConfigVersion=1;
+      }
+      state=next;
+      save();renderNav();renderPage();
+      toast("已按备份文件重新配置应用："+state.classes.length+" 个班级 · 当前「"+state.classInfo.name+"」");
     }
     function globalSearch(){
       const q=el("globalSearch").value.trim();if(!q)return;
