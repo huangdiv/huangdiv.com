@@ -20,7 +20,7 @@
     .app{min-height:100vh;display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr)}
     .sidebar{position:sticky;top:0;height:100vh;background:var(--ink);color:#29433f;padding:22px 14px 18px;display:flex;flex-direction:column;overflow-y:auto;z-index:20;border-right:1px solid #cddbd5}
     .brand{display:flex;align-items:center;gap:11px;padding:0 9px 18px}
-    .brand-mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#6fb9a4,#217765);display:grid;place-items:center;color:#fff;font-size:19px;font-weight:900;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+    .brand-mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#6fb9a4,#217765);display:grid;place-items:center;color:#fff;font-size:19px;font-weight:900;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);overflow:hidden;background-size:cover;background-position:center}
     .brand h1{font-size:16px;margin:0;letter-spacing:.3px}.brand-user{display:flex;align-items:center;gap:6px;margin-top:4px;color:#647a76;font-size:10px}.brand-user strong{color:#365b54}.brand-user span{white-space:nowrap}
     .class-switch{background:rgba(255,255,255,.68);border:1px solid #cad9d3;border-radius:13px;padding:11px 12px;margin:0 5px 15px;cursor:pointer;transition:.18s}
     .class-switch:hover{background:#fff;border-color:#88b7aa}
@@ -110,7 +110,7 @@
   <div class="app" data-page-node-id="tETmE1VglbY8H9c71Not7b">
     <aside class="sidebar" id="sidebar" data-page-node-id="fW2SJpruDmB9rHVEzaqQCB">
       <div class="brand" data-page-node-id="GPTASUHECG3oaZi1U5B2uB">
-        <div class="brand-mark" aria-hidden="true" data-page-node-id="IJYjlQKmZWWlZQtBrmf5Et">✦</div>
+        <div class="brand-mark" id="brandMark" aria-hidden="true" data-page-node-id="IJYjlQKmZWWlZQtBrmf5Et">✦</div>
         <div data-page-node-id="HIb4UmwW9bCObgY66CaHG0"><h1 data-page-node-id="uUURKl8e9gtJpXPEr5IGa6">班主任工作台</h1><div class="brand-user" data-page-node-id="BNma8WjfNe81GooyDeOLwA"><strong id="brandTeacher" data-page-node-id="ssm1cJGUK7Ftkikq7xf2kO">林老师</strong><span id="brandRole" data-page-node-id="5HYyBiXTlfCUlz9MHogSQt">班主任 · 语文</span></div></div>
       </div>
       <div class="class-switch" role="button" tabindex="0" onclick="openClassSwitch()" onkeydown="if(event.key==='Enter')openClassSwitch()" data-page-node-id="9yEyxPtjoGv12uHspMoXFQ">
@@ -1189,6 +1189,7 @@
       if(el("classSwitchName"))el("classSwitchName").textContent=state.classInfo.name;
       if(el("brandTeacher"))el("brandTeacher").textContent=state.classInfo.teacher?(state.classInfo.teacher.endsWith("老师")?state.classInfo.teacher:state.classInfo.teacher.slice(0,1)+"老师"):"班主任";
       if(el("brandRole"))el("brandRole").textContent="班主任 · "+(state.classInfo.subject||"待设置");
+      const bm=el("brandMark");if(bm){const c=state.classCulture;if(c&&c.logo){bm.style.background="url("+c.logo+") center/cover no-repeat";bm.textContent="";}else{bm.style.background="";bm.textContent=(c&&c.sealText)||"✦";}}
     }
     function computeGrowth(){
       const clamp=(v,a,b)=>Math.max(a,Math.min(b,Math.round(v)));
