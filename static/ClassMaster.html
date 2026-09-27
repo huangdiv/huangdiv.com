@@ -2111,7 +2111,7 @@
       }
       const seatRows=[];
       for(let pr=0;pr<L.rows;pr++){
-        const cells=L.physical.map(p=>p.type==="aisle"?blankCell():seatCell(L.nameAt(pr,p.seatCol),!L.tailEmpty(pr,p.seatCol)));
+        const cells=L.physical.map(p=>p.type==="aisle"?blankCell():seatCell(L.nameAt(pr,p.seatCol)));
         seatRows.push(new TableRow({height:{value:760,rule:HeightRule.ATLEAST},children:cells}));
       }
       const finalRows=cfg.podium==="bottom"?[titleRow,...seatRows,...(groupRow?[groupRow]:[]),podiumRow]:[titleRow,podiumRow,...(groupRow?[groupRow]:[]),...seatRows];
@@ -2145,7 +2145,7 @@
         }
         addRow(values,styles,38,"groups");
       };
-      const seats=()=>{for(let pr=0;pr<L.rows;pr++){const values=[],styles=[];L.physical.forEach(p=>{if(p.type==="aisle"){values.push("");styles.push(sAisle)}else{const name=L.nameAt(pr,p.seatCol);values.push(name);styles.push(name||!L.tailEmpty(pr,p.seatCol)?sSeat:sEmpty)}});addRow(values,styles,50)}};
+      const seats=()=>{for(let pr=0;pr<L.rows;pr++){const values=[],styles=[];L.physical.forEach(p=>{if(p.type==="aisle"){values.push("");styles.push(sAisle)}else{const name=L.nameAt(pr,p.seatCol);values.push(name);styles.push(sSeat)}});addRow(values,styles,50)}};
       if(cfg.podium==="top"){podium();if(cfg.mode!=="single")groups();seats()}
       else{seats();if(cfg.mode!=="single")groups();podium()}
       rowDefs.forEach((row,r)=>{
