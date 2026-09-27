@@ -1712,7 +1712,7 @@
       order.forEach((id,index)=>{if(id)posOf[id]=index});
       const genderOf=id=>{const student=state.students.find(x=>x.id===id);return student?(student.gender==="女"?"f":"m"):"m"};
       const near=id=>{const student=state.students.find(x=>x.id===id);return !!student&&student.special==="近视"};
-      const frontRow=index=>{const r=Math.floor(index/cols);return config.podium==="bottom"?rows-1-r:r};
+      const frontRow=index=>Math.floor(index/cols);
       const nearZone=Math.max(1,Math.ceil(rows/3));
       const locked=new Set();rules.filter(rule=>rule.type==="together").forEach(rule=>{locked.add(rule.a);locked.add(rule.b)});
       const conflict=(id,desk)=>apart.some(rule=>{const other=rule.a===id?rule.b:rule.b===id?rule.a:null;return other&&deskMap[other]===desk});
@@ -1772,7 +1772,7 @@
       if(mode!=="same"){while(made.length<need2&&rest.length>=2)made.push([rest.pop(),rest.pop()])}
       made.forEach(pair=>plan.push(pair));
       rest.forEach(student=>plan.push([student]));
-      const order=Array(cap).fill(null),rowKey=slot=>{const r=Math.floor(slot[0]/cols);return config.podium==="bottom"?rows-1-r:r},near=unit=>unit.filter(student=>student.special==="近视").length;
+      const order=Array(cap).fill(null),rowKey=slot=>Math.floor(slot[0]/cols),near=unit=>unit.filter(student=>student.special==="近视").length;
       const sortedPair=shuffleList(pairDesks).sort((a,b)=>rowKey(a)-rowKey(b));
       shuffleList(plan.filter(unit=>unit.length===2)).sort((a,b)=>near(b)-near(a)).forEach((unit,index)=>{const slot=sortedPair[index];if(!slot)return;slot.forEach((idx,k)=>{if(unit[k])order[idx]=unit[k].id})});
       const remainPair=sortedPair.slice(plan.filter(unit=>unit.length===2).length);
@@ -1785,12 +1785,8 @@
     function packSeatsFrontFirst(order,config){
       const cols=seatCols(config),rows=seatRows(config),cap=seatCapacity(config),students=order.filter(Boolean),out=Array(cap).fill(null);
       if(!students.length)return out;
-      const bottom=config.podium==="bottom",mirror=!!config.flipH,slots=deskSlots(config),byRow=[];
-      for(let pr=0;pr<rows;pr++){
-        const lr=bottom?rows-1-pr:pr,group=slots.filter(slot=>Math.floor(slot[0]/cols)===lr);
-        group.sort((a,b)=>mirror?(b[0]-a[0]):(a[0]-b[0]));
-        byRow.push(group);
-      }
+      const slots=deskSlots(config),byRow=[];
+      for(let lr=0;lr<rows;lr++)byRow.push(slots.filter(slot=>Math.floor(slot[0]/cols)===lr).sort((a,b)=>a[0]-b[0]));
       let k=0;
       for(const group of byRow)for(const slot of group)for(const idx of slot){
         if(k<students.length)out[idx]=students[k++];
