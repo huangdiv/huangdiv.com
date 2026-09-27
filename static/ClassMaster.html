@@ -144,7 +144,8 @@
     const SCALED_SUBJECTS=["化学","生物","政治","地理"];
     const DORM_CAPACITY=8;
     const DORM_BASE_ROOM=301;
-    const dormPlacement=(gender,seq)=>{const order=Math.max(0,Math.floor(Number(seq)||0));return {dorm:(gender==="女"?"B":"A")+(DORM_BASE_ROOM+Math.floor(order/DORM_CAPACITY)),bed:order%DORM_CAPACITY+1}};
+    const dormCap=()=>{try{return Math.max(1,Math.min(30,Number(state&&state.dormCapacity)||DORM_CAPACITY))}catch(e){return DORM_CAPACITY}};
+    const dormPlacement=(gender,seq)=>{const order=Math.max(0,Math.floor(Number(seq)||0));const cap=dormCap();return {dorm:(gender==="女"?"B":"A")+(DORM_BASE_ROOM+Math.floor(order/cap)),bed:order%cap+1}};
     const SCHEDULE_DAYS=["周一","周二","周三","周四","周五","周六","周日"];
     const DEFAULT_SCHEDULE=[
       {id:"sch-reading",label:"早读",kind:"reading",duration:30,start:"07:30",end:"08:00",courses:["语文","英语","语文","英语","语文","",""]},
@@ -367,7 +368,7 @@
     const initialState=()=>({
       page:"dashboard",scheduleSchemaVersion:3,gradeSchemaVersion:2,juniorConfigVersion:1,subtabs:{class:"basic",grades:"overview",seats:"current",dorms:"男",dormView:"rooms",comments:"generate",footprints:"all"},
       classes:[{id:"class-demo",name:"初一（3）班",stage:"junior"}],activeClassId:"class-demo",classProfiles:{},deletedBuiltinClasses:[],
-      students:seedStudents(),customPages:[],moduleTools:{},seatOrder:seedStudents().map(s=>s.id),seatHistory:[],seatRules:[],
+      students:seedStudents(),customPages:[],moduleTools:{},seatOrder:seedStudents().map(s=>s.id),seatHistory:[],seatRules:[],dormCapacity:8,
       exams:seedExams(),activeExamId:"exam-demo-3",
       seatConfig:{name:"初一（3）班座位表",mode:"group",groups:4,colsPerGroup:2,rows:5,singleCols:7,singleRows:6,smallGroupSize:4,smallGroupParts:3,podium:"top",flipH:false,showLabels:true},
       gradeLines:{total:0,subjects:{}},
@@ -444,7 +445,7 @@
     if(!Array.isArray(state.deletedBuiltinClasses))state.deletedBuiltinClasses=[];
     state.classProfiles=state.classProfiles&&typeof state.classProfiles==="object"?state.classProfiles:{};
     state.moduleTools=normalizeModuleTools(state.moduleTools);
-    const CLASS_KEYS=["students","seatOrder","seatHistory","seatConfig","classInfo","classCulture","teachers","cadres","representatives","scheduleDays","schedule","exams","activeExamId","gradeLines","gradeConfig","groupConfig","seatRules","dormScores","dormRecords","pointsRecords","comments","footprints","todos","moduleTools","selectedCommentStudent","commentLevel","commentTags","commentDraft"];
+    const CLASS_KEYS=["students","seatOrder","seatHistory","seatConfig","classInfo","classCulture","teachers","cadres","representatives","scheduleDays","schedule","exams","activeExamId","gradeLines","gradeConfig","groupConfig","seatRules","dormCapacity","dormScores","dormRecords","pointsRecords","comments","footprints","todos","moduleTools","selectedCommentStudent","commentLevel","commentTags","commentDraft"];
     const cloneData=value=>JSON.parse(JSON.stringify(value));
     const clampScore=value=>Math.max(0,Math.min(100,Number(value)||0));
     const GRADE_LEVEL_VALUES={"A+":95,"A":90,"A-":87,"B+":85,"B":80,"B-":77,"C+":75,"C":70,"C-":67,"D+":65,"D":60,"D-":57,"E":50,"优秀":90,"优":90,"良好":80,"良":80,"中等":70,"中":70,"合格":60,"及格":60,"达标":60,"不合格":50,"不及格":50,"待合格":50,"未达标":50};
@@ -938,7 +939,7 @@
     }
     function importAdaptiveDormBeds(file,rows,info={}){
       const layout=detectAdaptiveLayout(rows,IMPORT_SCHEMAS.dormBeds);if(!layout.roles.includes("room")||!layout.roles.some(role=>["name","studentNo","schoolNo"].includes(role)))return toast("未识别到学生或宿舍列");let updated=0,auto=0,noFit=0,noRoom=0,noMatch=0;
-      const plans=[];layout.dataRows.forEach((row,index)=>{const values=Object.fromEntries(layout.roles.filter(Boolean).map(role=>[role,adaptiveValue(row,layout,role)])),student=findStudentFlexible(values);if(!student){noMatch++;return}const gender=normalizeGender(values.gender||student.gender),room=normalizeRoom(values.room,gender);if(!room){noRoom++;return}const bed=metricNumber(values.bed);if(values.gender)student.gender=gender;plans.push({student,room,bed,hasBed:bed>0&&bed<=DORM_CAPACITY,order:index,extra:adaptiveSource(row,layout)})});
+      const plans=[];layout.dataRows.forEach((row,index)=>{const values=Object.fromEntries(layout.roles.filter(Boolean).map(role=>[role,adaptiveValue(row,layout,role)])),student=findStudentFlexible(values);if(!student){noMatch++;return}const gender=normalizeGender(values.gender||student.gender),room=normalizeRoom(values.room,gender);if(!room){noRoom++;return}const bed=metricNumber(values.bed);if(values.gender)student.gender=gender;plans.push({student,room,bed,hasBed:bed>0&&bed<=dormCap(),order:index,extra:adaptiveSource(row,layout)})});
       if(!plans.length)return toast("未匹配到本班学生或未识别到宿舍列，已忽略全部行");
       const groups={};plans.forEach(p=>{(groups[p.room]=groups[p.room]||{explicit:[],wait:[]});(p.hasBed?groups[p.room].explicit:groups[p.room].wait).push(p)});
       const relocatedIds=new Set(plans.filter(p=>{const old=String(p.student.dorm||"").trim();return old&&old!=="待安排"&&old!=="走读"&&old!==p.room}).map(p=>p.student.id));
@@ -948,7 +949,7 @@
         const displaced=[];
         g.explicit.sort((a,b)=>a.order-b.order).forEach(p=>{for(const [b,st] of taken){if(st===p.student){taken.delete(b);break}}const prev=taken.get(p.bed);if(prev&&prev!==p.student)displaced.push({student:prev,order:prev._importOrder||1e9});taken.set(p.bed,p.student);p.student._imp={room,bed:p.bed}});
         const fill=[...displaced,...g.wait].sort((a,b)=>a.order-b.order);
-        fill.forEach(p=>{let bed=0;for(let i=1;i<=DORM_CAPACITY;i++){if(!taken.has(i)){bed=i;break}}if(bed){taken.set(bed,p.student);p.student._imp={room,bed};auto++}else{p.student._imp={room,bed:0};noFit++}});
+        fill.forEach(p=>{let bed=0;for(let i=1;i<=dormCap();i++){if(!taken.has(i)){bed=i;break}}if(bed){taken.set(bed,p.student);p.student._imp={room,bed};auto++}else{p.student._imp={room,bed:0};noFit++}});
       });
       const touched=new Set();plans.forEach(p=>{touched.add(p.room);const old=String(p.student.dorm||"").trim();if(old&&old!=="待安排"&&old!=="走读")touched.add(old)});
       plans.forEach(p=>{p.student.extraInfo=Object.assign({},p.student.extraInfo||{},p.extra)});
@@ -1176,7 +1177,7 @@
     }
     function openDormDetail(room){
       const members=state.students.filter(s=>s.dorm===room).sort((a,b)=>(a.bed||9)-(b.bed||9)),score=latestDormScore(room);
-      openModal(room+" 宿舍详情",`<div class="grid three"><div class="info-cell"><small>最近得分</small><strong>${score||"暂无"}</strong></div><div class="info-cell"><small>入住人数</small><strong>${members.length}/${DORM_CAPACITY}</strong></div><div class="info-cell"><small>舍长</small><strong>${members[0]?.name||"待定"}</strong></div></div><div class="section-label">床位成员</div><div class="list">${members.map(s=>`<div class="list-row"><span class="mini-avatar ${s.gender==="女"?"girl":""}">${s.name.slice(-1)}</span><div class="grow"><strong>${s.name}</strong><small>${s.bed||"待定"} 号床 · ${s.studentNo}</small></div><span class="badge green">${s.points} 分</span></div>`).join("")||'<div class="empty">当前宿舍暂无成员</div>'}</div><div class="section-label">本周情况</div><textarea class="textarea" id="dormNote" placeholder="记录卫生、纪律、表扬或整改情况"></textarea>`,"保存记录",()=>{const note=el("dormNote").value.trim();if(note)state.footprints.unshift({id:Date.now(),type:"宿舍记录",date:new Date().toISOString().slice(0,10),student:room,title:room+" 宿舍周记录",detail:note,files:[]});save();closeModal();toast("宿舍记录已保存")});
+      openModal(room+" 宿舍详情",`<div class="grid three"><div class="info-cell"><small>最近得分</small><strong>${score||"暂无"}</strong></div><div class="info-cell"><small>入住人数</small><strong>${members.length}/${dormCap()}</strong></div><div class="info-cell"><small>舍长</small><strong>${members[0]?.name||"待定"}</strong></div></div><div class="section-label">床位成员</div><div class="list">${members.map(s=>`<div class="list-row"><span class="mini-avatar ${s.gender==="女"?"girl":""}">${s.name.slice(-1)}</span><div class="grow"><strong>${s.name}</strong><small>${s.bed||"待定"} 号床 · ${s.studentNo}</small></div><span class="badge green">${s.points} 分</span></div>`).join("")||'<div class="empty">当前宿舍暂无成员</div>'}</div><div class="section-label">本周情况</div><textarea class="textarea" id="dormNote" placeholder="记录卫生、纪律、表扬或整改情况"></textarea>`,"保存记录",()=>{const note=el("dormNote").value.trim();if(note)state.footprints.unshift({id:Date.now(),type:"宿舍记录",date:new Date().toISOString().slice(0,10),student:room,title:room+" 宿舍周记录",detail:note,files:[]});save();closeModal();toast("宿舍记录已保存")});
     }
     function openReminderSettings(){
       const r=state.reminderSettings;
@@ -1827,7 +1828,7 @@
     function deleteSeatVersion(id){state.seatHistory=state.seatHistory.filter(x=>x.id!==id);save();renderPage()}
     function dormRoomsFor(gender){
       const prefix=gender==="女"?"B":"A";
-      const need=Math.max(1,Math.ceil(state.students.filter(s=>(s.gender==="女"?"女":"男")===gender).length/DORM_CAPACITY));
+      const need=Math.max(1,Math.ceil(state.students.filter(s=>(s.gender==="女"?"女":"男")===gender).length/dormCap()));
       const rooms=Array.from({length:need},(_,i)=>prefix+(DORM_BASE_ROOM+i));
       state.students.forEach(s=>{const room=String(s.dorm||"").trim();if(room&&room!=="待安排"&&room.indexOf(prefix)===0&&rooms.indexOf(room)<0)rooms.push(room)});
       return rooms.filter(room=>state.students.some(s=>String(s.dorm||"").trim()===room)||state.dormScores.some(x=>String(x.room)===room)).sort();
@@ -1838,27 +1839,34 @@
       state.students.forEach(s=>{const room=String(s.dorm||"").trim();if(room&&room!=="待安排"&&room!=="走读"&&rooms.indexOf(room)<0)rooms.push(room)});
       return rooms.sort((a,b)=>rank(a)-rank(b));
     }
+    function openDormConfig(){
+      const current=dormCap();
+      openModal("宿舍每间人数设置",`<p class="module-field-help">设置每间宿舍可住几人（1-30 人）。保存后点击「按 X 人/间重排」即可按新设置重新分配男女生宿舍与床位（走读生保持不变）。</p><div class="form-group"><label>每间宿舍人数</label><input class="input" type="number" min="1" max="30" id="dormCapInput" value="${current}"></div>`,"保存设置",()=>{
+        const value=Math.max(1,Math.min(30,Math.round(Number(el("dormCapInput").value)||DORM_CAPACITY)));
+        state.dormCapacity=value;save();closeModal();renderPage();toast("已设置每间 "+value+" 人，可点击按 "+value+" 人/间重排");
+      });
+    }
     function autoAssignDorms(){
       if(!state.students.length)return toast("请先添加学生");
-      if(!confirm("将按每间 "+DORM_CAPACITY+" 人重新分配男女生宿舍与床位（走读生保持不变），确定继续？"))return;
+      if(!confirm("将按每间 "+dormCap()+" 人重新分配男女生宿舍与床位（走读生保持不变），确定继续？"))return;
       ["男","女"].forEach(gender=>{
         state.students.filter(s=>(s.gender==="女"?"女":"男")===gender&&String(s.dorm||"").trim()!=="走读")
           .forEach((s,i)=>{const place=dormPlacement(gender,i);s.dorm=place.dorm;s.bed=place.bed});
       });
-      save();renderPage();toast("已按每间 "+DORM_CAPACITY+" 人重新分配宿舍与床位");
+      save();renderPage();toast("已按每间 "+dormCap()+" 人重新分配宿舍与床位");
     }
     function renderDorms(){
       const gender=state.subtabs.dorms,view=state.subtabs.dormView||"rooms",students=state.students.filter(s=>s.gender===gender),prefix=gender==="男"?"A":"B",rooms=dormRoomsFor(gender),scores=state.dormScores.filter(x=>String(x.room).startsWith(prefix)),records=state.dormRecords.filter(x=>String(x.room).startsWith(prefix)),avg=scores.length?Math.round(scores.reduce((a,b)=>a+Number(b.score||0),0)/scores.length):0;
       let body="";
-      if(view==="rooms")body=`<div class="dorm-grid">${rooms.map(room=>{const members=students.filter(s=>s.dorm===room),latest=latestDormScore(room);return `<div class="dorm"><div class="dorm-head"><strong>${room} 宿舍</strong><span class="badge ${latest>=95?"green":latest>=90?"amber":"red"}">${latest||"暂无"}${latest?" 分":""}</span></div><div class="beds">${Array.from({length:DORM_CAPACITY},(_,bi)=>{const s=members.find(x=>Number(x.bed||0)===bi+1)||members.filter(x=>!x.bed)[bi];return `<div class="bed"><small>${bi+1} 号床</small>${s?`<b>${s.name}</b><span>${s.studentNo}</span>`:"<b>空床</b>"}</div>`}).join("")}</div><div style="display:flex;justify-content:space-between;margin-top:9px"><small style="color:var(--muted)">舍长：${members.sort((a,b)=>(a.bed||9)-(b.bed||9))[0]?.name||"待定"}</small><button class="btn sm" onclick="openDormDetail('${room}')">详情</button></div></div>`}).join("")}</div>`;
+      if(view==="rooms")body=`<div class="dorm-grid">${rooms.map(room=>{const members=students.filter(s=>s.dorm===room),latest=latestDormScore(room);return `<div class="dorm"><div class="dorm-head"><strong>${room} 宿舍</strong><span class="badge ${latest>=95?"green":latest>=90?"amber":"red"}">${latest||"暂无"}${latest?" 分":""}</span></div><div class="beds">${Array.from({length:Math.max(dormCap(),...members.map(m=>Number(m.bed)||0))},(_,bi)=>{const s=members.find(x=>Number(x.bed||0)===bi+1)||members.filter(x=>!x.bed)[bi];return `<div class="bed"><small>${bi+1} 号床</small>${s?`<b>${s.name}</b><span>${s.studentNo}</span>`:"<b>空床</b>"}</div>`}).join("")}</div><div style="display:flex;justify-content:space-between;margin-top:9px"><small style="color:var(--muted)">舍长：${members.sort((a,b)=>(a.bed||9)-(b.bed||9))[0]?.name||"待定"}</small><button class="btn sm" onclick="openDormDetail('${room}')">详情</button></div></div>`}).join("")}</div>`;
       if(view==="scores")body=`<div class="card"><div class="card-title"><h3>${gender}生宿舍分数</h3><small>${scores.length} 条</small></div><div class="table-wrap"><table class="table"><thead><tr><th>日期</th><th>宿舍</th><th>得分</th><th>检查说明</th></tr></thead><tbody>${scores.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.room}</td><td><span class="badge ${x.score>=95?"green":x.score>=90?"amber":"red"}">${x.score}</span></td><td>${escapeHtml(x.note||"—")}</td></tr>`).join("")||'<tr><td colspan="4">暂无宿舍分数，请导入 Excel。</td></tr>'}</tbody></table></div></div>`;
       if(view==="records")body=`<div class="card"><div class="card-title"><h3>${gender}生宿舍扣分记录</h3><button class="btn primary sm" onclick="openDormDeduction()">＋ 录入扣分</button></div><div class="table-wrap"><table class="table"><thead><tr><th>日期</th><th>宿舍</th><th>学生</th><th>扣分事项</th><th>分值</th><th>操作</th></tr></thead><tbody>${records.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.room}</td><td>${escapeHtml(x.student||"全寝室")}</td><td>${escapeHtml(x.item)}</td><td><b style="color:var(--red)">${x.score}</b></td><td><button class="btn sm" onclick="openNoticeGenerator('dorm','${x.id}')">生成通知书</button> <button class="btn sm danger" onclick="deleteDormRecord('${x.id}')">删除</button></td></tr>`).join("")||'<tr><td colspan="6">暂无扣分记录。</td></tr>'}</tbody></table></div></div>`;
-      return pageHeader("宿舍管理","男女分区安排床位，可自适应导入床位表和宿舍评分表，查看扣分记录并生成通知书。",`<button class="btn" onclick="triggerImport('dormBeds')">⇧ 自适应导入床位</button><button class="btn" onclick="downloadDormTemplate()">下载 Excel 模板</button><button class="btn" onclick="triggerImport('dormScores')">⇧ 自适应导入评分</button><button class="btn" onclick="exportDormExcel()">⇩ 导出名单</button><button class="btn" onclick="openNoticeGenerator('dorm')">生成通知书</button><button class="btn" onclick="autoAssignDorms()">↻ 按 8 人/间重排</button><button class="btn primary" onclick="openDormMove()">＋ 调整床位</button>`)
+      return pageHeader("宿舍管理","男女分区安排床位，可自适应导入床位表和宿舍评分表，查看扣分记录并生成通知书。",`<button class="btn" onclick="triggerImport('dormBeds')">⇧ 自适应导入床位</button><button class="btn" onclick="downloadDormTemplate()">下载 Excel 模板</button><button class="btn" onclick="triggerImport('dormScores')">⇧ 自适应导入评分</button><button class="btn" onclick="exportDormExcel()">⇩ 导出名单</button><button class="btn" onclick="openNoticeGenerator('dorm')">生成通知书</button><button class="btn" onclick="openDormConfig()">⚙ 每间人数</button><button class="btn" onclick="autoAssignDorms()">↻ 按 ${dormCap()} 人/间重排</button><button class="btn primary" onclick="openDormMove()">＋ 调整床位</button>`)
       +`<div class="tabs"><button class="tab ${gender==="男"?"active":""}" onclick="setTab('dorms','男')">男生宿舍</button><button class="tab ${gender==="女"?"active":""}" onclick="setTab('dorms','女')">女生宿舍</button></div><div class="tabs"><button class="tab ${view==="rooms"?"active":""}" onclick="setTab('dormView','rooms')">床位安排</button><button class="tab ${view==="scores"?"active":""}" onclick="setTab('dormView','scores')">宿舍分数</button><button class="tab ${view==="records"?"active":""}" onclick="setTab('dormView','records')">扣分记录</button></div>
-      <div class="grid four">${metric("舍",rooms.length,"宿舍间数","每间 "+DORM_CAPACITY+" 人","")}${metric("住",students.length,"住宿人数",gender+"生","")}${metric("分",avg,"平均宿舍分",scores.length+" 次检查","")}${metric("扣",records.length,"扣分记录","可生成通知书","")}</div><div style="margin-top:14px">${body}</div>`;
+      <div class="grid four">${metric("舍",rooms.length,"宿舍间数","每间 "+dormCap()+" 人","")}${metric("住",students.length,"住宿人数",gender+"生","")}${metric("分",avg,"平均宿舍分",scores.length+" 次检查","")}${metric("扣",records.length,"扣分记录","可生成通知书","")}</div><div style="margin-top:14px">${body}</div>`;
     }
     function latestDormScore(room){return Number(state.dormScores.slice().reverse().find(x=>x.room===room)?.score||0)}
-    function openDormMove(){if(!state.students.length)return toast("请先添加学生");openModal("调整宿舍",`<div class="form-grid"><div class="form-group"><label>学生</label>${studentSearchBox("dormStu")}</div><div class="form-group"><label>目标宿舍</label><select class="select" id="dormRoom">${dormRoomOptions().map(x=>`<option>${escapeHtml(x)}</option>`).join("")}</select></div><div class="form-group"><label>床位</label><select class="select" id="dormBed">${Array.from({length:DORM_CAPACITY},(_,i)=>`<option value="${i+1}">${i+1} 号床</option>`).join("")}</select></div><div class="form-group"><label>调整原因</label><input class="input" id="dormReason" placeholder="如：学生申请"></div></div>`,"确认调整",()=>{const s=state.students.find(x=>x.id===el("dormStu-val").value);s.dorm=el("dormRoom").value;s.bed=Number(el("dormBed").value);state.footprints.unshift({id:Date.now(),type:"宿舍调整",date:new Date().toISOString().slice(0,10),student:s.name,title:"宿舍调整至 "+s.dorm+" "+s.bed+"号床",detail:el("dormReason").value||"班级常规调整",files:[]});save();closeModal();renderPage();toast("宿舍调整已记录")})}
+    function openDormMove(){if(!state.students.length)return toast("请先添加学生");openModal("调整宿舍",`<div class="form-grid"><div class="form-group"><label>学生</label>${studentSearchBox("dormStu")}</div><div class="form-group"><label>目标宿舍</label><select class="select" id="dormRoom">${dormRoomOptions().map(x=>`<option>${escapeHtml(x)}</option>`).join("")}</select></div><div class="form-group"><label>床位</label><select class="select" id="dormBed">${Array.from({length:dormCap()},(_,i)=>`<option value="${i+1}">${i+1} 号床</option>`).join("")}</select></div><div class="form-group"><label>调整原因</label><input class="input" id="dormReason" placeholder="如：学生申请"></div></div>`,"确认调整",()=>{const s=state.students.find(x=>x.id===el("dormStu-val").value);s.dorm=el("dormRoom").value;s.bed=Number(el("dormBed").value);state.footprints.unshift({id:Date.now(),type:"宿舍调整",date:new Date().toISOString().slice(0,10),student:s.name,title:"宿舍调整至 "+s.dorm+" "+s.bed+"号床",detail:el("dormReason").value||"班级常规调整",files:[]});save();closeModal();renderPage();toast("宿舍调整已记录")})}
     function openDormDeduction(){const rooms=dormRoomOptions();openModal("录入宿舍扣分",`<div class="form-grid"><div class="form-group"><label>日期</label><input class="input" type="date" id="dormRecordDate" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>宿舍</label><select class="select" id="dormRecordRoom">${rooms.map(x=>`<option>${x}</option>`).join("")}</select></div><div class="form-group"><label>责任学生</label>${studentSearchBox("dormRecordStudent",{extraOptions:[{value:"__all__",label:"全寝室"}],selectedId:"__all__"})}</div><div class="form-group"><label>扣分值</label><input class="input" type="number" min="1" id="dormRecordScore" value="1"></div><div class="form-group full"><label>扣分事项</label><textarea class="textarea" id="dormRecordItem" placeholder="请填写检查发现的问题"></textarea></div></div>`,"保存扣分",()=>{state.dormRecords.push({id:"dr-"+Date.now(),date:el("dormRecordDate").value,room:el("dormRecordRoom").value,student:(()=>{const v=el("dormRecordStudent-val").value;return v==="__all__"?"全寝室":(state.students.find(x=>x.id===v)||{}).name||""})(),item:el("dormRecordItem").value.trim()||"宿舍常规扣分",score:-Math.abs(Number(el("dormRecordScore").value)||1)});save();closeModal();renderPage();toast("宿舍扣分已记录")})}
     function deleteDormRecord(id){if(!confirm("确定删除这条宿舍扣分记录吗？"))return;state.dormRecords=state.dormRecords.filter(x=>String(x.id)!==String(id));save();renderPage()}
     const POINT_ITEMS={
