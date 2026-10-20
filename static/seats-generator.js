@@ -4,12 +4,13 @@ import { createDragdrop } from './modules/dragdrop.js';
 import { createRandomArrange } from './modules/random-arrange.js';
 import { migrateConfig as migrateConfigFn } from './modules/migrate.js';
 import { MESSAGES } from './modules/messages.js';
+import { buildSeatCsv, buildSeatCsvFilename, CSV_BOM } from './modules/csv-export.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.3.1';
+        const APP_VERSION = '1.3.2';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -2623,6 +2624,28 @@ function isWholeWordMatch(label, keyword) {
             });
         }
 
+        // 导出座位表为 CSV —— 按「当前视角」输出:
+        //   学生视角:讲台在上、行列正序;教师视角:行列镜像、讲台在下(与屏幕一致)
+        function exportSeatCsv() {
+            const title = pageTitle.textContent.trim() || '班级座位表';
+            const csv = buildSeatCsv({
+                rows: rows,
+                cols: cols,
+                seats: currentSeats,
+                students: students,
+                viewMode: isTeacherView ? 'teacher' : 'student'
+            });
+            // 前置 UTF-8 BOM:否则 Windows 版 Excel 打开会把中文显示成乱码
+            const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = buildSeatCsvFilename(title, new Date());
+            link.href = url;
+            link.click();
+            // 给浏览器取用 URL 的机会后再释放
+            setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+        }
+
         // P1 UX #3:统一封装下拉按钮 — 同步 ARIA + 键盘 Enter/↓/Space 触发 + 内部 ↑↓/Enter/Esc 导航。
         // 取代原先智能排座/打印按钮的零散 click handler,既闭环 ARIA,又修下拉键盘可达性。
         // dropdown 元素 → 其 controller 的注册表。
@@ -3958,6 +3981,8 @@ function isWholeWordMatch(label, keyword) {
                     }, 150);
                 } else if (action === 'exportImage') {
                     exportSeatImage();
+                } else if (action === 'exportSeatCsv') {
+                    exportSeatCsv();
                 }
                 // 智能排座下拉里的「配对设置」菜单项
                 else if (action === 'pairSettings') {

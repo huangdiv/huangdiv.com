@@ -53,7 +53,7 @@
 
 ## 架构要点
 - 主文件 `static/seats-generator.js`(IIFE);模块 `static/modules/`:
-  state / migrate / seat-grid / dragdrop / random-arrange / messages
+  state / migrate / seat-grid / dragdrop / random-arrange / messages / csv-export
 - 工厂模式:`createSeatGrid / createDragdrop / createRandomArrange`(deps 显式注入)
 - state 变更走 `commit(patch)` 派发,渲染/自动保存订阅 bus
 - `seat-grid.js` 持久化节点 + `computeStructureKey()` 决定全量重建 or per-seat diff

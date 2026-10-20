@@ -41,7 +41,7 @@
   **仓库是公开的**（`github.com/huangdiv/huangdiv.com`，含 `.workbuddy/`）。
 - **本会话主战场**：`static/seats-generator.html`——面向教师的班级座位表 Web 应用。
   - 功能面：班级多配置、行列/走道/讲台布局、学生导入与拖拽、智能排座、分组与分组轮换、
-    签到模式、配对约束（强制同桌/回避同桌）、导出图片/CSV/打印、GitHub 云同步（PAT）。
+    签到模式、配对约束（强制同桌/回避同桌）、导出图片/CSV 座位表（按当前视角）/打印、GitHub 云同步（PAT）。
   - 技术：vanilla JS（无框架）、localStorage、CDN 依赖 SheetJS + html2canvas。
 - **同仓库还有别的 `static/` 工具**（不要混淆）：
   - `static/ClassMaster.html`（班级管家：宿舍/床位、成绩、学段、学生档案编辑…）——由**其他会话/机器**持续开发，与 seats-generator 相互独立。
