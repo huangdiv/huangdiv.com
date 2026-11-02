@@ -42,7 +42,7 @@
 - 云端推送需 GitHub PAT(`repo` 权限),勿入库(`.env` 已在 `.gitignore`)。
 
 ## 测试约定
-- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 7 文件)
+- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 9 文件)
 - 冒烟:Playwright,`.workbuddy/smoke_test_batch*.py`,需先在 `static/` 起
   `python -m http.server 8123 --bind 127.0.0.1`
   (跑 15~25 分钟会半挂:curl 200 但 goto 超时 ⇒ 重启即可)
@@ -53,9 +53,22 @@
 
 ## 架构要点
 - 主文件 `static/seats-generator.js`(IIFE);模块 `static/modules/`:
-  state / migrate / seat-grid / dragdrop / random-arrange / messages / csv-export
+  state / migrate / seat-grid / dragdrop / random-arrange / messages / csv-export / student-rank
 - 工厂模式:`createSeatGrid / createDragdrop / createRandomArrange`(deps 显式注入)
 - state 变更走 `commit(patch)` 派发,渲染/自动保存订阅 bus
 - `seat-grid.js` 持久化节点 + `computeStructureKey()` 决定全量重建 or per-seat diff
 - 事件委托非妥协:座位/banner 内按钮全部委托 `#classroom` 或父容器
+
+## 排名(rank)与导入语义(2026-11-02 定)
+- `students[i].rank` = 学生序号 1..N,**无手工编辑入口**,由导入决定
+  (勾「同时导入排名」按依据列+升/降序编号;不勾则按导入先后编号);migrate 给老配置补 1..N
+- **导入 = 按姓名增量合并**(不是重建名单):只覆盖「导入且有值」的属性;空单元格不覆盖;
+  标签取并集;文件里没出现的学生原样保留(座位/签到不动) ⇒ 重复导入不产生重复学生
+- 座位 `.seat-rank` 右下角(10px,与 `.seat-number` 同字号),受「隐藏图标」开关统一控制;
+  图标容量按 `--seat-width` 推算,超出部分**从后往前**不渲染
+- `seat-grid` per-seat diff 依赖 `innerSignature()`(rank+gender+tags):
+  studentId 没变但排名/标签变了也必须重绘
+- 「按排名均衡分组」= `student-rank.js#planBalancedGroupAssignment`:rank 升序分批,
+  批次 1..G 正序 / G..1 逆序交替,批内按 性别差²+班委数² 最优排列(n≤7 穷举);
+  分组自动命名 `1组..N组` + `distinctColors` 配色,会重建全部分组(可撤销)
 - 写回 seats **必须就地赋值**保持引用,勿 `state.seats = [...]` 重赋值(会断别名)

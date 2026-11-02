@@ -164,20 +164,22 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 
 ## 3. 架构现状（2026-09-20 快照）
 
-### 3.1 文件与行数
+### 3.1 文件与行数（2026-11-02 更新）
 ```
 static/
-├── seats-generator.html    411 行   入口（<link>/<script type="module"> + DOM 骨架）
-├── seats-generator.css    3644 行   全部样式（含打印 @media、:focus-visible）
-├── seats-generator.js     4754 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水）
+├── seats-generator.html    440 行   入口（<link>/<script type="module"> + DOM 骨架）
+├── seats-generator.css    3661 行   全部样式（含打印 @media、:focus-visible）
+├── seats-generator.js     4956 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
-│   ├── migrate.js          161 行   migrateConfig（老数据字段补默认/clamp/version）+ APP_VERSION
-│   ├── seat-grid.js        507 行   createSeatGrid(deps)：座位渲染 + persistent-DOM diff + 统计
+│   ├── migrate.js          175 行   migrateConfig（老数据字段补默认/clamp/version，含 rank）+ APP_VERSION
+│   ├── seat-grid.js        557 行   createSeatGrid(deps)：座位渲染 + persistent-DOM diff + 排名/图标截断 + 统计
 │   ├── dragdrop.js         285 行   createDragdrop(deps)：拖放 7 事件 + 事件注册
 │   ├── random-arrange.js  1158 行   createRandomArrange(deps)：排座引擎 + 分组轮换 + 性别规则 + 配对修复
-│   └── messages.js         126 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
-└── tests/                         7 个 Node ESM 单元测试（见 §5）
+│   ├── csv-export.js       120 行   buildSeatCsv / 文件名 / 转义（纯函数）
+│   ├── student-rank.js     309 行   排名解析/排序/班委识别/蛇形均衡分组（纯函数）
+│   └── messages.js         131 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
+└── tests/                         9 个 Node ESM 单元测试（见 §5）
 ```
 
 ### 3.2 核心设计模式
@@ -197,7 +199,8 @@ static/
 `state`：`title/rows/cols/seats[]/students[]/groups[]/aisles[]/viewMode/showStudentIcons/`
 `forcedPairs/avoidPairs/isCheckinMode/isGroupMode/groupRotateOffset/smartArrangeMixed/`
 `smartArrangeSameGender/smartArrangeRotate`。
-`students[i] = {id,name,gender,tags[],checkedIn,groupId}`；`gender ∈ 'male'|'female'|''`。
+`students[i] = {id,name,gender,tags[],checkedIn,groupId,rank}`；`gender ∈ 'male'|'female'|''`；
+`rank` 为 **>=1 的整数**（缺失视为「排最后」，migrate 会为老配置按名单顺序补 1..N）。
 
 ### 3.4 排座引擎（random-arrange.js）要点
 - 3 基础模式：`random`（完全随机）/ `mixed`（男女同桌）/ `samegender`（男女不同桌）。
@@ -211,12 +214,40 @@ static/
 - 写回**必须就地赋值**（`seats.fill(null)` / `state.seats[i]=...`）保持 `state.seats` 引用，
   否则打断顶层别名 `currentSeats` ⇒ 照片面/存档不一致。
 
+### 3.5 排名（rank）与导入合并语义（2026-11-02 新增）
+- **排名 = 学生序号**，取值 `1..N`，**不提供手工编辑入口**；来源有两条：
+  ① 导入时勾「同时导入排名」→ 按依据列排序后编号（空值恒排最后）；② 未勾选 → 按导入先后顺序编号。
+- **导入是「按姓名增量合并」，不是重建名单**：
+
+  | 情况 | 行为 |
+  |---|---|
+  | 姓名已存在 | 只覆盖「本次导入且解析出值」的属性；**空单元格 = 未导入 ⇒ 保留原值** |
+  | 性别 / 分组 | 空值不覆盖（分组进口径同性别） |
+  | 标签 | **并集合并**（同 label 去重，原有标签全部保留） |
+  | 排名 | 勾选排名导入时整体重编；否则已有排名不动，新学生接在最大排名之后 |
+  | 姓名不存在 | 追加到名单末尾，未导入属性取默认值 |
+  | 文件里没出现的学生 | **原样保留**（不删除、座位不动、签到不变） |
+
+  ⇒ 已入座学生的座位不会被重置；同一份表重复导入不会产生重复学生。
+- **座位排名数字**：`.seat-rank` 绝对定位右下角，字号 10px（与 `.seat-number` 一致），
+  统一受「隐藏图标」开关控制。图标容量由 `--seat-width` 推算（`refreshSeatMetrics()`），
+  超出的**排在后面**的标签直接不渲染 ⇒ 排名位永远不被挤占。
+  注意 `seat-grid` 的 per-seat diff 依赖 `innerSignature()`（rank+gender+tags），
+  studentId 不变但排名/标签变了也要重绘 —— 别只比 studentId。
+- **按排名均衡分组**（`student-rank.js#planBalancedGroupAssignment`）：
+  按 rank 升序排队，每 G 人一批，批次间 `1..G` 正序 / `G..1` 逆序交替；
+  批内在「一组建一人」约束下求 `性别差² + 班委数²` 最优排列（n≤7 穷举全排列，更大规模贪心），
+  无性别/班委信息时保持恒等排列 ⇒ 严格等于「按排名顺序分配」。
+  班委由标签文本识别（`isCadreStudent`，关键词见 `CADRE_KEYWORDS`）。
+  分组命名 `1组/2组/…`、配色取 `distinctColors` 前 N 个，会清空并重建全部分组（可撤销）。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| `7ba8d2d` | 学生**排名**属性 + 导入改「增量合并」+ 座位右下角排名数字 + 「按排名均衡分组」（分组栏 / 分组 banner 双入口） |
 | `fb4de80` | 开「隐藏图标」时同步隐藏「X排Y列」坐标标签 |
 | `776ee3b` | 修复「男女不同桌/同桌」随机排座达成率低（换座守卫+性别感知落座+全班收尾修复） |
 | `74f684e` | 下拉菜单键盘焦点环改为跟随顶/底圆角 |
@@ -253,12 +284,13 @@ static/
 
 ### 5.1 单元测试（Node ESM，零依赖）
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
-- 7 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
-  `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality`。
+- 9 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
+  `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
+  `unit_student_rank`。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 22 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 24 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -270,6 +302,14 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   不要怀疑页面代码。
 - **`dialog` 必须全局接受**：`page.on("dialog", lambda d: asyncio.create_task(d.accept()))`，
   否则 random/轮换的 confirm 会让测试卡死。
+- **外链脚本会拖死 `goto`**：页面外链 `cdn.sheetjs.com/xlsx…` 与 `html2canvas.hertzen.com`。
+  本机代理下这两个请求常挂住（`domcontentloaded` 30s 超时），且大文件会被**截断**（下载 946KB 仍是残片）。
+  跑导入相关用例时用 `page.route` 把这两个 URL 拦下注入桩 —— 见 `smoke_test_batch24`：
+  仍上传真实 `.xlsx`、仍走真实 `FileReader`，只把 `XLSX.read` / `utils.sheet_to_json` 换成返回行数组的桩。
+- **同一个 `#fileInput` 选同一路径不会触发 `change`** ⇒ 需要「第二次导入」时用另一个文件名
+  （或先 `value=''`），否则预览区不刷新、断言会卡在元素不可见。
+- **折叠面板里的控件不可见**：点击 `[data-target="ioPanel"]` / `[data-target="studentManagement"]`
+  展开后再操作，否则 Playwright 报 `element is not visible`。
 - 浏览器启动加 `args=["--no-proxy-server"]`；Playwright 装在 system Python 的 site-packages。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
