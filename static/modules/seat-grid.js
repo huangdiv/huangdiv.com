@@ -66,6 +66,7 @@ export function createSeatGrid(deps) {
 
     function generateSeats() {
         onUpdateToggleIconsBtnText();
+        refreshSeatMetrics();                       // 图标容量随 --seat-width 自适应
         classroom.style.gridTemplateColumns = generateGridTemplateColumns();
 
         const newStructureKey = computeStructureKey();
@@ -202,10 +203,12 @@ export function createSeatGrid(deps) {
                 cached.checkedIn = newCheckedIn;
             }
 
-            if (showIcons !== cached.showIcons) {
-                // innerHTML 中的图标区间需要随开关切换整段重写
+            if (showIcons !== cached.showIcons || innerSignature(student) !== cached.innerSig) {
+                // innerHTML 中的图标区间需要随开关切换整段重写;
+                // 排名 / 性别 / 标签变化(studentId 不变)同样只需重写内层
                 renderSeatInner(seat, i, showIcons);
                 cached.showIcons = showIcons;
+                cached.innerSig = innerSignature(student);
             }
 
             const newGroupColor = newStudentId ? (getStudentGroupColor(newStudentId) || '') : '';
@@ -284,6 +287,8 @@ export function createSeatGrid(deps) {
                 '<span class="group-mode-count" id="groupModeCount">已选 0 名学生</span>' +
                 '<button class="mode-banner-btn group-mode-clear-btn" id="groupModeClearBtn"' +
                     ' style="display:none;" title="取消当前已选中的全部学生">取消选择</button>' +
+                '<button class="mode-banner-btn" id="groupModeBalanceBtn"' +
+                    ' title="按排名顺序均衡分成若干组（兼顾性别与班委）">按排名均衡分组</button>' +
                 '<button class="mode-banner-btn" id="groupModeNewBtn">＋新建分组并分配</button>' +
                 '<button class="mode-banner-close" id="groupModeExitBtn">×</button>' +
             '</div>' +
@@ -366,7 +371,39 @@ export function createSeatGrid(deps) {
         seat.style.color = isLightColor(groupColor) ? '#000' : '#fff';
     }
 
-    // 渲染 seat 内层 HTML(座位号 / 学生名 / icons / 删除按钮 / 「空」占位)
+    // 座位内图标容量(随 --seat-width 自适应):给右下角排名徽标留出空间。
+    // 座位宽 100px 时约可放 5 个图标,窄屏 70px 时约 2 个 —— 超出的标签直接不渲染,
+    // 保证排名数字永远可见(而不是被挤出的图标盖住)。
+    let seatMetricsWidth = 0;
+    let seatMetricsMaxIcons = Infinity;
+
+    function refreshSeatMetrics() {
+        try {
+            const raw = getComputedStyle(document.documentElement).getPropertyValue('--seat-width');
+            const width = parseFloat(raw);
+            if (!Number.isFinite(width) || width <= 0) return;
+            if (width === seatMetricsWidth) return;
+            seatMetricsWidth = width;
+            // 左右内边距约 8px + 右下排名徽标预留 22px;单个图标宽约 11px + 2px 间距
+            seatMetricsMaxIcons = Math.max(1, Math.floor((width - 8 - 22) / 13));
+        } catch (e) {
+            seatMetricsMaxIcons = Infinity;
+        }
+    }
+
+    // 座位内层的「内容签名」——排名 / 性别 / 标签变化时用于触发重绘。
+    // 这些属性可以在 studentId 不变的情况下被导入或编辑,只比 studentId 会漏更新。
+    function innerSignature(student) {
+        if (!student) return '';
+        const rank = parseInt(student.rank, 10);
+        const rankPart = Number.isFinite(rank) ? String(rank) : '';
+        const tagPart = (student.tags || []).map(function (t) {
+            return (t && t.emoji ? t.emoji : '') + '|' + (t && t.label ? t.label : '');
+        }).join(',');
+        return rankPart + '#' + (student.gender || '') + '#' + tagPart;
+    }
+
+    // 渲染 seat 内层 HTML(座位号 / 学生名 / icons / 排名 / 删除按钮 / 「空」占位)
     function renderSeatInner(seat, seatIndex, showIcons) {
         const studentId = state.seats[seatIndex];
         const student = studentId ? getStudentById(studentId) : null;
@@ -397,15 +434,27 @@ export function createSeatGrid(deps) {
                     });
                 }
                 if (icons.length > 0) {
-                    iconsHtml = '<span class="seat-icons">' + icons.map(function (ic) {
-                        return '<span class="seat-icon" title="' + escapeHtml(ic.title) + '">' + escapeHtml(ic.emoji) + '</span>';
-                    }).join('') + '</span>';
+                    // 超出容量的标签(排在后面的)不渲染 —— 优先保证排名数字的位置
+                    const maxIcons = seatMetricsMaxIcons;
+                    const shown = icons.length > maxIcons ? icons.slice(0, maxIcons) : icons;
+                    const hidden = icons.length - shown.length;
+                    iconsHtml = '<span class="seat-icons"' +
+                        (hidden > 0 ? ' title="另有 ' + hidden + ' 个标签未显示"' : '') + '>' +
+                        shown.map(function (ic) {
+                            return '<span class="seat-icon" title="' + escapeHtml(ic.title) + '">' + escapeHtml(ic.emoji) + '</span>';
+                        }).join('') + '</span>';
                 }
             }
+            // 右下角排名数字:字号与左上角「X排Y列」一致(10px),同样受标签显示开关控制
+            const rankNum = student ? parseInt(student.rank, 10) : NaN;
+            const rankHtml = (showIcons && Number.isFinite(rankNum))
+                ? '<span class="seat-rank" title="排名 ' + rankNum + '">' + rankNum + '</span>'
+                : '';
             seat.innerHTML =
                 numberHtml +
                 '<span class="seat-name">' + escapeHtml(displayName) + '</span>' +
                 iconsHtml +
+                rankHtml +
                 deleteBtnHtml;
         } else {
             seat.innerHTML =
@@ -422,7 +471,8 @@ export function createSeatGrid(deps) {
             studentId,
             checkedIn: isCheckedIn,
             groupColor: studentId ? (getStudentGroupColor(studentId) || '') : '',
-            showIcons: state.showStudentIcons
+            showIcons: state.showStudentIcons,
+            innerSig: innerSignature(student)
         };
     }
 

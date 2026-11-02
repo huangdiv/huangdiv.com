@@ -14,7 +14,7 @@
 //   3. students.id 去重(碰撞时重新生成)
 //   4. groups 缺 id → 生成 id
 //   5. seats 中的旧姓名引用 → 转换为 id
-//   6. students[i] 补 checkedIn/gender/tags 默认
+//   6. students[i] 补 checkedIn/gender/tags 默认;排名 rank 缺失时按名单顺序补 1..N
 //   7. groups 顶层补 groups/seats/rows/cols/aisles/showStudentIcons/viewMode/title
 //   8. aisles[i].afterCol 范围钳制 [0, cols-1]
 //   9. version 升级到 APP_VERSION
@@ -25,7 +25,7 @@
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.3.1';
+export const APP_VERSION = '1.3.3';
 
 // === 工具 ===
 function generateId(prefix) {
@@ -67,11 +67,25 @@ export function migrateConfig(config) {
             s.id = id;
         });
 
-        // ─── 4. students[i] 补 checkedIn/gender/tags 默认 ───
+        // ─── 4. students[i] 补 checkedIn/gender/tags/rank 默认 ───
         config.students.forEach(function (s) {
             if (s.checkedIn == null) s.checkedIn = false;
             if (s.gender == null) s.gender = '';
             if (!Array.isArray(s.tags)) s.tags = [];
+        });
+        // 排名:老配置没有 rank ⇒ 按名单顺序补 1..N(已有的合法排名保持不动)
+        let maxRank = 0;
+        config.students.forEach(function (s) {
+            const rank = parseInt(s.rank, 10);
+            if (Number.isFinite(rank) && rank > maxRank) maxRank = rank;
+        });
+        config.students.forEach(function (s) {
+            const rank = parseInt(s.rank, 10);
+            if (Number.isFinite(rank) && rank >= 1) {
+                s.rank = rank;
+            } else {
+                s.rank = ++maxRank;
+            }
         });
     } else {
         // students 缺失、undefined、非数组、空数组 → 重置为 []

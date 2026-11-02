@@ -26,6 +26,11 @@ export const MESSAGES = {
     GROUP_NAME_REQUIRED: '请输入分组名称',
     GROUP_NAME_EXISTS: '分组名称已存在',
     CONFIRM_DELETE_GROUP: '确定要删除这个分组吗？该分组的学生将变为未分组状态。',
+    BALANCE_GROUP_PROMPT: '请输入要分成几个组（按排名顺序均衡分配）：',
+    BALANCE_GROUP_INVALID: (max) => `组数必须是 1 ~ ${max} 之间的整数`,
+    CONFIRM_BALANCE_GROUP: (existing, next) =>
+        `当前已有 ${existing} 个分组，将全部清空并重新分成 ${next} 组。\n` +
+        `学生现有的分组归属会被覆盖（可用「撤销」恢复），是否继续？`,
 
     // —— 学生 ——
     STUDENT_NAME_REQUIRED: '请输入学生姓名',

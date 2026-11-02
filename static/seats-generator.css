@@ -1515,6 +1515,19 @@ h1:focus {
     z-index: 1;
 }
 
+/* 右下角排名数字 — 字号与左上角「X排Y列」保持一致(10px),
+   绝对定位固定占位,不会被标签图标挤出座位。 */
+.seat-rank {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    font-size: 10px;
+    line-height: 1;
+    color: #666;
+    z-index: 1;
+    pointer-events: none;
+}
+
 .seat-name {
     font-size: 22px;
     color: #333;
@@ -2949,6 +2962,10 @@ button:disabled {
     bottom: 2px;
     left: 4px;
     display: flex;
+    flex-wrap: nowrap;
+    /* 给右下角排名数字留出固定空间:图标再多也只在左侧排队,不侵占排名位 */
+    max-width: calc(100% - 26px);
+    overflow: hidden;
     gap: 2px;
     font-size: 11px;
     line-height: 1;

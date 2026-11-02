@@ -5,12 +5,18 @@ import { createRandomArrange } from './modules/random-arrange.js';
 import { migrateConfig as migrateConfigFn } from './modules/migrate.js';
 import { MESSAGES } from './modules/messages.js';
 import { buildSeatCsv, buildSeatCsvFilename, CSV_BOM } from './modules/csv-export.js';
+import {
+    parseRankValue,
+    compareByRank,
+    rankOrderIndices,
+    planBalancedGroupAssignment
+} from './modules/student-rank.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.3.2';
+        const APP_VERSION = '1.3.3';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -109,6 +115,12 @@ function normalizeRotateOffset(value) {
         const enableTagImport = document.getElementById('enableTagImport');
         const tagImportControls = document.getElementById('tagImportControls');
         const tagColumnSelect = document.getElementById('tagColumnSelect');
+        const rankImportSection = document.getElementById('rankImportSection');
+        const enableRankImport = document.getElementById('enableRankImport');
+        const rankImportControls = document.getElementById('rankImportControls');
+        const rankColumnSelect = document.getElementById('rankColumnSelect');
+        const rankOrderSelect = document.getElementById('rankOrderSelect');
+        const balanceGroupBtn = document.getElementById('balanceGroupBtn');
         const aisleListEl = document.getElementById('aisleList');
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
@@ -134,6 +146,9 @@ function normalizeRotateOffset(value) {
         let isGenderImportEnabled = false;
         let selectedTagColumnIndex = -1;
         let isTagImportEnabled = false;
+        // 排名导入相关变量
+        let selectedRankColumnIndex = -1;
+        let isRankImportEnabled = false;
 
         let excelData = null;
         let selectedColumnIndex = 0;
@@ -558,6 +573,67 @@ function normalizeRotateOffset(value) {
             }
         }
 
+        // 「按排名均衡分组」——分组设置栏 / 分组模式 banner 共用入口。
+        // 询问组数后按排名蛇形顺序分配(每批 1..G 正序 / G..1 逆序交替),
+        // 批内兼顾性别与班委数量;分组自动命名 1组/2组/…,并配不同的预设色。
+        function balanceGroupsByRank() {
+            if (students.length === 0) {
+                alert(MESSAGES.NO_STUDENTS_YET);
+                return;
+            }
+            const maxGroups = students.length;
+            const suggested = Math.min(maxGroups, groups.length > 0 ? groups.length : 4);
+            const input = prompt(MESSAGES.BALANCE_GROUP_PROMPT, String(suggested));
+            if (input === null) return;                       // 用户取消
+            const count = parseInt(String(input).trim(), 10);
+            if (!Number.isFinite(count) || count < 1 || count > maxGroups) {
+                alert(MESSAGES.BALANCE_GROUP_INVALID(maxGroups));
+                return;
+            }
+            if (groups.length > 0 && !confirm(MESSAGES.CONFIRM_BALANCE_GROUP(groups.length, count))) return;
+
+            pushSnapshot('group');
+            const plan = planBalancedGroupAssignment(students, count);
+            if (plan.groupCount === 0) return;
+
+            // 重建分组:依次命名 1组 / 2组 …, 配色取预设高对比色板(前 N 个不重复)
+            groups.length = 0;
+            for (let i = 0; i < plan.groupCount; i++) {
+                groups.push({
+                    id: generateId('g'),
+                    name: (i + 1) + '组',
+                    color: distinctColors[i % distinctColors.length]
+                });
+            }
+            const groupIds = groups.map(function (g) { return g.id; });
+
+            // 清空旧归属后按方案逐个写回
+            students.forEach(function (s) { s.groupId = null; });
+            plan.assignments.forEach(function (item) {
+                const student = getStudentById(item.studentId);
+                if (student) student.groupId = groupIds[item.groupIndex];
+            });
+
+            groupModeSelectedIds.clear();
+            groupFocusId = null;
+            groupCurrentStudentId = null;
+
+            commit({ students: students, groups: groups });
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
+            generateSeats();
+            renderGroupModeList();
+            updateGroupModeCount();
+            autoSave();
+
+            showStatToast('已按排名均衡分为 ' + plan.groupCount + ' 组');
+        }
+
+        balanceGroupBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            balanceGroupsByRank();
+        });
+
         // 分组列表渲染（纯渲染，事件由委托处理）
         function updateGroupDisplay() {
             // 新增分组行（始终显示在最后）
@@ -659,7 +735,9 @@ function normalizeRotateOffset(value) {
             if (students.length === 0) {
                 studentGroupSelector.innerHTML = newRow;
             } else {
-                const studentsHtml = students.map(student => {
+                // 详细设置栏按排名顺序展示学生(不提供排名输入框,排名由导入决定)
+                const orderedStudents = students.slice().sort(compareByRank);
+                const studentsHtml = orderedStudents.map(student => {
                     let classes = 'student-group-item';
                     const checkbox = '';
                     // 性别选项（带选中状态）
@@ -787,7 +865,7 @@ function normalizeRotateOffset(value) {
                     if (label) newTags.push({ emoji: emoji, label: label });
                 });
 
-                students.push({ id: generateId('s'), name: name, groupId: groupId, checkedIn: false, gender: gender, tags: newTags });
+                students.push({ id: generateId('s'), name: name, groupId: groupId, checkedIn: false, gender: gender, tags: newTags, rank: nextStudentRank() });
                 nameInput.value = '';
                 groupSelect.value = '';
                 if (genderSelect) genderSelect.value = '';
@@ -1945,9 +2023,47 @@ function isWholeWordMatch(label, keyword) {
             return result;
         }
 
-        // 导入学生并应用分组
+        // 增量合并标签:已有标签全部保留,只追加本次新出现的(同 label 不重复)
+        function mergeStudentTags(current, incoming) {
+            const list = Array.isArray(current) ? current.slice() : [];
+            const seen = new Set(list.map(function (t) { return String((t && t.label) || '').trim(); }));
+            (incoming || []).forEach(function (t) {
+                const label = String((t && t.label) || '').trim();
+                if (!label || seen.has(label)) return;
+                seen.add(label);
+                list.push(t);
+            });
+            return list;
+        }
+
+        // 当前最大排名(列表为空/都无排名时为 0)
+        function maxStudentRank() {
+            return students.reduce(function (max, s) {
+                const r = parseInt(s.rank, 10);
+                return (Number.isFinite(r) && r > max) ? r : max;
+            }, 0);
+        }
+
+        // 下一个可用排名 —— 手动新增学生的默认编号(接在现有最大排名之后)
+        function nextStudentRank() {
+            return maxStudentRank() + 1;
+        }
+
+        // 兜底:保证每名学生都有合法的排名(缺失的按当前顺序接在最大值之后)
+        function ensureStudentRanks() {
+            let max = maxStudentRank();
+            students.forEach(function (s) {
+                const r = parseInt(s.rank, 10);
+                if (Number.isFinite(r) && r >= 1) return;
+                s.rank = ++max;
+            });
+        }
+
+        // 导入学生(增量):按姓名与已有名单合并。
+        //   已有学生 —— 只覆盖本次确实导入且解析出值的属性,其余(含座位、签到、未导入的属性)保持原样;
+        //   新学生   —— 追加到名单末尾,未导入的属性取默认值;
+        //   名单中未出现的学生 —— 原样保留(不删除、不移动座位)。
         function importStudentsWithGroups(nameColumnIndex) {
-            const newStudents = [];
             const sourceValueToId = new Map();
             const groupsToAdd = [];
             const groupsToUpdate = [];
@@ -1979,12 +2095,21 @@ function isWholeWordMatch(label, keyword) {
                 });
             });
 
+            // ① 逐行解析(同名的后续行忽略,避免同一份表里重复姓名被加两次)
+            const parsed = [];
+            const seenNames = new Set();
+            let duplicateRows = 0;
             getImportRows().forEach(row => {
                 const name = getCellText(row[nameColumnIndex]);
                 if (!name) return;
+                if (seenNames.has(name)) { duplicateRows++; return; }
+                seenNames.add(name);
                 let groupId = null;
+                let hasGroupValue = false;
                 if (isGroupImportEnabled && selectedGroupColumnIndex >= 0) {
-                    groupId = sourceValueToId.get(getCellText(row[selectedGroupColumnIndex])) || null;
+                    const groupText = getCellText(row[selectedGroupColumnIndex]);
+                    hasGroupValue = !!groupText;
+                    groupId = sourceValueToId.get(groupText) || null;
                 }
                 // 解析性别
                 let gender = '';
@@ -1996,60 +2121,84 @@ function isWholeWordMatch(label, keyword) {
                 if (isTagImportEnabled && selectedTagColumnIndex >= 0) {
                     tags = parseTagValue(getCellText(row[selectedTagColumnIndex]), usedEmojis, existingLabelToEmoji, existingEmojiToLabel);
                 }
-                newStudents.push({ id: generateId('s'), name: name, groupId: groupId, checkedIn: false, gender: gender, tags: tags });
+                // 解析排名依据值(未启用时为 null)
+                const rankValue = (isRankImportEnabled && selectedRankColumnIndex >= 0)
+                    ? parseRankValue(row[selectedRankColumnIndex])
+                    : null;
+                parsed.push({ name: name, groupId: groupId, hasGroupValue: hasGroupValue, gender: gender, tags: tags, rankValue: rankValue, rank: 0 });
             });
 
-            if (newStudents.length === 0) {
+            if (parsed.length === 0) {
                 fileInfo.innerHTML = '<span style="color:red">筛选结果中未找到学生名单，请检查筛选条件和姓名列</span>';
                 return;
             }
 
+            // ② 排名编号:勾选「同时导入排名」⇒ 按依据列排序后 1..N;否则按导入先后顺序 1..N
+            const importedRank = isRankImportEnabled && selectedRankColumnIndex >= 0;
+            if (importedRank) {
+                const direction = (rankOrderSelect && rankOrderSelect.value === 'desc') ? 'desc' : 'asc';
+                const order = rankOrderIndices(parsed.map(function (p) { return p.rankValue; }), direction);
+                order.forEach(function (idx, i) { parsed[idx].rank = i + 1; });
+            }
+
+            // ③ 按姓名合并(已有学生保持 id / 座位 / 未导入的属性)
+            const existingByName = new Map();
+            students.forEach(function (s) {
+                if (!existingByName.has(s.name)) existingByName.set(s.name, s);
+            });
+            let nextRank = maxStudentRank() + 1;
+
+            const newStudents = [];
+            let updatedCount = 0;
+            parsed.forEach(function (item) {
+                const existing = existingByName.get(item.name);
+                if (existing) {
+                    // 只覆盖「本次确实导入且解析出值」的属性;空单元格视为未导入,保留原值
+                    if (isGroupImportEnabled && item.hasGroupValue) existing.groupId = item.groupId;
+                    if (isGenderImportEnabled && item.gender) existing.gender = item.gender;
+                    if (isTagImportEnabled && item.tags.length > 0) {
+                        existing.tags = mergeStudentTags(existing.tags, item.tags);
+                    }
+                    if (importedRank) {
+                        existing.rank = item.rank;
+                    } else if (!Number.isFinite(parseInt(existing.rank, 10))) {
+                        existing.rank = nextRank++;
+                    }
+                    updatedCount++;
+                    return;
+                }
+                newStudents.push({
+                    id: generateId('s'),
+                    name: item.name,
+                    groupId: item.groupId,
+                    checkedIn: false,
+                    gender: item.gender,
+                    tags: item.tags,
+                    rank: importedRank ? item.rank : nextRank++
+                });
+            });
+
             pushSnapshot('import');
-            students = newStudents;
             groupsToUpdate.forEach(item => {
                 item.group.color = item.color;
             });
-            groups.push(...groupsToAdd);
+            if (groupsToAdd.length > 0) groups.push(...groupsToAdd);
+            // 就地追加,保持 students 数组引用(别名 / state 同步)
+            newStudents.forEach(function (s) { students.push(s); });
+            ensureStudentRanks();
 
             // 更新UI
-            fileInfo.innerHTML = '<span style="color:green">成功导入 ' + students.length + ' 名学生' +
-                (isGroupImportEnabled && tempImportGroups.length > 0 ? '，' + tempImportGroups.length + '个分组' : '') + '</span>';
-            generateStudentList();
-            updateGroupDisplay();
-            updateStudentAssignmentDisplay();
+            fileInfo.innerHTML = '<span style="color:green">导入完成：新增 ' + newStudents.length +
+                ' 名，更新 ' + updatedCount + ' 名' +
+                (duplicateRows > 0 ? '（忽略重复 ' + duplicateRows + ' 行）' : '') +
+                (groupsToAdd.length > 0 ? '，新建分组 ' + groupsToAdd.length + ' 个' : '') +
+                '</span>';
             previewArea.style.display = 'none';
 
-            // 尝试按姓名匹配旧座位配置（兼容旧数据）
-            const savedConfig = localStorage.getItem('classroomConfig');
-            if (savedConfig) {
-                try {
-                    const config = JSON.parse(savedConfig);
-                    migrateConfig(config);
-                    if (config.seats && config.students) {
-                        const oldNameToNewId = new Map(newStudents.map(s => [s.name, s.id]));
-                        const oldIdToName = new Map(config.students.map(s => [s.id, s.name]));
-                        currentSeats = config.seats.map(seatVal => {
-                            if (!seatVal) return null;
-                            const oldName = oldIdToName.get(seatVal) || seatVal;
-                            return oldNameToNewId.get(oldName) || null;
-                        });
-                        // 调整座位数组长度
-                        const targetLen = rows * cols;
-                        if (currentSeats.length < targetLen) {
-                            currentSeats = currentSeats.concat(Array(targetLen - currentSeats.length).fill(null));
-                        } else if (currentSeats.length > targetLen) {
-                            currentSeats = currentSeats.slice(0, targetLen);
-                        }
-                    }
-                    generateSeats();
-                } catch (e) {
-                    console.error('匹配旧座位配置失败:', e);
-                    generateSeats();
-                }
-            } else {
-                generateSeats();
-            }
             commit({ students: students, groups: groups, seats: currentSeats });
+            generateSeats();
+            updateGroupDisplay();
+            updateStudentAssignmentDisplay();
             autoSave();
         }
 
@@ -3547,7 +3696,8 @@ function isWholeWordMatch(label, keyword) {
             let nameColumnIndex = 0;
             let detectedGenderCol = -1;
             let detectedTagCol = -1;
-            const allSelects = [columnSelect, groupColumnSelect, genderColumnSelect, tagColumnSelect];
+            let detectedRankCol = -1;
+            const allSelects = [columnSelect, groupColumnSelect, genderColumnSelect, tagColumnSelect, rankColumnSelect];
             allSelects.forEach(function (sel) { sel.innerHTML = ''; });
             excelData[0].forEach((cell, index) => {
                 const colName = getCellText(cell);
@@ -3562,21 +3712,26 @@ function isWholeWordMatch(label, keyword) {
                 if (colNameLower.includes('姓名') || colNameLower.includes('name')) nameColumnIndex = index;
                 if (colNameLower.includes('性别') || colNameLower.includes('gender') || colNameLower.includes('sex')) detectedGenderCol = index;
                 if (colNameLower.includes('标签') || colNameLower.includes('tag') || colNameLower.includes('label')) detectedTagCol = index;
+                if (colNameLower.includes('排名') || colNameLower.includes('名次') || colNameLower.includes('rank') || colNameLower.includes('order')) detectedRankCol = index;
             });
             columnSelect.value = nameColumnIndex;
             selectedColumnIndex = nameColumnIndex;
             if (detectedGenderCol >= 0) genderColumnSelect.value = detectedGenderCol;
             if (detectedTagCol >= 0) tagColumnSelect.value = detectedTagCol;
+            if (detectedRankCol >= 0) rankColumnSelect.value = detectedRankCol;
             enableGroupImport.checked = false;
             enableRowFilter.checked = false;
             enableGenderImport.checked = false;
             enableTagImport.checked = false;
+            enableRankImport.checked = false;
             isGroupImportEnabled = false;
             isGenderImportEnabled = false;
             isTagImportEnabled = false;
+            isRankImportEnabled = false;
             selectedGroupColumnIndex = -1;
             selectedGenderColumnIndex = -1;
             selectedTagColumnIndex = -1;
+            selectedRankColumnIndex = -1;
             selectedFilterColumnIndex = -1;
             selectedFilterValue = '';
             tempImportGroups = [];
@@ -3584,6 +3739,7 @@ function isWholeWordMatch(label, keyword) {
             rowFilterControls.style.display = 'none';
             genderImportControls.style.display = 'none';
             tagImportControls.style.display = 'none';
+            rankImportControls.style.display = 'none';
             groupPreviewSection.style.display = 'none';
             filterSummary.textContent = '';
             const colCount = excelData[0].length;
@@ -3591,12 +3747,14 @@ function isWholeWordMatch(label, keyword) {
             groupImportSection.style.display = hasMultipleCols ? 'block' : 'none';
             genderImportSection.style.display = hasMultipleCols ? 'block' : 'none';
             tagImportSection.style.display = hasMultipleCols ? 'block' : 'none';
+            rankImportSection.style.display = hasMultipleCols ? 'block' : 'none';
             tablePreview.innerHTML = createPreviewTable(excelData, nameColumnIndex);
             previewArea.style.display = 'block';
             const columnName = escapeHtml(excelData[0][nameColumnIndex] || '列' + (nameColumnIndex + 1));
             let infoHtml = '<span>当前工作表：“' + escapeHtml(sheetName) + '”，已自动选择姓名列“' + columnName + '"';
             if (detectedGenderCol >= 0) infoHtml += '，检测到性别列"' + escapeHtml(excelData[0][detectedGenderCol]) + '"';
             if (detectedTagCol >= 0) infoHtml += '，检测到标签列"' + escapeHtml(excelData[0][detectedTagCol]) + '"';
+            if (detectedRankCol >= 0) infoHtml += '，检测到排名列"' + escapeHtml(excelData[0][detectedRankCol]) + '"';
             infoHtml += '</span>';
             if (importTruncated) {
                 infoHtml += '<span style="color:#e67e22">（表格超过 ' + MAX_IMPORT_ROWS + ' 行，已仅加载前 ' + MAX_IMPORT_ROWS + ' 行）</span>';
@@ -3689,9 +3847,24 @@ function isWholeWordMatch(label, keyword) {
             }
         });
 
+        // 排名导入启用复选框事件
+        enableRankImport.addEventListener('change', function () {
+            isRankImportEnabled = this.checked;
+            rankImportControls.style.display = this.checked ? 'block' : 'none';
+            selectedRankColumnIndex = this.checked ? parseInt(rankColumnSelect.value) : -1;
+        });
+
+        rankColumnSelect.addEventListener('change', function () {
+            if (isRankImportEnabled) {
+                selectedRankColumnIndex = parseInt(this.value);
+            }
+        });
+
         // 确认导入按钮点击事件
         confirmImportBtn.addEventListener('click', function () {
             selectedColumnIndex = parseInt(columnSelect.value);
+            // 以点击时的下拉实况为准,避免忘记触发 change
+            if (isRankImportEnabled) selectedRankColumnIndex = parseInt(rankColumnSelect.value);
             importStudentsWithGroups(selectedColumnIndex);
         });
 
@@ -4358,6 +4531,10 @@ function isWholeWordMatch(label, keyword) {
             }
             if (e.target.closest('#groupModeNewBtn')) {
                 createGroupAndAssign();
+                return;
+            }
+            if (e.target.closest('#groupModeBalanceBtn')) {
+                balanceGroupsByRank();
                 return;
             }
             if (e.target.closest('#groupModeClearBtn')) {
