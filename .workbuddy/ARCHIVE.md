@@ -276,6 +276,7 @@ static/
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | UI 紧凑化 + 术语统一：分组设置 / 详细设置的「删除」由 26×26 实心红块瘦身为 **18px 行内叉号**（与「布局设置 → 走道列表」的移除叉号同一套外观，宽度让给分组名/学生名）+ **「座位设置」更名「布局设置」**（v1.3.5） |
 | 本轮 | 名单/Excel 统一按排名呈现 + 配对设置改「输入姓名搜索」+ 均衡分组时**按组聚座** + 分组**均衡系数**（分组栏 / 分组 banner / 顶部汇总） |
 | `7ba8d2d` | 学生**排名**属性 + 导入改「增量合并」+ 座位右下角排名数字 + 「按排名均衡分组」（分组栏 / 分组 banner 双入口） |
 | `fb4de80` | 开「隐藏图标」时同步隐藏「X排Y列」坐标标签 |
@@ -320,7 +321,7 @@ static/
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 25 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 26 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -384,6 +385,11 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - `transition` 未结束时读 computed style 会拿到中间态 ⇒ 等 ~300ms。
 - 座位类只有 `seat` / `seat empty`（无 `assigned`）；空座位也带空 `data-student`，选择器要过滤非空。
 - 刷新会清空撤销栈，`undoBtn` 变 disabled ⇒ 撤销场景要在刷新后重做一次操作。
+- **纯 CSS 改动也能断言**：`getBoundingClientRect()` 量尺寸、`getComputedStyle()` 量
+  `backgroundColor / borderRadius / color`，再断言行容器 `scrollWidth <= clientWidth + 1` 防溢出。
+  「改造前 vs 改造后」的对比不必真的跑老代码：把几何值抽成 CSS 变量（如 `--icon-remove-size`），
+  页内 `documentElement.style.setProperty()` 改回旧值再量一次，就能拿到净增宽度（`smoke_test_batch26`：
+  分组名 32px → 44px、学生名 79px → 87px）。
 
 ### 6.3 通用工程教训
 - 删除 UI 功能时，用**全仓 grep**（py/mjs/md/html/css）找所有消费点：消息常量、localStorage key、

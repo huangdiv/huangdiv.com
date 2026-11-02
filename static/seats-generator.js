@@ -18,7 +18,7 @@ import { planGroupSeatSlots } from './modules/group-layout.js';
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.3.4';
+        const APP_VERSION = '1.3.5';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]

@@ -24,6 +24,9 @@
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
     --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+    /* 行内「删除/移除」小叉号的统一占位尺寸：
+       走道列表、分组行、详细设置学生行共用，保证三处观感一致 */
+    --icon-remove-size: 18px;
 }
 
 * {
@@ -2343,13 +2346,17 @@ button:disabled {
     min-width: 0;
 }
 
+/* 走道列表的移除叉号 —— 行内轻量删除按钮的基准样式
+   （分组设置 / 详细设置下的删除按钮与它保持同一套尺寸与观感，见下方同名注释块） */
 .aisle-remove-btn {
     background: none;
     border: none;
     color: var(--primary);
     cursor: pointer;
-    min-width: 18px;
-    height: 18px;
+    width: var(--icon-remove-size);
+    height: var(--icon-remove-size);
+    min-width: var(--icon-remove-size);
+    max-width: var(--icon-remove-size);
     font-size: 14px;
     line-height: 1;
     padding: 0;
@@ -2359,6 +2366,7 @@ button:disabled {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
 }
 
 .aisle-remove-btn:hover {
@@ -2432,7 +2440,7 @@ button:disabled {
 .group-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex: none;
     height: 100%;
 }
@@ -2447,6 +2455,40 @@ button:disabled {
     flex: none;
     background: var(--surface);
     box-sizing: border-box;
+}
+
+/* ───────── 行内轻量删除按钮（分组设置 / 详细设置） ───────── */
+/* 与「布局设置 → 走道列表」的 .aisle-remove-btn 保持同一套外观：
+   透明底 + 圆形 hover 底色，只占一个 --icon-remove-size 的宽度。
+   原先这里是 26×26 的实心红块，一行里挤掉太多横向空间，名称输入框被压窄；
+   改成图标尺寸后，多出来的宽度自动让给分组名/学生名（flex:1 的那一项）。
+   色相仍用 --danger，和「删除是危险操作」的既有语义一致。 */
+.group-item .group-delete-btn,
+.student-group-item .student-delete-btn {
+    background: none;
+    border: none;
+    border-radius: 50%;
+    color: var(--danger);
+    cursor: pointer;
+    width: var(--icon-remove-size);
+    height: var(--icon-remove-size);
+    min-width: var(--icon-remove-size);
+    max-width: var(--icon-remove-size);
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    opacity: 0.7;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.group-item .group-delete-btn:hover,
+.student-group-item .student-delete-btn:hover {
+    opacity: 1;
+    background: var(--danger-light);
 }
 
 /* ───────── 分组均衡系数 ───────── */
