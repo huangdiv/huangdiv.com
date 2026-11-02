@@ -42,7 +42,7 @@
 - 云端推送需 GitHub PAT(`repo` 权限),勿入库(`.env` 已在 `.gitignore`)。
 
 ## 测试约定
-- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 9 文件)
+- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 11 文件)
 - 冒烟:Playwright,`.workbuddy/smoke_test_batch*.py`,需先在 `static/` 起
   `python -m http.server 8123 --bind 127.0.0.1`
   (跑 15~25 分钟会半挂:curl 200 但 goto 超时 ⇒ 重启即可)
@@ -53,7 +53,8 @@
 
 ## 架构要点
 - 主文件 `static/seats-generator.js`(IIFE);模块 `static/modules/`:
-  state / migrate / seat-grid / dragdrop / random-arrange / messages / csv-export / student-rank
+  state / migrate / seat-grid / dragdrop / random-arrange / messages / csv-export /
+  student-rank / **group-balance** / **group-layout**
 - 工厂模式:`createSeatGrid / createDragdrop / createRandomArrange`(deps 显式注入)
 - state 变更走 `commit(patch)` 派发,渲染/自动保存订阅 bus
 - `seat-grid.js` 持久化节点 + `computeStructureKey()` 决定全量重建 or per-seat diff
@@ -72,3 +73,17 @@
   批次 1..G 正序 / G..1 逆序交替,批内按 性别差²+班委数² 最优排列(n≤7 穷举);
   分组自动命名 `1组..N组` + `distinctColors` 配色,会重建全部分组(可撤销)
 - 写回 seats **必须就地赋值**保持引用,勿 `state.seats = [...]` 重赋值(会断别名)
+
+## 名单呈现 / 按组聚座 / 均衡系数(2026-11-02 第二次迭代)
+- **凡是「给学生看名单」的地方一律按 rank 升序**:未入座名单(`getUnassignedStudents` 内部排)、
+  详细设置栏、统计块→复制姓名/下载 Excel(`getStatContext` 出口统一 `slice().sort(compareByRank)`,
+  并在 Excel 首列加「排名」)。座位 CSV 例外 —— 那是按座位视角,不做排名排序
+- **配对设置的学生选择框 = 输入姓名搜索**(原生 `<datalist>` + `resolvePairStudent`):
+  精确姓名优先,其次唯一片段(自动补全),多命中/无命中都 alert 且不添加;回车=添加
+- **按组聚座** = `group-layout.js`:`chooseBlockShape` 选统一矩形块(代价=空位+形状+行数+余列,
+  形状按「实际占用行列差」罚、超 2 重罚;代价相近优先更宽 ⇒ 6 人 6 组得 2×3),
+  `planGroupSeatSlots` 块内 row-major 填座、跳过 blocked、铺不下退化顺序连续排;
+  主 IIFE `arrangeSeatsByGroup()` 先清出待移动学生(未分组锁定)→ 规划 → 就地写回
+- **均衡系数** = `group-balance.js`:排名 0.6 + 性别 0.2 + 班委 0.2(缺数据自动剔除并归一)。
+  排名维度用**排名带覆盖度** `100·(1 - Σ|c_b - band/G|/(2k))`,**不要**用「组均值 vs 全班均值」
+  (整块切分时中间组会假满分)。展示在:分组行徽标 / 分组设置顶部汇总 / 分组模式 banner

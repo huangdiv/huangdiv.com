@@ -11,12 +11,14 @@ import {
     rankOrderIndices,
     planBalancedGroupAssignment
 } from './modules/student-rank.js';
+import { computeGroupBalance, balanceLevel, roundScore } from './modules/group-balance.js';
+import { planGroupSeatSlots } from './modules/group-layout.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.3.3';
+        const APP_VERSION = '1.3.4';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -121,6 +123,7 @@ function normalizeRotateOffset(value) {
         const rankColumnSelect = document.getElementById('rankColumnSelect');
         const rankOrderSelect = document.getElementById('rankOrderSelect');
         const balanceGroupBtn = document.getElementById('balanceGroupBtn');
+        const arrangeGroupBtn = document.getElementById('arrangeGroupBtn');
         const aisleListEl = document.getElementById('aisleList');
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
@@ -573,9 +576,103 @@ function normalizeRotateOffset(value) {
             }
         }
 
+        // ─────────── 按组聚座（同一组的人坐成一片）───────────
+        // 分组之后把每组的座位收拢成一个矩形块（6 人 → 2行3列 / 3行2列），
+        // 块与块互不重叠、按「从左到右、从上到下」排列；块内按排名先后逐行落座。
+        // 未分组的学生**原地不动**：只把参与重排的学生清出来再重新安放。
+        function buildGroupMemberBuckets() {
+            return groups.map(function (g) {
+                return {
+                    group: g,
+                    members: students
+                        .filter(function (s) { return s.groupId === g.id; })
+                        .sort(compareByRank)
+                };
+            }).filter(function (b) { return b.members.length > 0; });
+        }
+
+        // 返回 plan（成功）/ false（失败）。不自行 pushSnapshot —— 由调用方决定
+        // 是否与「分组变更」合并成同一次撤销。
+        function arrangeSeatsByGroup(options) {
+            options = options || {};
+            const notify = options.notify !== false;
+            const buckets = buildGroupMemberBuckets();
+            if (buckets.length === 0) {
+                if (notify) alert(MESSAGES.ARRANGE_GROUP_NO_GROUPS);
+                return false;
+            }
+            const total = rows * cols;
+            if (!total) {
+                if (notify) alert(MESSAGES.ARRANGE_GROUP_INVALID);
+                return false;
+            }
+
+            // 1) 复制座位表，把「本次要重排的学生」先清出来（其余人锁定不动）
+            const nextSeats = currentSeats.slice(0, total);
+            while (nextSeats.length < total) nextSeats.push(null);
+            const movingIds = new Set();
+            buckets.forEach(function (b) {
+                b.members.forEach(function (m) { movingIds.add(m.id); });
+            });
+            for (let i = 0; i < total; i++) {
+                if (nextSeats[i] && movingIds.has(nextSeats[i])) nextSeats[i] = null;
+            }
+
+            // 2) 容量检查
+            let free = 0;
+            for (let i = 0; i < total; i++) if (!nextSeats[i]) free++;
+            if (free < movingIds.size) {
+                if (notify) alert(MESSAGES.ARRANGE_GROUP_NO_ROOM(movingIds.size, free));
+                return false;
+            }
+
+            // 3) 规划座位块
+            const blocked = nextSeats.map(function (v) { return v !== null; });
+            const plan = planGroupSeatSlots(
+                buckets.map(function (b) { return b.members.length; }), rows, cols, blocked);
+            if (!plan.ok) {
+                if (notify) {
+                    alert(plan.reason === 'capacity'
+                        ? MESSAGES.ARRANGE_GROUP_NO_ROOM(movingIds.size, free)
+                        : MESSAGES.ARRANGE_GROUP_INVALID);
+                }
+                return false;
+            }
+
+            // 4) 落座：members 已按 rank 升序，块内逐行填
+            plan.slots.forEach(function (slotList, bi) {
+                const members = buckets[bi].members;
+                for (let k = 0; k < members.length && k < slotList.length; k++) {
+                    nextSeats[slotList[k]] = members[k].id;
+                }
+            });
+
+            // 5) 就地写回（保持 currentSeats / state.seats 的引用不被打断）
+            for (let i = 0; i < total; i++) currentSeats[i] = nextSeats[i];
+            if (currentSeats.length > total) currentSeats.length = total;
+
+            commit({ seats: currentSeats });
+            generateSeats();
+            generateStudentList();
+            autoSave();
+            return plan;
+        }
+
+        // 「按组聚座」独立入口：仅重排座位，不改分组归属
+        function arrangeSeatsByGroupClick() {
+            pushSnapshot('arrange');
+            const plan = arrangeSeatsByGroup();
+            if (!plan) return;
+            const blocks = plan.blocks.length;
+            showStatToast('已按分组聚座' + (blocks > 0
+                ? '：' + blocks + ' 个组，每组 ' + plan.layout.bh + '行×' + plan.layout.bw + '列'
+                : ''));
+        }
+
         // 「按排名均衡分组」——分组设置栏 / 分组模式 banner 共用入口。
         // 询问组数后按排名蛇形顺序分配(每批 1..G 正序 / G..1 逆序交替),
         // 批内兼顾性别与班委数量;分组自动命名 1组/2组/…,并配不同的预设色。
+        // 分组完成后**顺带按组聚座**：同组学生坐在一片连续座位上。
         function balanceGroupsByRank() {
             if (students.length === 0) {
                 alert(MESSAGES.NO_STUDENTS_YET);
@@ -619,20 +716,84 @@ function normalizeRotateOffset(value) {
             groupCurrentStudentId = null;
 
             commit({ students: students, groups: groups });
+
+            // 分组的同时按组聚座：同组学生坐成一片（失败时不影响分组本身）
+            const layout = arrangeSeatsByGroup({ notify: false });
+
             updateGroupDisplay();
             updateStudentAssignmentDisplay();
-            generateSeats();
             renderGroupModeList();
             updateGroupModeCount();
             autoSave();
 
-            showStatToast('已按排名均衡分为 ' + plan.groupCount + ' 组');
+            showStatToast('已按排名均衡分为 ' + plan.groupCount + ' 组' +
+                (layout ? '，并已按组聚座' : ''));
         }
 
         balanceGroupBtn.addEventListener('click', function (e) {
             e.preventDefault();
             balanceGroupsByRank();
         });
+
+        if (arrangeGroupBtn) {
+            arrangeGroupBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                arrangeSeatsByGroupClick();
+            });
+        }
+
+        // ─────────── 分组均衡系数（排名带覆盖 60% + 性别 20% + 班委 20%）───────────
+        // 算法细节见 modules/group-balance.js；这里只负责取值与展示。
+        function getGroupBalance() {
+            return computeGroupBalance(students, groups);
+        }
+
+        function groupBalanceBadgeHtml(info, extraClass) {
+            if (!info || info.score === null) return '';
+            const score = roundScore(info.score);
+            const parts = ['排名 ' + roundScore(info.rankScore)];
+            if (info.genderScore !== null) {
+                parts.push('性别 ' + roundScore(info.genderScore) + '（男' + info.male + '/女' + info.female + '）');
+            }
+            if (info.cadreScore !== null) {
+                parts.push('班委 ' + roundScore(info.cadreScore) + '（' + info.cadre + ' 人）');
+            }
+            const title = '均衡系数 ' + score + '（' + parts.join(' · ') + '）\n' +
+                info.count + ' 人，平均排名 ' +
+                (info.avgRank === null ? '—' : info.avgRank.toFixed(1)) +
+                '\n越接近 100 越均衡';
+            return '<span class="group-balance-badge' + (extraClass ? ' ' + extraClass : '') +
+                '" data-level="' + info.level + '" title="' + escapeHtml(title) + '">' +
+                score + '</span>';
+        }
+
+        function renderGroupBalanceSummary(balance) {
+            const el = document.getElementById('groupBalanceSummary');
+            if (!el) return;
+            const overall = balance ? balance.overall : null;
+            if (!overall || overall.score === null) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+            const level = balanceLevel(overall.score);
+            const weakest = overall.weakestGroupId
+                ? balance.groups.find(function (g) { return g.groupId === overall.weakestGroupId; })
+                : null;
+            el.style.display = 'flex';
+            el.innerHTML =
+                '<span class="gbs-label">整体均衡</span>' +
+                '<span class="group-balance-badge gbs-score" data-level="' + level + '">' +
+                    roundScore(overall.score) + '</span>' +
+                '<span class="gbs-detail">极差 ' + roundScore(overall.spread) +
+                    (weakest && weakest.score !== null
+                        ? ' · 最弱 ' + escapeHtml(weakest.name) + ' ' + roundScore(weakest.score)
+                        : '') +
+                '</span>';
+            el.title = '均衡系数 = 排名带覆盖 60% + 性别 20% + 班委 20%（越接近 100 越均衡）\n' +
+                '排名带：把已分组学生按排名每 ' + overall.groupCount + ' 人切成一条带，' +
+                '理想状态是每条带里每个组各占一人；某组缺了某一层、或重复占同一层，系数就会下降。';
+        }
 
         // 分组列表渲染（纯渲染，事件由委托处理）
         function updateGroupDisplay() {
@@ -648,6 +809,11 @@ function normalizeRotateOffset(value) {
                     '</div>' +
                 '</div>';
 
+            // 均衡系数：先算一次，分组行与顶部汇总共用
+            const balance = getGroupBalance();
+            const balanceById = new Map();
+            balance.groups.forEach(function (g) { balanceById.set(g.groupId, g); });
+
             if (groups.length === 0) {
                 groupList.innerHTML = newRow;
             } else {
@@ -657,12 +823,14 @@ function normalizeRotateOffset(value) {
                             '<input type="text" class="group-name-input" value="' + escapeHtml(group.name) + '" data-group-id="' + escapeHtml(group.id) + '">' +
                         '</div>' +
                         '<div class="group-actions">' +
+                            groupBalanceBadgeHtml(balanceById.get(group.id)) +
                             '<input type="color" class="group-color-input" value="' + escapeHtml(group.color) + '" data-group-id="' + escapeHtml(group.id) + '">' +
                             '<button class="delete-btn group-delete-btn" data-group-id="' + escapeHtml(group.id) + '" title="删除分组">×</button>' +
                         '</div>' +
                     '</div>'
                 ).join('') + newRow;
             }
+            renderGroupBalanceSummary(balance);
             studentAssignment.style.display = 'block';
 
             // 分组数变化后,旧的轮换步长可能越界(例如 4 组时的 +3 在删到 2 组后失效)
@@ -1308,11 +1476,48 @@ function normalizeRotateOffset(value) {
         // ==================== 配对设置 ====================
         let activePairPopup = null;
 
-        function buildStudentOptions(excludeId) {
-            return students.map(function (s) {
-                if (s.id === excludeId) return '';
-                return '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.name) + '</option>';
-            }).join('');
+        // 配对设置里的学生选择：可按姓名输入搜索（原生 datalist 提供候选）
+        // 候选按排名升序，label 里显示「第N名」，方便老师按水平找学生。
+        const PAIR_DATALIST_ID = 'pairStudentSuggestions';
+
+        function buildPairDatalistHtml() {
+            const ordered = students.slice().sort(compareByRank);
+            return '<datalist id="' + PAIR_DATALIST_ID + '">' +
+                ordered.map(function (s) {
+                    const r = parseInt(s.rank, 10);
+                    const label = Number.isFinite(r) ? '第' + r + '名' : '';
+                    return '<option value="' + escapeHtml(s.name) + '"' +
+                        (label ? ' label="' + label + '"' : '') + '></option>';
+                }).join('') +
+            '</datalist>';
+        }
+
+        function pairSearchInputHtml(cls, placeholder) {
+            return '<input type="text" class="pair-search-input ' + cls + '"' +
+                ' list="' + PAIR_DATALIST_ID + '"' +
+                ' placeholder="' + escapeHtml(placeholder) + '"' +
+                ' autocomplete="off" spellcheck="false"' +
+                ' aria-label="' + escapeHtml(placeholder) + '">';
+        }
+
+        // 输入框里的文字 → 学生 id。
+        // 支持：完整姓名；唯一的姓名片段（会自动补全为完整姓名）。
+        function resolvePairStudent(input) {
+            const raw = String(input.value || '').trim();
+            if (!raw) return null;
+            const exact = students.filter(function (s) { return s.name === raw; });
+            if (exact.length === 1) return exact[0].id;
+            const hits = students.filter(function (s) { return s.name.indexOf(raw) >= 0; });
+            if (hits.length === 1) {
+                input.value = hits[0].name;
+                return hits[0].id;
+            }
+            if (hits.length > 1) {
+                alert(MESSAGES.PAIR_STUDENT_AMBIGUOUS(raw, hits.length));
+            } else {
+                alert(MESSAGES.PAIR_STUDENT_NOT_FOUND(raw));
+            }
+            return null;
         }
 
         function pairKey(idA, idB) {
@@ -1426,16 +1631,14 @@ function normalizeRotateOffset(value) {
             popup.setAttribute('aria-modal', 'true');
             popup.setAttribute('aria-labelledby', 'pairPopupTitle');
 
-            var studentOpts = students.length > 0
-                ? students.map(function (s) { return '<option value="' + escapeHtml(s.id) + '">' + escapeHtml(s.name) + '</option>'; }).join('')
-                : '';
             popup.innerHTML =
                 '<div class="pair-popup-title" id="pairPopupTitle">配对设置</div>' +
+                buildPairDatalistHtml() +
                 '<div class="pair-popup-section">' +
                     '<div class="pair-popup-section-title">强制同桌</div>' +
                     '<div class="pair-popup-row">' +
-                        '<select class="pair-forced-a"><option value="">选择学生A</option>' + studentOpts + '</select>' +
-                        '<select class="pair-forced-b"><option value="">选择学生B</option>' + studentOpts + '</select>' +
+                        pairSearchInputHtml('pair-forced-a', '搜索姓名 A') +
+                        pairSearchInputHtml('pair-forced-b', '搜索姓名 B') +
                         '<button class="mini-btn pair-forced-add">添加</button>' +
                     '</div>' +
                     '<div class="pair-forced-list"></div>' +
@@ -1443,8 +1646,8 @@ function normalizeRotateOffset(value) {
                 '<div class="pair-popup-section">' +
                     '<div class="pair-popup-section-title">回避同桌</div>' +
                     '<div class="pair-popup-row">' +
-                        '<select class="pair-avoid-a"><option value="">选择学生A</option>' + studentOpts + '</select>' +
-                        '<select class="pair-avoid-b"><option value="">选择学生B</option>' + studentOpts + '</select>' +
+                        pairSearchInputHtml('pair-avoid-a', '搜索姓名 A') +
+                        pairSearchInputHtml('pair-avoid-b', '搜索姓名 B') +
                         '<button class="mini-btn pair-avoid-add">添加</button>' +
                     '</div>' +
                     '<div class="pair-avoid-list"></div>' +
@@ -1486,36 +1689,52 @@ function normalizeRotateOffset(value) {
                 popup.classList.add('visible');
             });
 
-            // 添加强制配对
-            popup.querySelector('.pair-forced-add').addEventListener('click', function () {
-                var a = popup.querySelector('.pair-forced-a').value;
-                var b = popup.querySelector('.pair-forced-b').value;
-                if (!a || !b || a === b) { alert(MESSAGES.PAIR_SELECT_TWO_DIFFERENT); return; }
-                var key = pairKey(a, b);
-                if (forcedPairs.some(function (p) { return pairKey(p[0], p[1]) === key; })) {
-                    alert(MESSAGES.PAIR_ALREADY_EXISTS); return;
+            // 添加配对（强制 / 回避共用一套逻辑）—— 输入框里填的是**姓名**
+            function addPairFromInputs(type) {
+                var inputA = popup.querySelector('.pair-' + type + '-a');
+                var inputB = popup.querySelector('.pair-' + type + '-b');
+                if (!inputA || !inputB) return;
+                if (!String(inputA.value).trim() || !String(inputB.value).trim()) {
+                    alert(MESSAGES.PAIR_SELECT_TWO_DIFFERENT);
+                    return;
                 }
-                forcedPairs.push([a, b]);
-                popup.querySelector('.pair-forced-a').value = '';
-                popup.querySelector('.pair-forced-b').value = '';
+                var a = resolvePairStudent(inputA);
+                if (!a) return;
+                var b = resolvePairStudent(inputB);
+                if (!b) return;
+                if (a === b) { alert(MESSAGES.PAIR_SELECT_TWO_DIFFERENT); return; }
+                var pairs = type === 'forced' ? forcedPairs : avoidPairs;
+                var key = pairKey(a, b);
+                if (pairs.some(function (p) { return pairKey(p[0], p[1]) === key; })) {
+                    alert(MESSAGES.PAIR_ALREADY_EXISTS);
+                    return;
+                }
+                pairs.push([a, b]);
+                inputA.value = '';
+                inputB.value = '';
                 renderAll();
                 autoSave();
+                // 连续录入：焦点回到 A
+                if (inputA.focus) inputA.focus();
+            }
+
+            popup.querySelector('.pair-forced-add').addEventListener('click', function () {
+                addPairFromInputs('forced');
             });
 
-            // 添加回避配对
             popup.querySelector('.pair-avoid-add').addEventListener('click', function () {
-                var a = popup.querySelector('.pair-avoid-a').value;
-                var b = popup.querySelector('.pair-avoid-b').value;
-                if (!a || !b || a === b) { alert(MESSAGES.PAIR_SELECT_TWO_DIFFERENT); return; }
-                var key = pairKey(a, b);
-                if (avoidPairs.some(function (p) { return pairKey(p[0], p[1]) === key; })) {
-                    alert(MESSAGES.PAIR_ALREADY_EXISTS); return;
-                }
-                avoidPairs.push([a, b]);
-                popup.querySelector('.pair-avoid-a').value = '';
-                popup.querySelector('.pair-avoid-b').value = '';
-                renderAll();
-                autoSave();
+                addPairFromInputs('avoid');
+            });
+
+            // 输入姓名后直接回车 = 点「添加」，方便连续录入
+            popup.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter') return;
+                var t = e.target;
+                if (!t || !t.classList || !t.classList.contains('pair-search-input')) return;
+                e.preventDefault();
+                var type = (t.classList.contains('pair-forced-a') ||
+                    t.classList.contains('pair-forced-b')) ? 'forced' : 'avoid';
+                addPairFromInputs(type);
             });
 
             // 删除配对
@@ -2346,13 +2565,20 @@ function isWholeWordMatch(label, keyword) {
                 list.innerHTML = '<span class="group-mode-empty">暂无分组</span>';
                 return;
             }
+            // 每个分组按钮上带一个均衡系数徽标,方便一眼看出哪组最需要调整
+            const balance = getGroupBalance();
+            const balanceById = new Map();
+            balance.groups.forEach(function (g) { balanceById.set(g.groupId, g); });
+
             list.innerHTML = groups.map(function (g) {
                 return '<button type="button" class="group-mode-group-btn' +
                     (g.id === groupFocusId ? ' active' : '') + '" data-group-id="' +
                     escapeHtml(g.id) + '" title="未选学生时点击：查看「' +
                     escapeHtml(g.name) + '」成员；选中学生后点击：分配到该组；长按：删除该分组"' +
                     (g.color ? ' style="background:' + escapeHtml(g.color) + '"' : '') + '>' +
-                    escapeHtml(g.name) + '</button>';
+                    '<span class="group-mode-name">' + escapeHtml(g.name) + '</span>' +
+                    groupBalanceBadgeHtml(balanceById.get(g.id), 'group-mode-balance') +
+                    '</button>';
             }).join('');
         }
 
@@ -2598,7 +2824,8 @@ function isWholeWordMatch(label, keyword) {
 
         function getUnassignedStudents() {
             const assignedIds = new Set(currentSeats.filter(s => s !== null));
-            return students.filter(s => !assignedIds.has(s.id));
+            // 名单类界面统一按排名升序呈现
+            return students.filter(s => !assignedIds.has(s.id)).sort(compareByRank);
         }
 
         // 生成学生名单（只显示未安排座位的学生）
@@ -4805,6 +5032,8 @@ function isWholeWordMatch(label, keyword) {
                     list = students.filter(function (s) { return groupModeSelectedIds.has(s.id); });
                     break;
             }
+            // 交给 UI 的名单一律按排名升序（复制姓名 / 导出 Excel 都走这里）
+            list = list.slice().sort(compareByRank);
             return { statId: statId, title: title, students: list };
         }
 
@@ -4880,17 +5109,19 @@ function isWholeWordMatch(label, keyword) {
                 showStatToast('Excel 库未加载，无法导出');
                 return;
             }
-            const aoa = [['姓名', '性别', '标签', '分组', '签到']];
+            // 名单导出：第一列是排名（ctx.students 已按排名升序）
+            const aoa = [['排名', '姓名', '性别', '标签', '分组', '签到']];
             ctx.students.forEach(function (s) {
                 const group = s.groupId ? getGroupById(s.groupId) : null;
                 const groupName = group ? group.name : '未分组';
                 const checkinText = s.checkedIn ? '是' : '否';
                 const genderText = s.gender === 'male' ? '男' : (s.gender === 'female' ? '女' : '');
                 const tagsText = (s.tags || []).map(function (t) { return t.label; }).join('、');
-                aoa.push([s.name, genderText, tagsText, groupName, checkinText]);
+                const rankNum = parseInt(s.rank, 10);
+                aoa.push([Number.isFinite(rankNum) ? rankNum : '', s.name, genderText, tagsText, groupName, checkinText]);
             });
             const ws = XLSX.utils.aoa_to_sheet(aoa);
-            ws['!cols'] = [{ wch: 14 }, { wch: 6 }, { wch: 20 }, { wch: 16 }, { wch: 8 }];
+            ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 6 }, { wch: 20 }, { wch: 16 }, { wch: 8 }];
             const wb = XLSX.utils.book_new();
             const sheetName = (ctx.title || '学生名单').slice(0, 28);
             XLSX.utils.book_append_sheet(wb, ws, sheetName);

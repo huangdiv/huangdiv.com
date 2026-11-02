@@ -164,12 +164,12 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 
 ## 3. 架构现状（2026-09-20 快照）
 
-### 3.1 文件与行数（2026-11-02 更新）
+### 3.1 文件与行数（2026-11-02 第二次更新）
 ```
 static/
-├── seats-generator.html    440 行   入口（<link>/<script type="module"> + DOM 骨架）
-├── seats-generator.css    3661 行   全部样式（含打印 @media、:focus-visible）
-├── seats-generator.js     4956 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水）
+├── seats-generator.html    444 行   入口（<link>/<script type="module"> + DOM 骨架）
+├── seats-generator.css    3780 行   全部样式（含打印 @media、:focus-visible）
+├── seats-generator.js     5187 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
 │   ├── migrate.js          175 行   migrateConfig（老数据字段补默认/clamp/version，含 rank）+ APP_VERSION
@@ -178,8 +178,10 @@ static/
 │   ├── random-arrange.js  1158 行   createRandomArrange(deps)：排座引擎 + 分组轮换 + 性别规则 + 配对修复
 │   ├── csv-export.js       120 行   buildSeatCsv / 文件名 / 转义（纯函数）
 │   ├── student-rank.js     309 行   排名解析/排序/班委识别/蛇形均衡分组（纯函数）
-│   └── messages.js         131 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
-└── tests/                         9 个 Node ESM 单元测试（见 §5）
+│   ├── group-balance.js    279 行   分组「均衡系数」（排名带覆盖 + 性别 + 班委，纯函数）
+│   ├── group-layout.js     216 行   按组聚座的座位块规划（chooseBlockShape / planGroupSeatSlots，纯函数）
+│   └── messages.js         139 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
+└── tests/                         11 个 Node ESM 单元测试（见 §5）
 ```
 
 ### 3.2 核心设计模式
@@ -241,12 +243,40 @@ static/
   班委由标签文本识别（`isCadreStudent`，关键词见 `CADRE_KEYWORDS`）。
   分组命名 `1组/2组/…`、配色取 `distinctColors` 前 N 个，会清空并重建全部分组（可撤销）。
 
+### 3.6 按组聚座 + 分组均衡系数（2026-11-02 新增）
+
+**按组聚座**（`group-layout.js`，纯几何）——把同组学生收拢成一片连续座位：
+- `chooseBlockShape(sizes, rows, cols)` 为每组选统一的矩形块 `bh × bw`（必须 `bh·bw ≥ 最大组人数`），
+  在可行候选里按代价取最优：`4·块内空位 + 形状惩罚 + 0.5·占用总行数 + 0.4·右侧余列`，
+  形状惩罚基于「组**实际占用**的行列数之差」，超过 2 的部分重罚（题目要求）。
+  代价相差 ≤0.5 时优先更宽的块 ⇒ 6 人 6 组稳定得到 `2×3`（`3×2` 同样合法）。
+- `planGroupSeatSlots(sizes, rows, cols, blocked)` 把块按「从左到右、从上到下」分配给各组，
+  块内 **row-major** 填座；`blocked` 座位（未分组/不参与重排的学生）直接跳过，块内坐不满的
+  再全表补位；实在铺不下块时退化为「顺序连续排」（一组一段连续座位，仍算聚拢）。
+- 主 IIFE 的 `arrangeSeatsByGroup()`：**先把要重排的学生清出来**（其余人锁定不动）→ 容量检查 →
+  规划 → 逐组落座 → **就地写回 `currentSeats`**（保持引用，勿整体重赋值）→ `commit({seats})` +
+  `generateSeats()` + `generateStudentList()` + `autoSave()`。
+- 两个入口：①「按排名均衡分组」分组后**自动**聚座；②分组设置标题右侧「按组聚座」按钮，
+  仅重排座位、不改分组归属（用于手动调整分组之后）。
+
+**分组均衡系数**（`group-balance.js`）——0~100，越高越均衡，便于横向对比后手动微调：
+- 三维加权：**排名 0.6 + 性别 0.2 + 班委 0.2**；缺数据的维度自动剔除并重新归一化权重。
+- **排名维度用「排名带覆盖度」而不是「平均排名偏差」**：把已分组学生按 rank 排队，每 G 人切一条带
+  （G = 非空组数）——一条带里每组各一人正是蛇形分组的理想形态。逐组算
+  `dev = Σ_b |c_b − bandSize_b/G|`，`score = 100·max(0, 1 − dev/(2k))`。
+  ⚠️ **曾经用「组均值 vs 全班均值」**：按名次整块切分（1-6 / 7-12 / 13-18）时中间那组均值恰好
+  等于全班均值 ⇒ 被判成 100 分，完全看不出问题。带覆盖度没有这个盲区。
+- 展示：分组行徽标（`.group-balance-badge`，`data-level` 分 good/fair/poor 三色）、
+  分组设置顶部整体汇总（整体分 + 极差 + 最弱组）、分组模式 banner 分组按钮内徽标；
+  `title` 里给出逐维度分数与「男X/女Y、班委 N 人、平均排名」，便于解释「为什么这组 82 分」。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | 名单/Excel 统一按排名呈现 + 配对设置改「输入姓名搜索」+ 均衡分组时**按组聚座** + 分组**均衡系数**（分组栏 / 分组 banner / 顶部汇总） |
 | `7ba8d2d` | 学生**排名**属性 + 导入改「增量合并」+ 座位右下角排名数字 + 「按排名均衡分组」（分组栏 / 分组 banner 双入口） |
 | `fb4de80` | 开「隐藏图标」时同步隐藏「X排Y列」坐标标签 |
 | `776ee3b` | 修复「男女不同桌/同桌」随机排座达成率低（换座守卫+性别感知落座+全班收尾修复） |
@@ -284,13 +314,13 @@ static/
 
 ### 5.1 单元测试（Node ESM，零依赖）
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
-- 9 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
+- 11 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
-  `unit_student_rank`。
+  `unit_student_rank` / `unit_group_layout` / `unit_group_balance`。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 24 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 25 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -306,11 +336,18 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   本机代理下这两个请求常挂住（`domcontentloaded` 30s 超时），且大文件会被**截断**（下载 946KB 仍是残片）。
   跑导入相关用例时用 `page.route` 把这两个 URL 拦下注入桩 —— 见 `smoke_test_batch24`：
   仍上传真实 `.xlsx`、仍走真实 `FileReader`，只把 `XLSX.read` / `utils.sheet_to_json` 换成返回行数组的桩。
+- **要断言「导出的 Excel 内容」时**：页面加载后用 `page.evaluate` 覆写
+  `window.XLSX = {utils:{aoa_to_sheet: aoa => (window.__lastAoa = aoa, {}), book_new, book_append_sheet}, writeFile(){}}`，
+  再点「下载 Excel」，直接读 `window.__lastAoa` 断言表头与行序 —— 不依赖 CDN、不产生真实下载
+  （`smoke_test_batch25`）。
 - **同一个 `#fileInput` 选同一路径不会触发 `change`** ⇒ 需要「第二次导入」时用另一个文件名
   （或先 `value=''`），否则预览区不刷新、断言会卡在元素不可见。
 - **折叠面板里的控件不可见**：点击 `[data-target="ioPanel"]` / `[data-target="studentManagement"]`
   展开后再操作，否则 Playwright 报 `element is not visible`。
 - 浏览器启动加 `args=["--no-proxy-server"]`；Playwright 装在 system Python 的 site-packages。
+- ⚠️ **老批次（batch10~13 等）没打桩**：它们用 `page.goto(BASE)`（默认等 `load`），
+  在本机代理下会**卡 30s 超时**，不是代码回归。要跑它们得临时补两行 `page.route` 桩 +
+  改 `wait_until="domcontentloaded"`（2026-11-02 用临时副本验证 batch12 17/17 通过）。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
 - `window.__seatsTest`：`rotateGroupSeats` / `randomSeatArrange`（驱动带撤销与 UI 回调的真实实例）。
@@ -355,6 +392,9 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - 文案集中到 `MESSAGES` 时保持 **byte-for-byte** 一致，既有 unit 断言无需改。
 - 追加 `messages.js` 常量后确认闭合 `};`（否则 `Unexpected end of input`）。
 - 盘点「剩余优化项」时先 grep 已修项，避免做无用功（批次1 三项里两项早已隐性修复）。
+- **设计「均衡/健康度」类指标时，先想清楚「哪种坏情况会被这个指标误判成好」**：
+  「组均排名 vs 全班均值」会把「按名次整块切」的中间组判成满分（均值恰好相等）。
+  改用**分布覆盖**类指标（每条排名带每组各一人）才没有盲区 —— 见 §3.6。
 
 ---
 

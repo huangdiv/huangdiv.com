@@ -25,7 +25,7 @@
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.3.3';
+export const APP_VERSION = '1.3.4';
 
 // === 工具 ===
 function generateId(prefix) {

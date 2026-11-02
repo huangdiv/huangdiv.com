@@ -31,6 +31,11 @@ export const MESSAGES = {
     CONFIRM_BALANCE_GROUP: (existing, next) =>
         `当前已有 ${existing} 个分组，将全部清空并重新分成 ${next} 组。\n` +
         `学生现有的分组归属会被覆盖（可用「撤销」恢复），是否继续？`,
+    // —— 按组聚座 ——
+    ARRANGE_GROUP_NO_GROUPS: '还没有任何分组（或分组里没有学生），无法按组聚座',
+    ARRANGE_GROUP_INVALID: '座位表行列数无效，无法按组聚座',
+    ARRANGE_GROUP_NO_ROOM: (need, free) =>
+        `座位不够：本次需要 ${need} 个座位，当前只剩 ${free} 个空座位`,
 
     // —— 学生 ——
     STUDENT_NAME_REQUIRED: '请输入学生姓名',
@@ -42,6 +47,9 @@ export const MESSAGES = {
     // —— 配对 ——
     PAIR_SELECT_TWO_DIFFERENT: '请选择两位不同的学生',
     PAIR_ALREADY_EXISTS: '该配对已存在',
+    PAIR_STUDENT_NOT_FOUND: (name) => `没有找到姓名为「${name}」的学生`,
+    PAIR_STUDENT_AMBIGUOUS: (name, count) =>
+        `「${name}」匹配到 ${count} 名学生，请把姓名输入得更完整`,
 
     // —— 导出 ——
     EXPORT_FAILED: '导出图片失败，请重试！',

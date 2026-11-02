@@ -2449,6 +2449,101 @@ button:disabled {
     box-sizing: border-box;
 }
 
+/* ───────── 分组均衡系数 ───────── */
+/* 章节标题右侧的多按钮容器（分组设置：「按组聚座」+「按排名均衡分组」） */
+.section-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+
+/* 均衡系数徽标：分组行 / 分组模式 banner / 顶部汇总共用 */
+.group-balance-badge {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    cursor: help;
+    border: 1px solid transparent;
+    box-sizing: border-box;
+}
+
+.group-balance-badge[data-level="good"] {
+    background: #e8f7ee;
+    color: #1b7f45;
+    border-color: #b7e4c9;
+}
+
+.group-balance-badge[data-level="fair"] {
+    background: #fff6e5;
+    color: #9a6100;
+    border-color: #f5dca8;
+}
+
+.group-balance-badge[data-level="poor"] {
+    background: #fdeceb;
+    color: #b3261e;
+    border-color: #f5c6c2;
+}
+
+/* 分组设置上方的整体均衡汇总 */
+.group-balance-summary {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding: 4px 8px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: help;
+    overflow: hidden;
+}
+
+.group-balance-summary .gbs-label {
+    flex: none;
+    font-weight: 600;
+}
+
+.group-balance-summary .gbs-score {
+    height: 18px;
+    min-width: 30px;
+    font-size: 11px;
+}
+
+.group-balance-summary .gbs-detail {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+/* 分组模式 banner 里：分组名 + 系数徽标 */
+.group-mode-group-btn .group-mode-name {
+    vertical-align: middle;
+}
+
+.group-mode-group-btn .group-mode-balance {
+    margin-left: 5px;
+    vertical-align: middle;
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #1a1a1a;
+}
+
 /* 批量操作工具栏 - 新版风格 */
 .batch-toolbar {
     display: none;
@@ -3251,6 +3346,30 @@ button:disabled {
     border-radius: 3px;
     font-size: 12px;
     box-sizing: border-box;
+}
+
+/* 配对设置里的「输入姓名搜索」输入框（原生 datalist 提供候选） */
+.pair-popup .pair-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 26px;
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+.pair-popup .pair-search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.pair-popup .pair-search-input::placeholder {
+    color: var(--text-muted);
 }
 
 .pair-popup .mini-btn {
