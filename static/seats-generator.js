@@ -13,12 +13,13 @@ import {
 } from './modules/student-rank.js';
 import { computeGroupBalance, balanceLevel, roundScore } from './modules/group-balance.js';
 import { planGroupSeatSlots } from './modules/group-layout.js';
+import { ZONE_DEFS, ZONE_IDS, isZoneId } from './modules/zone.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.3.5';
+        const APP_VERSION = '1.4.0';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -1476,35 +1477,119 @@ function normalizeRotateOffset(value) {
         // ==================== 配对设置 ====================
         let activePairPopup = null;
 
-        // 配对设置里的学生选择：可按姓名输入搜索（原生 datalist 提供候选）
-        // 候选按排名升序，label 里显示「第N名」，方便老师按水平找学生。
-        const PAIR_DATALIST_ID = 'pairStudentSuggestions';
-
-        function buildPairDatalistHtml() {
-            const ordered = students.slice().sort(compareByRank);
-            return '<datalist id="' + PAIR_DATALIST_ID + '">' +
-                ordered.map(function (s) {
-                    const r = parseInt(s.rank, 10);
-                    const label = Number.isFinite(r) ? '第' + r + '名' : '';
-                    return '<option value="' + escapeHtml(s.name) + '"' +
-                        (label ? ' label="' + label + '"' : '') + '></option>';
-                }).join('') +
-            '</datalist>';
-        }
+        // 配对设置里的学生选择：可按姓名输入搜索。
+        // 候选列表是**自绘**的（不再用原生 <datalist>）：
+        //   原生 datalist 的每一项高度由浏览器决定、且没法把「第N名」放到名字右侧，
+        //   一个班几十人时列表很高、一屏看不了几项。自绘列表可以：
+        //     · 姓名靠左、名次靠右（第N名，弱化色、等宽数字）
+        //     · 行高 24px + 最大高度 8 行 ⇒ 一屏能看到更多候选
+        //     · 支持 ↑/↓ 选择、Enter 确认、Esc 收起
+        let pairSuggestSeq = 0;
 
         function pairSearchInputHtml(cls, placeholder) {
-            return '<input type="text" class="pair-search-input ' + cls + '"' +
-                ' list="' + PAIR_DATALIST_ID + '"' +
+            const listId = 'pairSuggest' + (++pairSuggestSeq);
+            return '<div class="pair-search-wrap">' +
+                '<input type="text" class="pair-search-input ' + cls + '"' +
                 ' placeholder="' + escapeHtml(placeholder) + '"' +
                 ' autocomplete="off" spellcheck="false"' +
-                ' aria-label="' + escapeHtml(placeholder) + '">';
+                ' role="combobox" aria-autocomplete="list" aria-expanded="false"' +
+                ' aria-controls="' + listId + '"' +
+                ' aria-label="' + escapeHtml(placeholder) + '">' +
+                '<div class="pair-suggest" id="' + listId + '" role="listbox" hidden></div>' +
+            '</div>';
+        }
+
+        // 按输入内容过滤候选；空前缀 = 全部（按排名升序）
+        function pairSuggestHits(query) {
+            const q = String(query || '').trim();
+            const ordered = students.slice().sort(compareByRank);
+            if (!q) return ordered;
+            const isNum = /^\d+$/.test(q);
+            return ordered.filter(function (s) {
+                if (s.name.indexOf(q) >= 0) return true;
+                if (isNum && String(parseInt(s.rank, 10) || '').indexOf(q) === 0) return true;
+                return false;
+            });
+        }
+
+        function pairSuggestItemHtml(s) {
+            const r = parseInt(s.rank, 10);
+            return '<div class="pair-suggest-item" role="option" aria-selected="false"' +
+                ' data-student-id="' + escapeHtml(s.id) + '">' +
+                '<span class="psi-name">' + escapeHtml(s.name) + '</span>' +
+                '<span class="psi-rank">' + (Number.isFinite(r) ? '第' + r + '名' : '') + '</span>' +
+            '</div>';
+        }
+
+        function closePairSuggest(input) {
+            if (!input) return;
+            const list = input.parentNode && input.parentNode.querySelector('.pair-suggest');
+            if (!list) return;
+            list.hidden = true;
+            list.innerHTML = '';
+            input.setAttribute('aria-expanded', 'false');
+        }
+
+        function closeAllPairSuggests(scope) {
+            const root = scope || document;
+            root.querySelectorAll('.pair-search-input').forEach(closePairSuggest);
+        }
+
+        // 打开候选（focus / 输入时调用）：按当前输入过滤并重建列表
+        function openPairSuggest(input) {
+            if (!input || input.disabled) return;
+            const list = input.parentNode && input.parentNode.querySelector('.pair-suggest');
+            if (!list) return;
+            const hits = pairSuggestHits(input.value);
+            list.innerHTML = hits.length
+                ? hits.map(pairSuggestItemHtml).join('')
+                : '<div class="pair-suggest-empty">没有匹配的学生</div>';
+            list.hidden = false;
+            input.setAttribute('aria-expanded', 'true');
+        }
+
+        // ↑/↓ 在候选里移动高亮；返回当前高亮项
+        function movePairSuggest(input, delta) {
+            const list = input.parentNode && input.parentNode.querySelector('.pair-suggest');
+            if (!list || list.hidden) return null;
+            const items = Array.prototype.slice.call(list.querySelectorAll('.pair-suggest-item'));
+            if (items.length === 0) return null;
+            let cur = items.findIndex(function (el) { return el.classList.contains('active'); });
+            if (cur < 0) cur = delta > 0 ? -1 : items.length;
+            let next = cur + delta;
+            if (next < 0) next = items.length - 1;
+            if (next >= items.length) next = 0;
+            items.forEach(function (el, i) {
+                el.classList.toggle('active', i === next);
+                el.setAttribute('aria-selected', i === next ? 'true' : 'false');
+            });
+            const active = items[next];
+            if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+            return active;
+        }
+
+        // 选中候选：输入框显示姓名，同时记下学生 id（同名学生也能区分）
+        function pickPairSuggest(input, item) {
+            if (!input || !item) return;
+            const id = item.getAttribute('data-student-id');
+            const stu = students.find(function (s) { return s.id === id; });
+            if (!stu) return;
+            input.value = stu.name;
+            input.setAttribute('data-student-id', stu.id);
+            closePairSuggest(input);
         }
 
         // 输入框里的文字 → 学生 id。
-        // 支持：完整姓名；唯一的姓名片段（会自动补全为完整姓名）。
+        // 支持：下拉点选（优先）；完整姓名；唯一的姓名片段（会自动补全为完整姓名）。
         function resolvePairStudent(input) {
             const raw = String(input.value || '').trim();
             if (!raw) return null;
+            // 点选过且文字没被改写 ⇒ 直接用记下的 id（避免同名学生取错人）
+            const picked = input.getAttribute('data-student-id');
+            if (picked) {
+                const p = students.find(function (s) { return s.id === picked; });
+                if (p && p.name === raw) return p.id;
+            }
             const exact = students.filter(function (s) { return s.name === raw; });
             if (exact.length === 1) return exact[0].id;
             const hits = students.filter(function (s) { return s.name.indexOf(raw) >= 0; });
@@ -1633,7 +1718,6 @@ function normalizeRotateOffset(value) {
 
             popup.innerHTML =
                 '<div class="pair-popup-title" id="pairPopupTitle">配对设置</div>' +
-                buildPairDatalistHtml() +
                 '<div class="pair-popup-section">' +
                     '<div class="pair-popup-section-title">强制同桌</div>' +
                     '<div class="pair-popup-row">' +
@@ -1712,6 +1796,10 @@ function normalizeRotateOffset(value) {
                 pairs.push([a, b]);
                 inputA.value = '';
                 inputB.value = '';
+                inputA.removeAttribute('data-student-id');
+                inputB.removeAttribute('data-student-id');
+                closePairSuggest(inputA);
+                closePairSuggest(inputB);
                 renderAll();
                 autoSave();
                 // 连续录入：焦点回到 A
@@ -1726,12 +1814,58 @@ function normalizeRotateOffset(value) {
                 addPairFromInputs('avoid');
             });
 
-            // 输入姓名后直接回车 = 点「添加」，方便连续录入
-            popup.addEventListener('keydown', function (e) {
-                if (e.key !== 'Enter') return;
+            // 候选列表：聚焦即展开、输入即过滤、点选即填入
+            popup.addEventListener('focusin', function (e) {
                 var t = e.target;
                 if (!t || !t.classList || !t.classList.contains('pair-search-input')) return;
+                openPairSuggest(t);
+            });
+
+            popup.addEventListener('input', function (e) {
+                var t = e.target;
+                if (!t || !t.classList || !t.classList.contains('pair-search-input')) return;
+                // 手改了文字 ⇒ 之前点选记下的 id 作废，回到按文字解析
+                t.removeAttribute('data-student-id');
+                openPairSuggest(t);
+            });
+
+            // 用 mousedown 而不是 click：避免 blur 先把候选收起来导致点不中
+            popup.addEventListener('mousedown', function (e) {
+                var item = e.target.closest ? e.target.closest('.pair-suggest-item') : null;
+                if (!item) return;
                 e.preventDefault();
+                var wrap = item.closest('.pair-search-wrap');
+                var input = wrap && wrap.querySelector('.pair-search-input');
+                pickPairSuggest(input, item);
+            });
+
+            popup.addEventListener('focusout', function (e) {
+                var t = e.target;
+                if (!t || !t.classList || !t.classList.contains('pair-search-input')) return;
+                // 让 mousedown 有机会先处理点选，再收起候选
+                setTimeout(function () { closePairSuggest(t); }, 120);
+            });
+
+            // 输入姓名后直接回车 = 点「添加」，方便连续录入；↑/↓ 在候选里移动
+            popup.addEventListener('keydown', function (e) {
+                var t = e.target;
+                if (!t || !t.classList || !t.classList.contains('pair-search-input')) return;
+
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (t.parentNode.querySelector('.pair-suggest').hidden) openPairSuggest(t);
+                    movePairSuggest(t, e.key === 'ArrowDown' ? 1 : -1);
+                    return;
+                }
+                if (e.key === 'Escape') {
+                    closePairSuggest(t);
+                    return;
+                }
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                // 有高亮候选 ⇒ 先选中它并把名字填进输入框，再执行添加
+                var active = t.parentNode.querySelector('.pair-suggest .pair-suggest-item.active');
+                if (active) pickPairSuggest(t, active);
                 var type = (t.classList.contains('pair-forced-a') ||
                     t.classList.contains('pair-forced-b')) ? 'forced' : 'avoid';
                 addPairFromInputs(type);
@@ -1808,6 +1942,181 @@ function normalizeRotateOffset(value) {
                 closePairPopup();
             }
         });
+
+        // ==================== 区域设置（智能排座 → 九宫格） ====================
+        // 教室按 行数三等分（前/中/后）× 列数三等分（左/中/右）划成 9 个区域。
+        // 每名学生可设一个「倾向区域」（尽量安排进去）和一个「避开区域」（尽量不安排进去），
+        // 二者都是**软约束**：排座引擎在保证配对/性别等硬约束的前提下做等价换座。
+        let activeZonePopup = null;
+
+        function zoneOptionsHtml(selected) {
+            const cur = isZoneId(selected) ? selected : '';
+            return '<option value="">不设置</option>' + ZONE_DEFS.map(function (d) {
+                return '<option value="' + d.id + '"' + (d.id === cur ? ' selected' : '') + '>' +
+                    d.name + '</option>';
+            }).join('');
+        }
+
+        function zoneRowHtml(student) {
+            const r = parseInt(student.rank, 10);
+            return '<div class="zone-row" data-student-id="' + escapeHtml(student.id) + '">' +
+                '<span class="zone-row-name">' + escapeHtml(student.name) + '</span>' +
+                '<span class="zone-row-rank">' + (Number.isFinite(r) ? r : '') + '</span>' +
+                '<select class="zone-select zone-pref" data-field="zonePref" aria-label="倾向区域">' +
+                    zoneOptionsHtml(student.zonePref) + '</select>' +
+                '<select class="zone-select zone-avoid" data-field="zoneAvoid" aria-label="避开区域">' +
+                    zoneOptionsHtml(student.zoneAvoid) + '</select>' +
+            '</div>';
+        }
+
+        // 每个区域各有多少人「想坐」「避开」（弹窗顶部 3×3 预览用）
+        function zonePrefCounts() {
+            const counts = {};
+            ZONE_IDS.forEach(function (id) { counts[id] = { prefer: 0, avoid: 0 }; });
+            students.forEach(function (s) {
+                if (isZoneId(s.zonePref)) counts[s.zonePref].prefer++;
+                if (isZoneId(s.zoneAvoid)) counts[s.zoneAvoid].avoid++;
+            });
+            return counts;
+        }
+
+        function refreshZoneGrid(popup) {
+            const grid = popup.querySelector('.zone-grid');
+            if (!grid) return;
+            const counts = zonePrefCounts();
+            grid.innerHTML = ZONE_DEFS.map(function (d) {
+                const c = counts[d.id];
+                const tags = (c.prefer ? '<span class="zone-cell-pref">' + c.prefer + ' 想坐</span>' : '') +
+                    (c.avoid ? '<span class="zone-cell-avoid">' + c.avoid + ' 避开</span>' : '');
+                return '<div class="zone-cell" data-zone-id="' + d.id + '">' +
+                    '<span class="zone-cell-name">' + d.name + '</span>' +
+                    (tags ? '<span class="zone-cell-counts">' + tags + '</span>' : '') +
+                '</div>';
+            }).join('');
+        }
+
+        // 菜单项文字上的「已设置人数」角标
+        function updateZoneMenuLabel() {
+            const label = document.querySelector('[data-action="zoneSettings"] .zone-settings-label');
+            if (!label) return;
+            const n = students.filter(function (s) {
+                return isZoneId(s.zonePref) || isZoneId(s.zoneAvoid);
+            }).length;
+            label.textContent = '区域设置' + (n > 0 ? ' [' + n + ']' : '');
+        }
+
+        function openZonePopup(anchorEl) {
+            if (activeZonePopup) { closeZonePopup(); return; }
+            if (activePairPopup) closePairPopup();
+
+            const container = ensureTagPopupContainer();
+            const popup = document.createElement('div');
+            popup.className = 'pair-popup zone-popup';
+            popup.setAttribute('role', 'dialog');
+            popup.setAttribute('aria-modal', 'true');
+            popup.setAttribute('aria-label', '区域设置');
+
+            const ordered = students.slice().sort(compareByRank);
+            popup.innerHTML =
+                '<div class="pair-popup-title">区域设置</div>' +
+                '<div class="zone-hint">教室按行数三等分（前/中/后）、列数三等分（左/中/右），共 9 个区域。' +
+                    '「倾向」尽量安排进去，「避开」尽量不安排进去；排座时会优先保证配对与性别规则。</div>' +
+                '<div class="zone-grid"></div>' +
+                '<input type="text" class="zone-filter" placeholder="搜索姓名（留空显示全部）"' +
+                    ' autocomplete="off" spellcheck="false" aria-label="搜索学生姓名">' +
+                '<div class="zone-head"><span>姓名</span><span>排名</span><span>倾向</span><span>避开</span></div>' +
+                '<div class="zone-list">' +
+                    (ordered.length
+                        ? ordered.map(zoneRowHtml).join('')
+                        : '<div class="zone-empty">还没有学生，请先导入名单</div>') +
+                '</div>';
+
+            container.appendChild(popup);
+            refreshZoneGrid(popup);
+
+            const rect = anchorEl.getBoundingClientRect();
+            const popupWidth = 340;
+            let left = rect.left;
+            let top = rect.bottom + 4;
+            if (left + popupWidth > window.innerWidth - 8) {
+                left = Math.max(8, window.innerWidth - popupWidth - 8);
+            }
+            if (top + 480 > window.innerHeight) {
+                top = Math.max(8, window.innerHeight - 480 - 8);
+            }
+            popup.style.left = left + 'px';
+            popup.style.top = top + 'px';
+
+            activeZonePopup = { popupEl: popup };
+            requestAnimationFrame(function () { popup.classList.add('visible'); });
+
+            // 姓名过滤：直接切换行的显隐，不重建 DOM（保留已选的 select 状态）
+            popup.addEventListener('input', function (e) {
+                const t = e.target;
+                if (!t || !t.classList.contains('zone-filter')) return;
+                const q = String(t.value || '').trim();
+                popup.querySelectorAll('.zone-row').forEach(function (row) {
+                    const name = row.querySelector('.zone-row-name').textContent || '';
+                    row.hidden = !!q && name.indexOf(q) < 0;
+                });
+            });
+
+            // 区域选择：即时写入 + 自动保存
+            popup.addEventListener('change', function (e) {
+                const sel = e.target;
+                if (!sel || !sel.classList || !sel.classList.contains('zone-select')) return;
+                const row = sel.closest('.zone-row');
+                if (!row) return;
+                const student = getStudentById(row.getAttribute('data-student-id'));
+                if (!student) return;
+                const field = sel.getAttribute('data-field');
+                const value = isZoneId(sel.value) ? sel.value : '';
+                const otherField = field === 'zonePref' ? 'zoneAvoid' : 'zonePref';
+
+                // 倾向与避开不能是同一个区域
+                if (value && student[otherField] === value) {
+                    alert(MESSAGES.ZONE_SAME_BOTH);
+                    sel.value = student[field] || '';
+                    return;
+                }
+
+                student[field] = value;
+                autoSave();
+                refreshZoneGrid(popup);
+                updateZoneMenuLabel();
+            });
+
+            const zoneFocusTrap = installFocusTrap(popup, closeZonePopup);
+            activeZonePopup.focusTrap = zoneFocusTrap;
+        }
+
+        function closeZonePopup() {
+            if (!activeZonePopup) return;
+            const cur = activeZonePopup;
+            activeZonePopup = null;
+            if (cur.focusTrap && typeof cur.focusTrap.restoreFocus === 'function') {
+                cur.focusTrap.restoreFocus();
+            }
+            cur.popupEl.classList.remove('visible');
+            setTimeout(function () {
+                if (cur.popupEl.parentNode) cur.popupEl.parentNode.removeChild(cur.popupEl);
+            }, 150);
+        }
+
+        // 点击 popup 外部关闭
+        document.addEventListener('click', function (e) {
+            if (!activeZonePopup) return;
+            if (activeZonePopup.popupEl.contains(e.target)) return;
+            if (e.target.closest('[data-action="zoneSettings"]')) return;
+            closeZonePopup();
+        });
+
+        // Esc 关闭
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && activeZonePopup) closeZonePopup();
+        });
+
+        // ==================== 区域设置结束 ====================
 
         // ==================== 配对设置结束 ====================
 
@@ -2833,6 +3142,9 @@ function isWholeWordMatch(label, keyword) {
             studentList.innerHTML = '';
             const unassigned = getUnassignedStudents();
 
+            // 区域设置的菜单项角标随名单变化同步（导入/删人后立即正确）
+            updateZoneMenuLabel();
+
             if (unassigned.length === 0) {
                 studentList.innerHTML = '<p style="margin:0;font-size:13px;color:var(--text-muted);text-align:center;padding:20px 0;">所有学生已安排座位</p>';
                 if (isGroupMode) applyGroupFocusHighlight();
@@ -3227,6 +3539,7 @@ function isWholeWordMatch(label, keyword) {
             const genderMode = smartArrangeMode();   // 'mixed' | 'samegender' | 'random'
             const warnings = [];
             let rotateMsg = '';
+            let zoneMsg = '';
             if (smartArrangeRotate) {
                 // 开启「小组轮换」:**只做轮换**,不做全班随机排座。
                 //   全班座位保持原样(无分组学生原地不动),仅把各分组整体迁移到
@@ -3248,12 +3561,18 @@ function isWholeWordMatch(label, keyword) {
                 if (result.warnings && result.warnings.length > 0) {
                     warnings.push.apply(warnings, result.warnings);
                 }
+                // 区域设置(软约束)的执行结果单独提示:它不影响排座是否成功
+                if (result.zone && result.zone.total > 0) {
+                    zoneMsg = MESSAGES.ZONE_RESULT(result.zone.met, result.zone.total);
+                }
             }
             // 排座与轮换的提示合并为一条 toast,避免后一条盖掉前一条
             if (warnings.length > 0) {
-                showStatToast(warnings.join(' / '));
+                showStatToast(warnings.join(' / ') + (zoneMsg ? ' · ' + zoneMsg : ''));
             } else if (rotateMsg) {
                 showStatToast(rotateMsg);
+            } else if (zoneMsg) {
+                showStatToast(zoneMsg);
             }
         }
 
@@ -4393,6 +4712,15 @@ function isWholeWordMatch(label, keyword) {
                         // 记为恢复目标,菜单项随下拉隐藏后无法聚焦,会导致恢复落空
                         randomDropdownBtn.focus();
                         openPairPopup(randomDropdownBtn);
+                    }
+                }
+                // 智能排座下拉里的「区域设置」菜单项（九宫格倾向 / 避开）
+                else if (action === 'zoneSettings') {
+                    if (activeZonePopup) {
+                        closeZonePopup();
+                    } else {
+                        randomDropdownBtn.focus();
+                        openZonePopup(randomDropdownBtn);
                     }
                 }
                 return;

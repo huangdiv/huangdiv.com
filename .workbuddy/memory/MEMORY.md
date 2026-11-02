@@ -95,3 +95,16 @@
   走道列表 / 分组行 / 详细设置学生行三处共用;删除类保留 `--danger` 色,走道保留 `--primary`
 - 这类「列表行内按钮」**不要用 26px 实心色块**:面板内分组行只有 ~142px 宽,操作区多吃 12px
   名称输入框就只剩 32px。新增行内按钮先量 `getBoundingClientRect` 再定尺寸
+
+## 九宫格区域设置(2026-11-02 第四次迭代)
+- `student.zonePref` / `student.zoneAvoid` = 区域 id(`front-left`…`back-right`),`''` = 未设置;
+  migrate 用 `zone.js#ZONE_IDS` 白名单清非法值
+- 区域 = rows 三等分(前/中/后) × cols 三等分(左/中/右);`bandIndex`:total=1→中、total=2→前/后
+- **软约束后处理**:`zone.js#optimizeZones` 只做「有人↔有人」等价交换(占座集合不变),
+  代价 倾向未达成+2 / 避开命中+3,收益必须 >0 才换;最多 4 轮
+- 接入点在 `random-arrange.js` 的 commit 之前、性别收尾修复之后;guard 依次查
+  回避同桌 → 旧座位 → 性别规则 → 配对违规数不上升 ⇒ **硬约束优先,偏好让位**
+- UI:智能排座下拉「区域设置」→ `.zone-popup`(复用 `.pair-popup` 外壳);
+  3×3 预览带「n 想坐 / n 避开」计数 + 姓名过滤 + 姓名/排名/倾向/避开 四列表头
+- **配对选择框已改成自绘候选**(`.pair-suggest`):原生 datalist 无法把名次放右侧、条目过高;
+  自绘要点 = mousedown+preventDefault、就地撑高(父级 overflow 会裁浮层)、选中 id 记 dataset

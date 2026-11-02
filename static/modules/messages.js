@@ -136,5 +136,13 @@ export const MESSAGES = {
         if (forcedCount > 0) parts.push(`${forcedCount} 对强制同桌未能安排在一起`);
         if (avoidCount > 0) parts.push(`${avoidCount} 对回避同桌未能分开`);
         return `已安排座位,但配对设置未能完全满足:${parts.join('；')}`;
-    }
+    },
+
+    // —— 区域设置(九宫格)——
+    ZONE_RESULT: (met, total) =>
+        met >= total
+            ? `区域设置全部满足(${total} 项)`
+            : `区域设置达成 ${met}/${total}(受人数与座位限制,已尽量安排)`,
+    ZONE_PICK_ZONE_FIRST: '请先设置倾向或避开区域',
+    ZONE_SAME_BOTH: '倾向与避开不能是同一个区域'
 };

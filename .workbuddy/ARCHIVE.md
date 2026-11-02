@@ -164,24 +164,25 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 
 ## 3. 架构现状（2026-09-20 快照）
 
-### 3.1 文件与行数（2026-11-02 第二次更新）
+### 3.1 文件与行数（2026-11-02 第三次更新）
 ```
 static/
-├── seats-generator.html    444 行   入口（<link>/<script type="module"> + DOM 骨架）
-├── seats-generator.css    3780 行   全部样式（含打印 @media、:focus-visible）
-├── seats-generator.js     5187 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水）
+├── seats-generator.html    448 行   入口（<link>/<script type="module"> + DOM 骨架）
+├── seats-generator.css    4068 行   全部样式（含打印 @media、:focus-visible、九宫格区域弹窗）
+├── seats-generator.js     5515 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
-│   ├── migrate.js          175 行   migrateConfig（老数据字段补默认/clamp/version，含 rank）+ APP_VERSION
+│   ├── migrate.js          184 行   migrateConfig（老数据字段补默认/clamp/version，含 rank/区域偏好）+ APP_VERSION
 │   ├── seat-grid.js        557 行   createSeatGrid(deps)：座位渲染 + persistent-DOM diff + 排名/图标截断 + 统计
 │   ├── dragdrop.js         285 行   createDragdrop(deps)：拖放 7 事件 + 事件注册
-│   ├── random-arrange.js  1158 行   createRandomArrange(deps)：排座引擎 + 分组轮换 + 性别规则 + 配对修复
+│   ├── random-arrange.js  1195 行   createRandomArrange(deps)：排座引擎 + 分组轮换 + 性别规则 + 配对修复 + 区域偏好后处理
+│   ├── zone.js             224 行   九宫格区域：seatZone / buildZoneMap / zoneStats / optimizeZones（纯函数）
 │   ├── csv-export.js       120 行   buildSeatCsv / 文件名 / 转义（纯函数）
 │   ├── student-rank.js     309 行   排名解析/排序/班委识别/蛇形均衡分组（纯函数）
 │   ├── group-balance.js    279 行   分组「均衡系数」（排名带覆盖 + 性别 + 班委，纯函数）
 │   ├── group-layout.js     216 行   按组聚座的座位块规划（chooseBlockShape / planGroupSeatSlots，纯函数）
-│   └── messages.js         139 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
-└── tests/                         11 个 Node ESM 单元测试（见 §5）
+│   └── messages.js         147 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
+└── tests/                         12 个 Node ESM 单元测试（见 §5）
 ```
 
 ### 3.2 核心设计模式
@@ -270,12 +271,45 @@ static/
   分组设置顶部整体汇总（整体分 + 极差 + 最弱组）、分组模式 banner 分组按钮内徽标；
   `title` 里给出逐维度分数与「男X/女Y、班委 N 人、平均排名」，便于解释「为什么这组 82 分」。
 
+### 3.7 九宫格区域设置（2026-11-02 新增，`zone.js`）
+
+**区域划分**：把教室按 `rows` 三等分（前/中/后）× `cols` 三等分（左/中/右），得到 9 个区域
+（`front-left` … `back-right`，中文名「前左…后右」）。`bandIndex(i, total)` 的边界处理：
+- `total === 1` → 归「中」档（只有一排/一列时不存在前后、左右之分）；
+- `total === 2` → 归 `0` / `2` 两档（不产生空的中间档）；
+- 其余 → `floor(i*3/total)` 钳到 0..2（8 行得 前3/中3/后2）。
+
+**数据**：`student.zonePref` / `student.zoneAvoid`（区域 id，`''` = 未设置）。
+`migrate.js` 会把非法值清成 `''`（白名单来自 `zone.js#ZONE_IDS`，不另存一份）。
+
+**算法**（`optimizeZones`，纯函数、就地改 `seats`、只做「有人↔有人」等价交换 ⇒ 占座集合不变）：
+- 代价：倾向未达成 +2、避开命中 +3（避开更硬一点）；一次交换的收益 =
+  双方「换前代价 − 换后代价」之和，**必须严格 > 0** 才考虑，平局取下标更靠前的座位；
+- 最多 4 轮扫描，某轮无变化即提前退出；`O(passes × 有偏好人数 × 座位数)`，班级规模下可忽略；
+- **业务硬约束由调用方注入的 `guard(seatA, seatB, idA, idB)` 判定**，模块本身不认识配对/性别规则。
+
+**random-arrange.js 里的接入点与 guard 顺序**（在 commit 之前、性别收尾修复之后）：
+1. `isAvoided(idA, idB)` —— 交换后两人不能成为「回避同桌」；
+2. `wasOldSeat()` —— 不能把学生放回排座前的旧座位（保住「完全换座」）；
+3. `swapBreaksGender()` —— 不破坏男女同桌 / 男女不同桌；
+4. `computePairViolations()` 前后对比 —— 强制/回避配对的违规数不得上升。
+
+⇒ 优先级明确：**配对 + 性别硬约束 > 区域偏好**。两者抢同一批座位时区域偏好让位，
+排座结束后 `randomSeatArrange` 返回 `zone = zoneStats(...)`，主 IIFE 用
+`MESSAGES.ZONE_RESULT(met, total)` 如实告知「达成 x/y」。
+
+**UI**：智能排座下拉的「区域设置」菜单项（`data-action="zoneSettings"`，角标显示已设置人数）
+→ `.zone-popup`（复用 `.pair-popup` 外壳）：3×3 区域预览（含「n 想坐 / n 避开」计数）、
+姓名过滤框、按 rank 排序的学生行（姓名 + 排名 + 倾向/避开两个 `<select>`）。
+改动即时写 `student.zonePref/zoneAvoid` + `autoSave()`；倾向与避开设成同一区域会 alert 并回退。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | 智能排座**区域设置**（九宫格 前/中/后 × 左/中/右，逐生「倾向 / 避开」软约束，排座时等价换座满足，硬约束优先）+ 配对选择框改**自绘紧凑候选**（姓名左、第N名右、行高 24px） |
 | 本轮 | UI 紧凑化 + 术语统一：分组设置 / 详细设置的「删除」由 26×26 实心红块瘦身为 **18px 行内叉号**（与「布局设置 → 走道列表」的移除叉号同一套外观，宽度让给分组名/学生名）+ **「座位设置」更名「布局设置」**（v1.3.5） |
 | 本轮 | 名单/Excel 统一按排名呈现 + 配对设置改「输入姓名搜索」+ 均衡分组时**按组聚座** + 分组**均衡系数**（分组栏 / 分组 banner / 顶部汇总） |
 | `7ba8d2d` | 学生**排名**属性 + 导入改「增量合并」+ 座位右下角排名数字 + 「按排名均衡分组」（分组栏 / 分组 banner 双入口） |
@@ -315,13 +349,13 @@ static/
 
 ### 5.1 单元测试（Node ESM，零依赖）
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
-- 11 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
+- 12 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
-  `unit_student_rank` / `unit_group_layout` / `unit_group_balance`。
+  `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone`。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 26 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 27 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -401,6 +435,14 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - **设计「均衡/健康度」类指标时，先想清楚「哪种坏情况会被这个指标误判成好」**：
   「组均排名 vs 全班均值」会把「按名次整块切」的中间组判成满分（均值恰好相等）。
   改用**分布覆盖**类指标（每条排名带每组各一人）才没有盲区 —— 见 §3.6。
+- **软约束一定要跑在硬约束之后，并用 guard 守住不变量**：区域偏好做成「有人↔有人」的等价交换、
+  每次交换前问一遍 `guard`，比把偏好塞进落座打分里安全得多 —— 不会丢座位、不会破坏配对/性别，
+  失败也只是「没达成」而不是「排错」。用户能接受的降级必须是**显式的**（toast 报 x/y）。
+- **原生 `<datalist>` / `<select>` 的候选项高度和排版不可控**：要「姓名左、名次右、一屏更多条」
+  就只能自绘列表（`.pair-suggest`）。自绘时注意三点：
+  ① 用 `mousedown` + `preventDefault` 选项，别用 `click`（blur 会先收起列表）；
+  ② 就地撑高而不是浮层 —— 父级 popup 有 `overflow:auto`，浮层会被裁掉；
+  ③ 选中后把 id 记在 `input.dataset` 上，`blur`/手改文字时清掉，同名同姓才不会认错人。
 
 ---
 

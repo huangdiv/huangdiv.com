@@ -20,6 +20,7 @@
 
 import { state, commit } from './state.js';
 import { MESSAGES } from './messages.js';
+import { optimizeZones, zoneStats } from './zone.js';
 
 export function createRandomArrange(deps) {
     const { helpers, callbacks } = deps;
@@ -877,6 +878,41 @@ export function createRandomArrange(deps) {
             conflicts = findConflicts();
         }
 
+        // ==================== 区域偏好后处理（智能排座 → 区域设置）====================
+        // 软约束：把「倾向某区域」的学生换进去、把「避开某区域」的学生换出来。
+        // 只做「有人 ↔ 有人」的等价交换 ⇒ 占座集合不变、不会有人失去座位。
+        // 每次候选交换都要过三道硬约束（顺序与既有后处理一致，区域偏好优先级最低）：
+        //   1. 不新增配对破坏（强制同桌 / 回避同桌，交换前后违规数不得上升）
+        //   2. 不破坏性别规则（男女同桌 / 男女不同桌）
+        //   3. 不把学生放回排座前的旧座位（保住「完全换座」的观感）
+        var zone = null;
+        var hasZonePrefs = state.students.some(function (s) {
+            return (s && s.zonePref) || (s && s.zoneAvoid);
+        });
+        if (hasZonePrefs) {
+            var baselinePair = computePairViolations(pairMap);
+            var zoneGuard = function (seatA, seatB, idA, idB) {
+                if (isAvoided(idA, idB)) return false;
+                if (wasOldSeat(idA, seatB) || wasOldSeat(idB, seatA)) return false;
+                if (swapBreaksGender(seatA, seatB)) return false;
+
+                var idAtA = state.seats[seatA];
+                var idAtB = state.seats[seatB];
+                state.seats[seatA] = idAtB;
+                state.seats[seatB] = idAtA;
+                var after = computePairViolations(pairMap);
+                state.seats[seatA] = idAtA;
+                state.seats[seatB] = idAtB;
+
+                return after.forcedBroken.length <= baselinePair.forcedBroken.length
+                    && after.avoidBroken.length <= baselinePair.avoidBroken.length;
+            };
+            optimizeZones(state.seats, state.students, state.rows, state.cols, {
+                guard: zoneGuard
+            });
+            zone = zoneStats(state.seats, state.students, state.rows, state.cols);
+        }
+
         commit({ seats: state.seats });
         onGenerateSeats();
 
@@ -906,7 +942,8 @@ export function createRandomArrange(deps) {
                 warnings.push(MESSAGES.GENDER_RULE_UNSATISFIED(genderRuleMode, finalGender.length));
             }
         }
-        return { warnings: warnings };
+        // 区域偏好(软约束)结果 —— 交给调用方决定提示方式，不占用 warnings
+        return { warnings: warnings, zone: zone };
     }
 
     // ─────────── 分组轮换 ───────────

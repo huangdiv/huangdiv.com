@@ -3374,7 +3374,7 @@ button:disabled {
 
 .pair-popup-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 4px;
     margin-bottom: 4px;
 }
@@ -3390,9 +3390,16 @@ button:disabled {
     box-sizing: border-box;
 }
 
-/* 配对设置里的「输入姓名搜索」输入框（原生 datalist 提供候选） */
-.pair-popup .pair-search-input {
+/* 配对设置里的「输入姓名搜索」——自绘候选列表（姓名左、名次右、行高紧凑） */
+.pair-popup .pair-search-wrap {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.pair-popup .pair-search-input {
+    width: 100%;
     min-width: 0;
     height: 26px;
     padding: 2px 6px;
@@ -3411,6 +3418,245 @@ button:disabled {
 }
 
 .pair-popup .pair-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* 候选列表：紧贴在输入框下方展开（就地撑高，而不是浮层 ——
+   浮层会被 .pair-popup 的 overflow 裁掉）。行高 24px，一屏看 8 项。 */
+.pair-popup .pair-suggest {
+    margin-top: 2px;
+    max-height: 192px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.pair-popup .pair-suggest[hidden] {
+    display: none;
+}
+
+.pair-popup .pair-suggest-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+    line-height: 24px;
+    color: var(--text-primary);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.pair-popup .pair-suggest-item + .pair-suggest-item {
+    border-top: 1px solid var(--border-light);
+}
+
+.pair-popup .pair-suggest-item:hover,
+.pair-popup .pair-suggest-item.active {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.pair-popup .pair-suggest-item .psi-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pair-popup .pair-suggest-item .psi-rank {
+    flex: none;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.pair-popup .pair-suggest-item.active .psi-rank,
+.pair-popup .pair-suggest-item:hover .psi-rank {
+    color: var(--primary);
+}
+
+.pair-popup .pair-suggest-empty {
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ==================== 区域设置 popup（复用 .pair-popup 外壳） ==================== */
+.zone-popup {
+    width: 340px;
+    max-height: 480px;
+}
+
+.zone-hint {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+/* 3×3 区域预览：前/中/后 三行，左/中/右 三列 */
+.zone-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.zone-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 34px;
+    padding: 3px 2px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.zone-cell-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.zone-cell-counts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+}
+
+.zone-cell-pref {
+    color: var(--success);
+}
+
+.zone-cell-avoid {
+    color: var(--danger);
+}
+
+.zone-filter {
+    width: 100%;
+    height: 26px;
+    padding: 2px 6px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+.zone-filter:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.zone-list {
+    max-height: 230px;
+    overflow-y: auto;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    padding: 2px;
+    background: var(--surface-hover);
+}
+
+/* 列表表头：与 .zone-row 同一套栅格，避免列错位 */
+.zone-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px 2px 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.zone-head span:nth-child(1) {
+    flex: 1;
+    min-width: 0;
+}
+
+.zone-head span:nth-child(2) {
+    flex: none;
+    width: 22px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.zone-head span:nth-child(3),
+.zone-head span:nth-child(4) {
+    flex: none;
+    width: 68px;
+    text-align: center;
+}
+
+.zone-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    background: var(--surface);
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.zone-row + .zone-row {
+    margin-top: 2px;
+}
+
+.zone-row[hidden] {
+    display: none;
+}
+
+.zone-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
+.zone-row-rank {
+    flex: none;
+    width: 22px;
+    text-align: right;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.zone-select {
+    flex: none;
+    width: 68px;
+    height: 24px;
+    padding: 0 2px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+    background: var(--surface);
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+.zone-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.zone-empty {
+    padding: 8px;
+    text-align: center;
+    font-size: 11px;
     color: var(--text-muted);
 }
 

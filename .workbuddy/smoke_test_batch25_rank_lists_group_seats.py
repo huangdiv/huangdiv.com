@@ -15,7 +15,7 @@
   3. 统计块 → 下载 Excel：表头首列为「排名」
   4. 导出的行按排名升序，且排名等于期望值
   5. 配对设置是「输入框」而不是下拉（4 个 .pair-search-input）
-  6. 配对候选（datalist）按排名升序
+  6. 配对候选（自绘下拉 .pair-suggest）按排名升序
   7. 输入姓名片段 + 回车 → 成功添加配对（自动补全为完整姓名）
   8. 输入不存在的姓名 → 不添加、且给出提示
   9. 按排名均衡分组：3 组、每组 4 人
@@ -260,8 +260,12 @@ async def main():
         else:
             bad(f"搜索框数量异常：input={search_count} select={select_count}")
 
+        # 自绘候选列表（原生 datalist 已换掉）：聚焦即展开，按排名升序
+        await page.click(".pair-forced-a")
+        await page.wait_for_timeout(300)
         options = await page.eval_on_selector_all(
-            "#pairStudentSuggestions option", "els => els.map(e => e.value)"
+            ".pair-suggest:not([hidden]) .pair-suggest-item .psi-name",
+            "els => els.map(e => e.textContent.trim())"
         )
         if options == BY_RANK:
             ok("候选名单按排名升序（共 %d 人）" % len(options))
