@@ -106,5 +106,11 @@
   回避同桌 → 旧座位 → 性别规则 → 配对违规数不上升 ⇒ **硬约束优先,偏好让位**
 - UI:智能排座下拉「区域设置」→ `.zone-popup`(复用 `.pair-popup` 外壳);
   3×3 预览带「n 想坐 / n 避开」计数 + 姓名过滤 + 姓名/排名/倾向/避开 四列表头
+- **区域设置的颜色提示**(2026-11-03):`zoneStudentStatus()` 三态 ok/bad/na + '' 未设置(不着色),
+  粒度到列(`prefBad`/`avoidBad` 各自给 select 加 `.zone-field-bad`);
+  `applyZoneRowStatus` **就地改 class**,不重建行(否则掉焦点);
+  刷新点 = 打开 / change / `afterSeatsRender()`→`refreshZonePopupStatus()`(内层必须 try/catch,
+  `activeZonePopup` 是后段 `let`,早期调用会 TDZ);
+  `.zone-popup` 改 flex column + `.zone-list{flex:1 1 auto}` 消除双滚动条
 - **配对选择框已改成自绘候选**(`.pair-suggest`):原生 datalist 无法把名次放右侧、条目过高;
   自绘要点 = mousedown+preventDefault、就地撑高(父级 overflow 会裁浮层)、选中 id 记 dataset

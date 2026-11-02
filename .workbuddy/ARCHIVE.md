@@ -164,12 +164,12 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 
 ## 3. 架构现状（2026-09-20 快照）
 
-### 3.1 文件与行数（2026-11-02 第三次更新）
+### 3.1 文件与行数（2026-11-03 更新）
 ```
 static/
 ├── seats-generator.html    448 行   入口（<link>/<script type="module"> + DOM 骨架）
-├── seats-generator.css    4068 行   全部样式（含打印 @media、:focus-visible、九宫格区域弹窗）
-├── seats-generator.js     5515 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉）
+├── seats-generator.css    4145 行   全部样式（含打印 @media、:focus-visible、九宫格区域弹窗）
+├── seats-generator.js     5653 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
 │   ├── migrate.js          184 行   migrateConfig（老数据字段补默认/clamp/version，含 rank/区域偏好）+ APP_VERSION
@@ -303,12 +303,31 @@ static/
 姓名过滤框、按 rank 排序的学生行（姓名 + 排名 + 倾向/避开两个 `<select>`）。
 改动即时写 `student.zonePref/zoneAvoid` + `autoSave()`；倾向与避开设成同一区域会 alert 并回退。
 
+**「当前满足情况」颜色提示（与配对设置同一套 ok/bad/na 语言）**：
+- 判定入口只有两处函数：`currentZoneSeatMap()`（座位表 → `{sid: {index, zone}}`，用 `seatZone`）
+  与 `zoneStudentStatus(student, at)` → `{status, prefBad, avoidBad, zone}`；
+  `status` 三态：`''` 未设置（**不着色**，免得整屏泛绿）、`ok` 全满足、`bad` 有未满足、`na` 已设但未入座。
+- 粒度到「列」：`prefBad`（倾向未达成）/ `avoidBad`（落在避开区）分别给对应 `<select>` 加
+  `.zone-field-bad` 描红 ⇒ 老师一眼知道该动哪一栏，而不是只知道这行有问题。
+- `applyZoneRowStatus()` **就地改 class / title**，不重建行 —— 改完某个下拉后焦点仍留在那个 select 上；
+  重建 DOM 的写法会掉焦点（键盘连续改多行时很难用）。
+- 刷新时机：① 打开弹窗；② `change` 事件后；③ `afterSeatsRender()` → `refreshZonePopupStatus()`
+  （拖拽 / 排座 / 轮换 / 撤销都会经过这个统一出口）。
+  ⚠️ `refreshZonePopupStatus` 内必须 `try/catch`：`activeZonePopup` 是声明在文件后段的 `let`，
+  初始化早期调用会命中 **TDZ**（`typeof` 也会抛）⇒ 与 `refreshGenderHints` 同样的兜底手法。
+- 顶部还有一条汇总 `refreshZoneStatusLine()`：「倾向 2/6 达成 · 避开 1/2 守住」，
+  `data-state=bad/ok` 控制颜色；**未入座的也算进分母且算未达成**（不虚报）。
+- 布局：`.zone-popup` 改成 `display:flex; flex-direction:column` + `.zone-list { flex:1 1 auto }`。
+  原先列表自己滚、外壳（`max-height`）也滚 ⇒ 出现**双滚动条**且末行被外壳切一半；
+  交给 flex 分配后外壳 `scrollHeight === clientHeight`，只剩列表一条滚动条。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | 区域设置里**已有设置项的当前满足情况**颜色提示（绿=已满足 / 红=未满足并描红具体那一栏 / 灰=未入座）+ 顶部达成汇总条（v1.4.1） |
 | 本轮 | 智能排座**区域设置**（九宫格 前/中/后 × 左/中/右，逐生「倾向 / 避开」软约束，排座时等价换座满足，硬约束优先）+ 配对选择框改**自绘紧凑候选**（姓名左、第N名右、行高 24px） |
 | 本轮 | UI 紧凑化 + 术语统一：分组设置 / 详细设置的「删除」由 26×26 实心红块瘦身为 **18px 行内叉号**（与「布局设置 → 走道列表」的移除叉号同一套外观，宽度让给分组名/学生名）+ **「座位设置」更名「布局设置」**（v1.3.5） |
 | 本轮 | 名单/Excel 统一按排名呈现 + 配对设置改「输入姓名搜索」+ 均衡分组时**按组聚座** + 分组**均衡系数**（分组栏 / 分组 banner / 顶部汇总） |
@@ -355,7 +374,7 @@ static/
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 27 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 28 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py

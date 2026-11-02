@@ -13,13 +13,13 @@ import {
 } from './modules/student-rank.js';
 import { computeGroupBalance, balanceLevel, roundScore } from './modules/group-balance.js';
 import { planGroupSeatSlots } from './modules/group-layout.js';
-import { ZONE_DEFS, ZONE_IDS, isZoneId } from './modules/zone.js';
+import { ZONE_DEFS, ZONE_IDS, isZoneId, zoneName, seatZone } from './modules/zone.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.0';
+        const APP_VERSION = '1.4.1';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -1703,6 +1703,7 @@ function normalizeRotateOffset(value) {
         // 座位渲染统一出口:任何一次座位重绘后都要做的派生刷新
         function afterSeatsRender() {
             refreshPairPopupStatus();
+            refreshZonePopupStatus();
             refreshGenderHints();
         }
 
@@ -1957,6 +1958,59 @@ function normalizeRotateOffset(value) {
             }).join('');
         }
 
+        // ─────────── 区域设置的「当前满足情况」（颜色提示） ───────────
+        // 与配对设置的满足情况提示同一套视觉语言：ok=绿 / bad=红 / na=灰。
+        // 只对有设置的项判定（两项都没设的行保持中性，避免整屏绿油油）。
+        // 额外把「具体是哪一列没满足」标在该 select 上，老师一眼知道要动哪一栏。
+
+        // 座位表里每名学生的落座位置：{ sid: { index, zone } }（未入座的不在表里）
+        function currentZoneSeatMap() {
+            const map = {};
+            const total = rows * cols;
+            for (let i = 0; i < currentSeats.length && i < total; i++) {
+                const sid = currentSeats[i];
+                if (!sid) continue;
+                map[sid] = { index: i, zone: seatZone(i, rows, cols) };
+            }
+            return map;
+        }
+
+        // 单个学生的满足情况
+        //   status: '' 未设置 | ok 全满足 | bad 有未满足 | na 未入座无法判定
+        function zoneStudentStatus(student, at) {
+            const pref = isZoneId(student.zonePref) ? student.zonePref : '';
+            const avoid = isZoneId(student.zoneAvoid) ? student.zoneAvoid : '';
+            const info = {
+                pref: pref,
+                avoid: avoid,
+                zone: at && at.zone ? at.zone : '',
+                status: '',
+                prefBad: false,
+                avoidBad: false
+            };
+            if (!pref && !avoid) return info;
+            if (!info.zone) { info.status = 'na'; return info; }
+            info.prefBad = !!pref && info.zone !== pref;
+            info.avoidBad = !!avoid && info.zone === avoid;
+            info.status = (info.prefBad || info.avoidBad) ? 'bad' : 'ok';
+            return info;
+        }
+
+        // 悬停提示文案：把「现在坐哪 / 哪条没满足」说清楚
+        function zoneStatusTitle(info) {
+            if (info.status === 'na') return '当前满足情况:尚未入座,暂无法判定';
+            const at = info.zone ? '当前坐在「' + zoneName(info.zone) + '」' : '';
+            if (info.status === 'ok') return at + (at ? ' ' : '') + '✓ 区域设置已满足';
+            const parts = [];
+            if (info.prefBad) {
+                parts.push('没在倾向区域「' + zoneName(info.pref) + '」');
+            }
+            if (info.avoidBad) {
+                parts.push('落在了避开区域「' + zoneName(info.avoid) + '」');
+            }
+            return at + (at ? ' ' : '') + '✗ ' + parts.join(';');
+        }
+
         function zoneRowHtml(student) {
             const r = parseInt(student.rank, 10);
             return '<div class="zone-row" data-student-id="' + escapeHtml(student.id) + '">' +
@@ -1995,6 +2049,85 @@ function normalizeRotateOffset(value) {
             }).join('');
         }
 
+        // 把一个学生的满足情况刷到行上（就地改 class / title，不重建 DOM ⇒ 不丢焦点）
+        function applyZoneRowStatus(row, student, at) {
+            const info = zoneStudentStatus(student, at);
+            row.classList.remove('zone-status-ok', 'zone-status-bad', 'zone-status-na');
+            if (info.status) {
+                row.classList.add('zone-status-' + info.status);
+                row.title = zoneStatusTitle(info);
+            } else {
+                row.removeAttribute('title');
+            }
+            const prefSel = row.querySelector('.zone-pref');
+            const avoidSel = row.querySelector('.zone-avoid');
+            if (prefSel) prefSel.classList.toggle('zone-field-bad', info.prefBad);
+            if (avoidSel) avoidSel.classList.toggle('zone-field-bad', info.avoidBad);
+        }
+
+        // 弹窗顶部的达成汇总（「倾向 2/3 达成 · 避开 1/2 守住」）
+        function zoneStatusSummary() {
+            const seatMap = currentZoneSeatMap();
+            const sum = { prefTotal: 0, prefMet: 0, avoidTotal: 0, avoidHit: 0 };
+            students.forEach(function (s) {
+                const at = seatMap[s.id];
+                const zone = at && at.zone ? at.zone : '';
+                if (isZoneId(s.zonePref)) {
+                    sum.prefTotal++;
+                    if (zone === s.zonePref) sum.prefMet++;
+                }
+                if (isZoneId(s.zoneAvoid)) {
+                    sum.avoidTotal++;
+                    if (zone === s.zoneAvoid) sum.avoidHit++;
+                }
+            });
+            sum.missed = (sum.prefTotal - sum.prefMet) + sum.avoidHit;
+            return sum;
+        }
+
+        function refreshZoneStatusLine(popup) {
+            const line = popup.querySelector('.zone-status-line');
+            if (!line) return;
+            const sum = zoneStatusSummary();
+            if (sum.prefTotal === 0 && sum.avoidTotal === 0) {
+                line.hidden = true;
+                line.textContent = '';
+                return;
+            }
+            const parts = [];
+            if (sum.prefTotal > 0) {
+                parts.push('倾向 ' + sum.prefMet + '/' + sum.prefTotal + ' 达成');
+            }
+            if (sum.avoidTotal > 0) {
+                parts.push('避开 ' + (sum.avoidTotal - sum.avoidHit) + '/' + sum.avoidTotal + ' 守住');
+            }
+            line.hidden = false;
+            line.setAttribute('data-state', sum.missed > 0 ? 'bad' : 'ok');
+            line.textContent = '当前座位:' + parts.join(' · ') + (sum.missed > 0 ? '' : ' ✓');
+        }
+
+        // 整表刷新（座位一变 / 改了某个下拉都调用）
+        function refreshZoneStatuses(popup) {
+            if (!popup) return;
+            const seatMap = currentZoneSeatMap();
+            popup.querySelectorAll('.zone-row').forEach(function (row) {
+                const student = getStudentById(row.getAttribute('data-student-id'));
+                if (!student) return;
+                applyZoneRowStatus(row, student, seatMap[student.id]);
+            });
+            refreshZoneStatusLine(popup);
+        }
+
+        // 座位发生变化(拖拽 / 排座 / 轮换 / 撤销)后，若区域弹窗开着就重刷颜色
+        function refreshZonePopupStatus() {
+            try {
+                if (!activeZonePopup || !activeZonePopup.popupEl) return;
+                refreshZoneStatuses(activeZonePopup.popupEl);
+            } catch (e) {
+                // 初始化早期 activeZonePopup 还处于 TDZ ⇒ 忽略
+            }
+        }
+
         // 菜单项文字上的「已设置人数」角标
         function updateZoneMenuLabel() {
             const label = document.querySelector('[data-action="zoneSettings"] .zone-settings-label');
@@ -2019,8 +2152,10 @@ function normalizeRotateOffset(value) {
             const ordered = students.slice().sort(compareByRank);
             popup.innerHTML =
                 '<div class="pair-popup-title">区域设置</div>' +
-                '<div class="zone-hint">教室按行数三等分（前/中/后）、列数三等分（左/中/右），共 9 个区域。' +
-                    '「倾向」尽量安排进去，「避开」尽量不安排进去；排座时会优先保证配对与性别规则。</div>' +
+                '<div class="zone-hint">共 9 个区域（行三等分 前/中/后 × 列三等分 左/中/右）。' +
+                    '「倾向」尽量坐进去，「避开」尽量避开；排座时优先保证配对与性别规则。' +
+                    '已设置的项若当前<b>未满足</b>，整行标红并描红对应那一栏。</div>' +
+                '<div class="zone-status-line" hidden></div>' +
                 '<div class="zone-grid"></div>' +
                 '<input type="text" class="zone-filter" placeholder="搜索姓名（留空显示全部）"' +
                     ' autocomplete="off" spellcheck="false" aria-label="搜索学生姓名">' +
@@ -2033,6 +2168,7 @@ function normalizeRotateOffset(value) {
 
             container.appendChild(popup);
             refreshZoneGrid(popup);
+            refreshZoneStatuses(popup);
 
             const rect = anchorEl.getBoundingClientRect();
             const popupWidth = 340;
@@ -2041,8 +2177,8 @@ function normalizeRotateOffset(value) {
             if (left + popupWidth > window.innerWidth - 8) {
                 left = Math.max(8, window.innerWidth - popupWidth - 8);
             }
-            if (top + 480 > window.innerHeight) {
-                top = Math.max(8, window.innerHeight - 480 - 8);
+            if (top + 520 > window.innerHeight) {
+                top = Math.max(8, window.innerHeight - 520 - 8);
             }
             popup.style.left = left + 'px';
             popup.style.top = top + 'px';
@@ -2083,6 +2219,8 @@ function normalizeRotateOffset(value) {
                 student[field] = value;
                 autoSave();
                 refreshZoneGrid(popup);
+                // 行底色就地刷新(不重建行 ⇒ 焦点仍留在刚操作的下拉上)
+                refreshZoneStatuses(popup);
                 updateZoneMenuLabel();
             });
 
