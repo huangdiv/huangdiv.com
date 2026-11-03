@@ -236,7 +236,7 @@ async def main():
         # ════════════════════════════════════════════════════════════════
         # Step 5: 导出图片
         # ════════════════════════════════════════════════════════════════
-        await page.click("#printBtn")
+        await page.click("#printDropdownBtn")
         await page.wait_for_selector("#printDropdown", state="visible", timeout=2000)
 
         async with page.expect_download(timeout=15000) as download_info:

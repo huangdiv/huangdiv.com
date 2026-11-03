@@ -19,7 +19,7 @@ import { ZONE_DEFS, ZONE_IDS, isZoneId, zoneName, seatZone } from './modules/zon
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.1';
+        const APP_VERSION = '1.4.2';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -129,7 +129,12 @@ function normalizeRotateOffset(value) {
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
         const printBtn = document.getElementById('printBtn');
+        // 打印/PDF 上段 = 直接打印;下段 #printDropdownBtn = 其他导出方式
+        const printDropdownBtn = document.getElementById('printDropdownBtn');
         const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+        // 模式切换上段 = 轮换三态;下段 #modeDropdownBtn = 直接选定某个模式
+        const modeDropdownBtn = document.getElementById('modeDropdownBtn');
+        const modeDropdown = document.getElementById('modeDropdown');
         const modeSwitchIcon = document.getElementById('modeSwitchIcon');
         const modeSwitchLabel = document.getElementById('modeSwitchLabel');
         const quickRandomBtn = document.getElementById('quickRandomBtn');
@@ -2937,6 +2942,30 @@ function isWholeWordMatch(label, keyword) {
             }
         }
 
+        // 当前模式标识(与下拉菜单项的 data-mode 对齐)
+        function currentModeKey() {
+            if (isCheckinMode) return 'checkin';
+            if (isGroupMode) return 'group';
+            return 'normal';
+        }
+
+        // 下拉里直接选定模式(与 cycleMode 互不影响):
+        // 先按需退出另一个模式,再进入目标模式 —— toggle* 内部本身也处理互斥,
+        // 所以只需判断「当前不是目标就切」。
+        function applyMode(target) {
+            const cur = currentModeKey();
+            if (target === cur) return;
+            if (target === 'normal') {
+                if (isCheckinMode) toggleCheckinMode();
+                else if (isGroupMode) toggleGroupMode();
+            } else if (target === 'checkin') {
+                if (!isCheckinMode) toggleCheckinMode();
+            } else if (target === 'group') {
+                if (!isGroupMode) toggleGroupMode();
+            }
+            updateModeSwitchButton();
+        }
+
         // 进入/退出签到模式(与分组模式互斥)
         function toggleCheckinMode() {
             if (typeof clearTapSelection === 'function') clearTapSelection();
@@ -3479,8 +3508,18 @@ function isWholeWordMatch(label, keyword) {
         // 若只改 style.display,对方闭包里的 isOpen 会停留在 true,
         // 下次点它就执行了「关闭」—— 表现为「要点两下才弹出」。
         const dropdownCtrls = new WeakMap();
+        // 所有下拉的登记表:开一个就关掉其余(三方互斥:模式 / 智能排座 / 打印)
+        const allDropdownCtrls = [];
 
-        function setupActionDropdown(btn, dropdown, peerBtn, peerDropdown) {
+        function closeAllDropdowns() {
+            allDropdownCtrls.forEach(function (entry) {
+                if (entry.ctrl && dropdownCtrls.get(entry.dropdown) === entry.ctrl) {
+                    entry.ctrl.close();
+                }
+            });
+        }
+
+        function setupActionDropdown(btn, dropdown) {
             let isOpen = false;
             // 将下拉改为 fixed 定位并按视口钳制,避免被 .controls 的 overflow:hidden 裁剪,
             // 也保证任何按钮(最左/最右)的下拉都不会超出屏幕。
@@ -3504,22 +3543,19 @@ function isWholeWordMatch(label, keyword) {
                 btn.setAttribute('aria-expanded', String(open));
                 if (open) {
                     positionDropdown();
-                    const firstItem = dropdown.querySelector('[role="menuitem"]');
-                    if (firstItem) firstItem.focus();
+                    // 模式菜单优先聚焦「当前模式」那一项;其余菜单仍聚焦首项
+                    const focusTarget = (dropdown === modeDropdown &&
+                        dropdown.querySelector('[role="menuitem"][aria-checked="true"]')) ||
+                        dropdown.querySelector('[role="menuitem"]');
+                    if (focusTarget) focusTarget.focus();
                 }
             }
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                // 关闭另一个下拉(互斥):走 close() 才能同步对方的 isOpen 与 aria-expanded
-                const peerCtrl = peerDropdown ? dropdownCtrls.get(peerDropdown) : null;
-                if (peerCtrl) {
-                    peerCtrl.close();
-                } else if (peerDropdown && peerBtn) {
-                    peerDropdown.style.display = 'none';
-                    peerBtn.setAttribute('aria-expanded', 'false');
-                }
-                // 以 DOM 实际显示状态为准翻转,避免 isOpen 被外部直接改 display 的操作带偏
-                setOpen(dropdown.style.display !== 'block');
+                // 关闭其他下拉(互斥):走 close() 才能同步对方的 isOpen 与 aria-expanded
+                const willOpen = dropdown.style.display !== 'block';
+                closeAllDropdowns();
+                setOpen(willOpen);
             });
             // 键盘 Enter / ↓ / Space 在按钮上 → 展开并聚焦首项
             btn.addEventListener('keydown', function (e) {
@@ -3568,16 +3604,25 @@ function isWholeWordMatch(label, keyword) {
                 close: function () { setOpen(false); }
             };
             dropdownCtrls.set(dropdown, ctrl);
+            allDropdownCtrls.push({ btn: btn, dropdown: dropdown, ctrl: ctrl });
             return ctrl;
         }
         const randomDropdown = document.getElementById('randomDropdown');
         const printDropdown = document.getElementById('printDropdown');
-        const randomDropdownCtrl = setupActionDropdown(randomDropdownBtn, randomDropdown, printBtn, printDropdown);
-        // 「切换模式」:点击即轮换 普通 → 签到 → 分组 → 普通(不再是下拉)
-        modeSwitchBtn.addEventListener('click', cycleMode);
-        const printDropdownCtrl = setupActionDropdown(printBtn, printDropdown, randomDropdownBtn, randomDropdown);
-
-        // 点击关闭 randomDropdown / printDropdown（事件委托，在 printBtn 的 document click handler 里统一处理）
+        const randomDropdownCtrl = setupActionDropdown(randomDropdownBtn, randomDropdown);
+        // 「切换模式」上段:点击即轮换 普通 → 签到 → 分组 → 普通
+        modeSwitchBtn.addEventListener('click', function () {
+            closeAllDropdowns();
+            cycleMode();
+        });
+        // 下段:直接选定某个模式(菜单项 data-action="mode" + data-mode)
+        const modeDropdownCtrl = setupActionDropdown(modeDropdownBtn, modeDropdown);
+        // 「打印/PDF」上段:直接打印 / 另存为 PDF;下段才展开其他导出方式
+        printBtn.addEventListener('click', function () {
+            closeAllDropdowns();
+            doPrint();
+        });
+        const printDropdownCtrl = setupActionDropdown(printDropdownBtn, printDropdown);
 
         // ─────────── 随机排座模块 (modules/random-arrange.js) ───────────
         // randomSeatArrange + 模块私有 helpers(getDeskMatePairs / getGender)
@@ -4795,6 +4840,16 @@ function isWholeWordMatch(label, keyword) {
             printPrepared = false;
         }
 
+        // 「打印/PDF」上段按钮:直接走浏览器打印(用户在打印对话框里选「另存为 PDF」)
+        function doPrint() {
+            printPrepared = false;
+            applyPrintScale();
+            // 等一帧让 transform / 日期落进 DOM,再唤起打印
+            setTimeout(function () {
+                window.print();
+            }, 150);
+        }
+
         function calculatePrintScale() {
             const pageWidthMm = 297 - 10 - 6;
             const pageHeightMm = 210 - 10 - 6;
@@ -4816,7 +4871,7 @@ function isWholeWordMatch(label, keyword) {
             return Math.min(scaleX, scaleY);
         }
 
-        // printBtn 的 click 由 setupActionDropdown 统一处理 (P1 UX #3)
+        // 「打印/PDF」上段的 click 直接调用 doPrint();下段 #printDropdownBtn 才展开菜单
 
         // 下拉菜单项点击
         document.addEventListener('click', function (e) {
@@ -4824,22 +4879,17 @@ function isWholeWordMatch(label, keyword) {
             if (item) {
                 const action = item.getAttribute('data-action');
                 // 关闭所有下拉菜单(同步 ARIA)
-                randomDropdownCtrl.close();
-                printDropdownCtrl.close();
-                randomDropdown.style.display = 'none';
-                printDropdown.style.display = 'none';
+                closeAllDropdowns();
 
-                // printDropdown 动作
-                if (action === 'print') {
-                    printPrepared = false;
-                    applyPrintScale();
-                    setTimeout(function () {
-                        window.print();
-                    }, 150);
-                } else if (action === 'exportImage') {
+                // printDropdown 动作(打印本身已上移到按钮,这里只剩「其他导出」)
+                if (action === 'exportImage') {
                     exportSeatImage();
                 } else if (action === 'exportSeatCsv') {
                     exportSeatCsv();
+                }
+                // modeDropdown:直接选定某个模式
+                else if (action === 'mode') {
+                    applyMode(item.getAttribute('data-mode'));
                 }
                 // 智能排座下拉里的「配对设置」菜单项
                 else if (action === 'pairSettings') {
@@ -4864,16 +4914,12 @@ function isWholeWordMatch(label, keyword) {
                 return;
             }
             // 点击外部关闭所有下拉菜单(同步 ARIA 与 setupActionDropdown)
-            const printDd = document.getElementById('printDropdown');
-            const randDd = document.getElementById('randomDropdown');
-            if (printDd && !printDd.contains(e.target) && !printBtn.contains(e.target)) {
-                printDd.style.display = 'none';
-                printBtn.setAttribute('aria-expanded', 'false');
-            }
-            if (randDd && !randDd.contains(e.target) && !randomDropdownBtn.contains(e.target)) {
-                randDd.style.display = 'none';
-                randomDropdownBtn.setAttribute('aria-expanded', 'false');
-            }
+            // 三个下拉的触发按钮都在各自 .action-btn-wrapper 里,统一按登记表判断
+            allDropdownCtrls.forEach(function (entry) {
+                if (!entry.ctrl.isOpen) return;
+                if (entry.dropdown.contains(e.target) || entry.btn.contains(e.target)) return;
+                entry.ctrl.close();
+            });
         });
 
         if (window.matchMedia) {
@@ -5388,6 +5434,13 @@ function isWholeWordMatch(label, keyword) {
                 modeSwitchBtn.classList.toggle('action-btn-primary', !!(isCheckinMode || isGroupMode));
                 modeSwitchBtn.title = '当前：' + label + '，点击切换到下一模式（普通 → 签到 → 分组）';
             }
+            // 下拉菜单里的当前项打勾
+            const cur = currentModeKey();
+            document.querySelectorAll('#modeDropdown [data-action="mode"]').forEach(function (el) {
+                const on = el.getAttribute('data-mode') === cur;
+                el.setAttribute('aria-checked', on ? 'true' : 'false');
+                el.classList.toggle('active', on);
+            });
         }
 
         // ==================== 统计项点击：复制姓名 / 下载 Excel ====================

@@ -737,11 +737,6 @@ h1:focus {
     opacity: 0.6;
 }
 
-/* 「切换模式」无下拉菜单,用不可见箭头占位,使高度与带下拉的按钮一致 */
-.caret-placeholder {
-    visibility: hidden;
-}
-
 .print-dropdown {
     position: absolute;
     top: 100%;
@@ -793,6 +788,31 @@ h1:focus {
 
 .print-dropdown-icon {
     font-size: 14px;
+}
+
+/* 模式下拉:当前模式项加粗打勾(与「智能排座」下拉里的开关行同一套观感) */
+.mode-menu-item[aria-checked="true"] {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.mode-menu-item .mode-menu-check {
+    /* 用「当前」小胶囊而不是对勾:签到模式的图标本身就是 ✓,再来个 ✓ 会分不清
+       哪个是图标、哪个是选中标记 */
+    margin-left: auto;
+    padding: 1px 6px;
+    border-radius: 9px;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 10px;
+    line-height: 1.5;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+
+.mode-menu-item[aria-checked="true"] .mode-menu-check {
+    opacity: 1;
 }
 
 /* 下拉项右侧徽标(如「分组轮换 +2」) */

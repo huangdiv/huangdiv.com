@@ -114,12 +114,32 @@
             <!-- 快捷操作 -->
             <div class="quick-actions">
                 <div class="action-btn-wrapper">
-                    <button id="modeSwitchBtn" class="action-btn" title="点击轮换模式：普通模式 → 签到模式 → 分组模式">
-                        <span class="action-icon" id="modeSwitchIcon">▦</span>
-                        <span id="modeSwitchLabel">普通模式</span>
-                        <!-- 占位箭头:与带下拉的按钮(随机排座/打印)保持同样的三段式高度 -->
-                        <span class="dropdown-caret caret-placeholder" aria-hidden="true">▾</span>
-                    </button>
+                    <div class="action-btn-split">
+                        <button id="modeSwitchBtn" class="action-btn action-btn-split-main" title="点击轮换模式：普通模式 → 签到模式 → 分组模式">
+                            <span class="action-icon" id="modeSwitchIcon">▦</span>
+                            <span id="modeSwitchLabel">普通模式</span>
+                        </button>
+                        <button id="modeDropdownBtn" class="action-btn action-btn-dropdown action-btn-split-caret" aria-haspopup="menu" aria-expanded="false" aria-controls="modeDropdown" title="直接选择模式">
+                            <span class="dropdown-caret" aria-hidden="true">▾</span>
+                        </button>
+                    </div>
+                    <div id="modeDropdown" class="print-dropdown" role="menu" style="display:none;" aria-label="选择模式">
+                        <div class="print-dropdown-item mode-menu-item" role="menuitem" tabindex="0" aria-checked="true" data-action="mode" data-mode="normal">
+                            <span class="print-dropdown-icon" aria-hidden="true">▦</span>
+                            <span>普通模式</span>
+                            <span class="mode-menu-check" aria-hidden="true">当前</span>
+                        </div>
+                        <div class="print-dropdown-item mode-menu-item" role="menuitem" tabindex="0" aria-checked="false" data-action="mode" data-mode="checkin">
+                            <span class="print-dropdown-icon" aria-hidden="true">✓</span>
+                            <span>签到模式</span>
+                            <span class="mode-menu-check" aria-hidden="true">当前</span>
+                        </div>
+                        <div class="print-dropdown-item mode-menu-item" role="menuitem" tabindex="0" aria-checked="false" data-action="mode" data-mode="group">
+                            <span class="print-dropdown-icon" aria-hidden="true">👥</span>
+                            <span>分组模式</span>
+                            <span class="mode-menu-check" aria-hidden="true">当前</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="action-btn-wrapper">
                     <div class="action-btn-split">
@@ -165,16 +185,16 @@
                     </div>
                 </div>
                 <div class="action-btn-wrapper">
-                    <button id="printBtn" class="action-btn action-btn-dropdown" aria-haspopup="menu" aria-expanded="false" aria-controls="printDropdown">
-                        <span class="action-icon">⎙</span>
-                        <span>打印/PDF</span>
-                        <span class="dropdown-caret" aria-hidden="true">▾</span>
-                    </button>
+                    <div class="action-btn-split">
+                        <button id="printBtn" class="action-btn action-btn-split-main" title="打印 / 另存为 PDF">
+                            <span class="action-icon">⎙</span>
+                            <span>打印/PDF</span>
+                        </button>
+                        <button id="printDropdownBtn" class="action-btn action-btn-dropdown action-btn-split-caret" aria-haspopup="menu" aria-expanded="false" aria-controls="printDropdown" title="其他导出方式">
+                            <span class="dropdown-caret" aria-hidden="true">▾</span>
+                        </button>
+                    </div>
                     <div id="printDropdown" class="print-dropdown" role="menu" style="display:none;">
-                        <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="print">
-                            <span class="print-dropdown-icon" aria-hidden="true">⎙</span>
-                            <span>打印 / 另存为PDF</span>
-                        </div>
                         <div class="print-dropdown-item" role="menuitem" tabindex="0" data-action="exportImage">
                             <span class="print-dropdown-icon" aria-hidden="true">🖼</span>
                             <span>导出为图片</span>

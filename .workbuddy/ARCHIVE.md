@@ -167,9 +167,9 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 ### 3.1 文件与行数（2026-11-03 更新）
 ```
 static/
-├── seats-generator.html    448 行   入口（<link>/<script type="module"> + DOM 骨架）
-├── seats-generator.css    4145 行   全部样式（含打印 @media、:focus-visible、九宫格区域弹窗）
-├── seats-generator.js     5653 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉）
+├── seats-generator.html    468 行   入口（<link>/<script type="module"> + DOM 骨架）
+├── seats-generator.css    4165 行   全部样式（含打印 @media、:focus-visible、九宫格区域弹窗）
+├── seats-generator.js     5706 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
 │   ├── migrate.js          184 行   migrateConfig（老数据字段补默认/clamp/version，含 rank/区域偏好）+ APP_VERSION
@@ -321,12 +321,48 @@ static/
   原先列表自己滚、外壳（`max-height`）也滚 ⇒ 出现**双滚动条**且末行被外壳切一半；
   交给 flex 分配后外壳 `scrollHeight === clientHeight`，只剩列表一条滚动条。
 
+### 3.8 三个快捷按钮统一为「两段式」（2026-11-03，v1.4.2）
+
+```
+┌──────────────┐        .action-btn-split (column flex, flex:1)
+│  icon        │  ← 上段 .action-btn-split-main（flex:1 1 auto，直接执行）
+│  label       │
+├──────────────┤
+│      ▾       │  ← 下段 .action-btn-split-caret（自然高度 22px，展开下拉）
+└──────────────┘
+```
+
+| 按钮 | 上段（直接执行） | 下段（下拉） |
+|---|---|---|
+| 模式切换 | `cycleMode()` 普通→签到→分组→普通 | `#modeDropdown` 直接选定某个模式 |
+| 智能排座 | 按当前开关排座 | 男女同桌 / 不同桌 / 小组轮换+步长 / 配对设置 / 区域设置 |
+| 打印/PDF | `doPrint()` 直接打印（另存为 PDF 在浏览器打印对话框里选） | `#printDropdown` 导出为图片 / 导出为 CSV 座位表 |
+
+**关键改造点**
+- `setupActionDropdown(btn, dropdown)` 去掉了 peer 参数，改为**登记表 + 全关**：
+  `allDropdownCtrls` 里存 `{btn, dropdown, ctrl}`，开之前先 `closeAllDropdowns()`。
+  三方互斥靠这一份登记表，不再两两配对（原先 `print` ↔ `random` 互相指名，加第三个就漏）。
+- 「点外部关闭」也改成遍历登记表（`entry.dropdown.contains(target) || entry.btn.contains(target)`），
+  不再硬编码 `printDd` / `randDd` 两个 id。
+- 新增 `applyMode(target)`（`'normal' | 'checkin' | 'group'`）：当前不是目标才切，
+  依赖 `toggleCheckinMode` / `toggleGroupMode` 内部已有的互斥逻辑，不重复处理。
+- `updateModeSwitchButton()` 额外同步下拉里的选中态：`aria-checked` + `.active` + 「当前」胶囊。
+  用文字胶囊而**不是对勾** —— 签到模式的图标本身就是 ✓，两个 ✓ 会分不清哪个是选中标记。
+- 打开模式下拉时优先聚焦「当前模式」那一项（`dropdown === modeDropdown` 时取
+  `[role="menuitem"][aria-checked="true"]`），其余菜单仍聚焦首项。
+- 「打印/PDF」下拉里的 `data-action="print"` 项已删除（打印上移到按钮本体）。
+
+**连带改的测试**（按钮语义变了，测试必须跟着走，不能只改断言值）：
+`batch16`（上段直接打印，不再点菜单项）、`batch18`（`#printBtn` → `#printDropdownBtn`，
+高度探针改比三个 `.action-btn-split` 容器）、`batch23`（CSV 导出入口）、`e2e_happy_path`（导出图片入口）。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | 「模式切换」「打印/PDF」改为与「智能排座」同款**两段式按钮**：上段直接执行（轮换模式 / 打印），下段下拉直接选模式 / 选其他导出方式（v1.4.2） |
 | 本轮 | 区域设置里**已有设置项的当前满足情况**颜色提示（绿=已满足 / 红=未满足并描红具体那一栏 / 灰=未入座）+ 顶部达成汇总条（v1.4.1） |
 | 本轮 | 智能排座**区域设置**（九宫格 前/中/后 × 左/中/右，逐生「倾向 / 避开」软约束，排座时等价换座满足，硬约束优先）+ 配对选择框改**自绘紧凑候选**（姓名左、第N名右、行高 24px） |
 | 本轮 | UI 紧凑化 + 术语统一：分组设置 / 详细设置的「删除」由 26×26 实心红块瘦身为 **18px 行内叉号**（与「布局设置 → 走道列表」的移除叉号同一套外观，宽度让给分组名/学生名）+ **「座位设置」更名「布局设置」**（v1.3.5） |
@@ -374,7 +410,7 @@ static/
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 28 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 29 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py

@@ -74,9 +74,8 @@ async def main():
         print("\n── 场景 3:点打印 ⇒ 写入今天日期 ──")
         # headless 下 window.print() 无实际效果,stub 掉以免阻塞
         await page.evaluate("() => { window.print = () => {}; }")
+        # 打印已上移到按钮本体(上段),点一下即打印;下拉只剩「其他导出」
         await page.click("#printBtn")
-        await page.wait_for_timeout(300)
-        await page.click("#printDropdown [data-action='print']")
         await page.wait_for_timeout(700)
         date_text = await page.evaluate(
             "(document.getElementById('titleDate') || {}).textContent"
@@ -124,7 +123,7 @@ async def main():
                 };
             }"""
         )
-        await page.click("#printBtn")
+        await page.click("#printDropdownBtn")
         await page.wait_for_timeout(300)
         await page.click("#printDropdown [data-action='exportImage']")
         await page.wait_for_timeout(900)

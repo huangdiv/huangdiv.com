@@ -30,7 +30,7 @@ import { ZONE_IDS } from './zone.js';
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.4.1';
+export const APP_VERSION = '1.4.2';
 
 // === 工具 ===
 function generateId(prefix) {

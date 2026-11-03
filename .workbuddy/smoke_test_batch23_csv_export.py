@@ -51,7 +51,7 @@ async def read_download_text(download):
 
 
 async def export_csv(page):
-    await page.click("#printBtn")
+    await page.click("#printDropdownBtn")
     await page.wait_for_timeout(250)
     async with page.expect_download(timeout=8000) as dl_info:
         await page.click('[data-action="exportSeatCsv"]')
@@ -101,7 +101,7 @@ async def main():
 
         # ─── 1. 菜单项存在 ───
         print("=== 1. 打印/PDF 下拉包含 CSV 导出项 ===")
-        await page.click("#printBtn")
+        await page.click("#printDropdownBtn")
         await page.wait_for_timeout(250)
         item = page.locator('[data-action="exportSeatCsv"]')
         if await item.count() == 1:

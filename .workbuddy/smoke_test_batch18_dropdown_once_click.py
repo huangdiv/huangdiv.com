@@ -34,8 +34,10 @@ def check(cond, msg):
 DD_STATE_JS = """() => ({
     rand: document.getElementById('randomDropdown').style.display,
     print: document.getElementById('printDropdown').style.display,
+    mode: document.getElementById('modeDropdown').style.display,
     randAria: document.getElementById('randomDropdownBtn').getAttribute('aria-expanded'),
-    printAria: document.getElementById('printBtn').getAttribute('aria-expanded')
+    printAria: document.getElementById('printDropdownBtn').getAttribute('aria-expanded'),
+    modeAria: document.getElementById('modeDropdownBtn').getAttribute('aria-expanded')
 })"""
 
 HEIGHTS_JS = """() => {
@@ -43,12 +45,18 @@ HEIGHTS_JS = """() => {
         return { h: Math.round(r.height * 10) / 10,
                  top: Math.round(r.top * 10) / 10,
                  bottom: Math.round(r.bottom * 10) / 10 }; };
+    const splits = document.querySelectorAll('.action-btn-split');
     return {
-        mode: box(document.getElementById('modeSwitchBtn')),
-        print: box(document.getElementById('printBtn')),
-        split: box(document.querySelector('.action-btn-split')),
+        // 三个按钮现在同构:上段(主)+下段(箭头),整组高度直接比容器
+        mode: box(splits[0]),
+        split: box(splits[1]),
+        print: box(splits[2]),
         main: box(document.getElementById('smartArrangeBtn')),
-        caret: box(document.getElementById('randomDropdownBtn'))
+        caret: box(document.getElementById('randomDropdownBtn')),
+        modeMain: box(document.getElementById('modeSwitchBtn')),
+        modeCaret: box(document.getElementById('modeDropdownBtn')),
+        printMain: box(document.getElementById('printBtn')),
+        printCaret: box(document.getElementById('printDropdownBtn'))
     };
 }"""
 
@@ -98,7 +106,7 @@ async def main():
 
         # ── 场景 4:互斥切换后仍一次点击即开(原 bug 高发点) ──
         print("\n── 场景 4:互斥切换后仍一次点击即开 ──")
-        await page.click("#printBtn")
+        await page.click("#printDropdownBtn")
         await page.wait_for_timeout(200)
         st = await page.evaluate(DD_STATE_JS)
         check(
@@ -128,7 +136,7 @@ async def main():
             await page.wait_for_timeout(200)
         seq_ok, detail = True, []
         for i in range(8):
-            btn, dd = ("#printBtn", "print") if i % 2 else ("#randomDropdownBtn", "rand")
+            btn, dd = ("#printDropdownBtn", "print") if i % 2 else ("#randomDropdownBtn", "rand")
             await page.click(btn)
             await page.wait_for_timeout(150)
             st = await page.evaluate(DD_STATE_JS)

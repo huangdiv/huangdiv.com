@@ -96,6 +96,15 @@
 - 这类「列表行内按钮」**不要用 26px 实心色块**:面板内分组行只有 ~142px 宽,操作区多吃 12px
   名称输入框就只剩 32px。新增行内按钮先量 `getBoundingClientRect` 再定尺寸
 
+## 快捷操作区:三个按钮统一两段式(2026-11-03, v1.4.2)
+- 模式切换 / 智能排座 / 打印PDF 结构一致 = `.action-btn-split` > 主按钮(`.action-btn-split-main`) + 箭头(`.action-btn-split-caret`)
+- 模式切换上段 = `cycleMode()` 三态轮换;下段 `#modeDropdown` 直接选 `normal|checkin|group`(`applyMode`)
+- 打印上段 = `doPrint()` 直接打印;下段 `#printDropdown` 只剩 导出图片 / 导出CSV(已删 `data-action="print"`)
+- 下拉互斥 = `allDropdownCtrls` 登记表 + `closeAllDropdowns()`;点外部关闭也遍历登记表,
+  **别再退回两两 peer 参数**(加第三个按钮必漏)
+- 模式菜单选中态用「当前」文字胶囊,**不要用 ✓**(签到模式图标本身就是 ✓)
+- 改这两个按钮的语义后,`batch16/18/23/e2e` 里的点击目标要跟着改(printBtn → printDropdownBtn)
+
 ## 九宫格区域设置(2026-11-02 第四次迭代)
 - `student.zonePref` / `student.zoneAvoid` = 区域 id(`front-left`…`back-right`),`''` = 未设置;
   migrate 用 `zone.js#ZONE_IDS` 白名单清非法值
