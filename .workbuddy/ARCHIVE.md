@@ -356,12 +356,35 @@ static/
 `batch16`（上段直接打印，不再点菜单项）、`batch18`（`#printBtn` → `#printDropdownBtn`，
 高度探针改比三个 `.action-btn-split` 容器）、`batch23`（CSV 导出入口）、`e2e_happy_path`（导出图片入口）。
 
+### 3.9 菜单项计数徽标的刷新时机（2026-11-04，v1.4.3）
+
+「智能排座」下拉里两个菜单项都带计数：`配对设置 [2强/1避]`、`区域设置 [3]`。
+两者**刷新策略不同**，一度只有区域设置是对的：
+
+| 菜单项 | 计数来源 | 刷新点 |
+|---|---|---|
+| 区域设置 | `students` 里 `zonePref/zoneAvoid` 有效的人数 | `generateStudentList()`（每次 `generateSeats` 都走） |
+| 配对设置 | `forcedPairs` / `avoidPairs` 的 `length` | 原先**只在 `openPairPopup()` 的 `renderAll()`** ⇒ 刷新后徽标为空，点开一次才出现 |
+
+修法：抽出幂等函数 `updatePairSettingsLabel()`（文本没变就不写 DOM），三处调用 ——
+`afterSeatsRender()`（座位每次重绘都走到，覆盖初始化 / 应用配置 / 导入配置）、
+`openPairPopup()` 的 `renderAll()`（弹窗内增删配对）、`initialize()` 末尾（首屏兜底）。
+
+文案规则（`join` 而非逐段拼字符串，避免只有回避时出现前导斜杠）：
+- 0 组 ⇒ `配对设置`（**不要**出现 `[]`）
+- 仅强制 ⇒ `配对设置 [3强]`；仅回避 ⇒ `配对设置 [2避]`
+- 都有 ⇒ `配对设置 [2强/1避]`
+
+⚠️ 这类"派生文案跟着数据走"的 UI，**不要只挂在打开弹窗的回调里** ——
+凡是首屏就该正确的展示项，刷新点必须落在初始化/渲染出口，否则就是一个"点一下才正常"的隐形 bug。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | 修复「配对设置」菜单项计数徽标**刷新后不显示**（把文案同步抽成 `updatePairSettingsLabel()`，挂到 `afterSeatsRender` + `initialize` 末尾）（v1.4.3） |
 | 本轮 | 「模式切换」「打印/PDF」改为与「智能排座」同款**两段式按钮**：上段直接执行（轮换模式 / 打印），下段下拉直接选模式 / 选其他导出方式（v1.4.2） |
 | 本轮 | 区域设置里**已有设置项的当前满足情况**颜色提示（绿=已满足 / 红=未满足并描红具体那一栏 / 灰=未入座）+ 顶部达成汇总条（v1.4.1） |
 | 本轮 | 智能排座**区域设置**（九宫格 前/中/后 × 左/中/右，逐生「倾向 / 避开」软约束，排座时等价换座满足，硬约束优先）+ 配对选择框改**自绘紧凑候选**（姓名左、第N名右、行高 24px） |
@@ -410,7 +433,7 @@ static/
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 29 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 30 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -467,6 +490,10 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 ### 6.2 测试技巧
 - 用 `localStorage.setItem('classroomConfig', JSON.stringify(cfg))` + `page.reload()` 注入数据；
   cfg 结构见 `getCurrentConfig()`。
+- ⚠️ **`page.add_init_script` 每次导航都会重跑**：拿它播种 `localStorage` 后，
+  任何 `reload()` 都会被重新覆盖回初始配置 ⇒「改动 → 自动保存 → 刷新」这类链路**永远测不到**
+  （表现：刷新后仍是初始值，看着像自动保存坏了）。修：播种脚本加 `sessionStorage` 标记，
+  只在首次执行（`smoke_test_batch30`）。
 - `autoSave()` 有 **500ms 防抖** ⇒ 断言持久化前 `wait_for_timeout(700)`。
 - 验证 DOM 节点持久化：给座位加 `data-persist-test` 自定义属性，no-op render 后看是否还在。
 - 验证「是否走了全班随机」：注入 2 名**无分组**学生——轮换时原地不动，全班随机会打散，可稳定区分路径。

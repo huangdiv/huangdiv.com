@@ -105,6 +105,15 @@
 - 模式菜单选中态用「当前」文字胶囊,**不要用 ✓**(签到模式图标本身就是 ✓)
 - 改这两个按钮的语义后,`batch16/18/23/e2e` 里的点击目标要跟着改(printBtn → printDropdownBtn)
 
+## 下拉菜单项计数徽标(2026-11-04, v1.4.3)
+- 两个菜单项带计数:`配对设置 [2强/1避]`、`区域设置 [3]`
+- **刷新点必须落在渲染出口,不能只挂在打开弹窗的回调里**:
+  区域设置 = `generateStudentList()`;配对设置 = `updatePairSettingsLabel()`(幂等),
+  调用处 = `afterSeatsRender()` / `openPairPopup().renderAll()` / `initialize()` 末尾
+- 文案用 `parts.join('/')`,不要逐段拼 ⇒ 只有回避时不会出现前导斜杠 `[/2避]`
+- 0 组时必须正好是 `配对设置`,不出现 `[]`
+- 测试 `batch30`:核心断言 = 刷新后**不打开弹窗**徽标就得正确
+
 ## 九宫格区域设置(2026-11-02 第四次迭代)
 - `student.zonePref` / `student.zoneAvoid` = 区域 id(`front-left`…`back-right`),`''` = 未设置;
   migrate 用 `zone.js#ZONE_IDS` 白名单清非法值

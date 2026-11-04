@@ -19,7 +19,7 @@ import { ZONE_DEFS, ZONE_IDS, isZoneId, zoneName, seatZone } from './modules/zon
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.2';
+        const APP_VERSION = '1.4.3';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -1694,6 +1694,24 @@ function normalizeRotateOffset(value) {
             return genderHintSeats.has(seatIndex) ? 'gender-rule-hint' : '';
         }
 
+        // 「智能排座」下拉里的「配对设置」菜单项带计数徽标(如「配对设置 [2强/1避]」)。
+        // forcedPairs / avoidPairs 会在初始化、应用配置、导入配置、清空时被整体替换,
+        // 早先只在打开弹窗的 renderAll 里刷新 ⇒ 刷新页面后徽标一直是空的,必须点开一次才出现。
+        // 抽成幂等函数,挂到 afterSeatsRender(座位每次重绘都会走到,覆盖初始化/应用配置)和弹窗变更处。
+        function updatePairSettingsLabel() {
+            var label = document.querySelector('[data-action="pairSettings"] .pair-settings-label');
+            if (!label) return;
+            var text = '配对设置';
+            if (forcedPairs.length > 0 || avoidPairs.length > 0) {
+                var parts = [];
+                if (forcedPairs.length > 0) parts.push(forcedPairs.length + '强');
+                if (avoidPairs.length > 0) parts.push(avoidPairs.length + '避');
+                text += ' [' + parts.join('/') + ']';
+            }
+            // 幂等:文本没变就不写 DOM,避免每次重绘都触发一次无谓的布局
+            if (label.textContent !== text) label.textContent = text;
+        }
+
         function refreshPairPopupStatus() {
             if (!activePairPopup || !activePairPopup.popupEl) return;
             var popup = activePairPopup.popupEl;
@@ -1707,6 +1725,7 @@ function normalizeRotateOffset(value) {
 
         // 座位渲染统一出口:任何一次座位重绘后都要做的派生刷新
         function afterSeatsRender() {
+            updatePairSettingsLabel();
             refreshPairPopupStatus();
             refreshZonePopupStatus();
             refreshGenderHints();
@@ -1764,13 +1783,7 @@ function normalizeRotateOffset(value) {
                 renderPairList(popup.querySelector('.pair-forced-list'), forcedPairs, 'forced');
                 renderPairList(popup.querySelector('.pair-avoid-list'), avoidPairs, 'avoid');
                 // 更新菜单项文字(已从独立按钮改为「随机排座」下拉内的菜单项)
-                var pairSettingsMenuItemLabel = document.querySelector('[data-action="pairSettings"] .pair-settings-label');
-                if (pairSettingsMenuItemLabel) {
-                    pairSettingsMenuItemLabel.textContent = '配对设置' +
-                        (forcedPairs.length > 0 ? ' [' + forcedPairs.length + '强' : '') +
-                        (avoidPairs.length > 0 ? (forcedPairs.length > 0 ? '/' : ' [') + avoidPairs.length + '避' : '') +
-                        (forcedPairs.length > 0 || avoidPairs.length > 0 ? ']' : '');
-                }
+                updatePairSettingsLabel();
             }
 
             renderAll();
@@ -4703,6 +4716,8 @@ function isWholeWordMatch(label, keyword) {
                 updateGroupStatsRow();
             }
             isInitialized = true;
+            // 兜底:首屏徽标必须正确(即使座位渲染链路后续重构不再派发 afterSeatsRender)
+            updatePairSettingsLabel();
         }
 
         // 导出配置按钮
