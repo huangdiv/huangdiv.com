@@ -42,7 +42,8 @@
 - 云端推送需 GitHub PAT(`repo` 权限),勿入库(`.env` 已在 `.gitignore`)。
 
 ## 测试约定
-- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 11 文件)
+- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 13 文件)
+  - 含 `unit_version_sync`:钉死「两处 APP_VERSION + HTML 入口 `?v=` + 两个静态兜底 span」一致
 - 冒烟:Playwright,`.workbuddy/smoke_test_batch*.py`,需先在 `static/` 起
   `python -m http.server 8123 --bind 127.0.0.1`
   (跑 15~25 分钟会半挂:curl 200 但 goto 超时 ⇒ 重启即可)
@@ -50,6 +51,13 @@
 - **写完新测试必须回退验证**:临时改回 buggy 写法跑一遍确认测试会红,再改回来
 - 本地预览(127.0.0.1/localhost)下暴露 `window.__seatsTest`
   (rotateGroupSeats / randomSeatArrange);`?debug=1` 下暴露 `window.__undoTest`
+
+## 发版与缓存(v1.4.4 起)
+- GitHub Pages 对 `.js` 发 `Cache-Control: max-age=600` + Cloudflare edge 缓存
+  ⇒ **改版本号时 HTML 入口的 `?v=` 必须一起改**,否则用户 10 分钟内看到的还是旧代码
+  (`static/tests/unit_version_sync.mjs` 会在漏改时失败)
+- 判断「线上到底发没发」:用带随机查询串的 curl 抓 `seats-generator.js` 看 `APP_VERSION`,
+  再用全新 browser context 读 `#appVersion`;**别拿普通刷新的页面当结论**
 
 ## 架构要点
 - 主文件 `static/seats-generator.js`(IIFE);模块 `static/modules/`:

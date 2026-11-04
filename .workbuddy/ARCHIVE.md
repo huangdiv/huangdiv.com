@@ -378,12 +378,33 @@ static/
 ⚠️ 这类"派生文案跟着数据走"的 UI，**不要只挂在打开弹窗的回调里** ——
 凡是首屏就该正确的展示项，刷新点必须落在初始化/渲染出口，否则就是一个"点一下才正常"的隐形 bug。
 
+### 3.10 发版缓存与版本号一致性（2026-11-04，v1.4.4）
+
+**问题**：GitHub Pages 给 `.js` 发 `Cache-Control: max-age=600`，Cloudflare 再缓存一层。
+入口脚本 URL 从不变化 ⇒ **发版后 10 分钟内打开页面，跑的还是旧代码**，`#appVersion` 也显示旧版本号
+（v1.4.3 上线后用户仍看到 v1.4.2，被误判为"没修好"）。
+
+**做法**：
+- HTML 入口改成 `<script type="module" src="seats-generator.js?v=<APP_VERSION>"></script>`
+  ⇒ 版本一变 URL 就变，必然穿透浏览器缓存与 edge 缓存。
+- 版本号共 5 处必须同步（两处 `APP_VERSION` + 入口 `?v=` + 两个静态兜底 span），
+  靠人记必漏 ⇒ `static/tests/unit_version_sync.mjs`（8 项）钉死。
+- HTML 里 `#appVersion` / `#appInfoVersion` 的**静态文字**也升到当前版本：
+  JS 没跑起来或脚本被拦时，页面不会显示一个上古版本号。
+- ⚠️ 模块文件（`modules/*.js`）仍按普通 URL 缓存，改动它们时最坏有 10 分钟延迟；
+  需要立刻生效就在入口文件的 import 上拼同样的查询串（当前未做，因为收益不抵复杂度）。
+
+**诊断口径**：判断"到底发没发"用
+`curl -s "https://huangdiv.com/seats-generator.js?x=$RANDOM" | grep APP_VERSION`（带随机查询串绕缓存），
+再用全新 browser context 打开页面读版本号；**不要**用普通刷新后的页面结论当作"没部署成功"。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | **发版缓存修复**：入口脚本加 `?v=<版本>` 破缓存（GitHub Pages `max-age=600`）+ `unit_version_sync` 钉死 5 处版本号（v1.4.4） |
 | 本轮 | 修复「配对设置」菜单项计数徽标**刷新后不显示**（把文案同步抽成 `updatePairSettingsLabel()`，挂到 `afterSeatsRender` + `initialize` 末尾）（v1.4.3） |
 | 本轮 | 「模式切换」「打印/PDF」改为与「智能排座」同款**两段式按钮**：上段直接执行（轮换模式 / 打印），下段下拉直接选模式 / 选其他导出方式（v1.4.2） |
 | 本轮 | 区域设置里**已有设置项的当前满足情况**颜色提示（绿=已满足 / 红=未满足并描红具体那一栏 / 灰=未入座）+ 顶部达成汇总条（v1.4.1） |
@@ -427,9 +448,9 @@ static/
 
 ### 5.1 单元测试（Node ESM，零依赖）
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
-- 12 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
+- 13 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
-  `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone`。
+  `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone` / `unit_version_sync`。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
@@ -525,6 +546,14 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   ① 用 `mousedown` + `preventDefault` 选项，别用 `click`（blur 会先收起列表）；
   ② 就地撑高而不是浮层 —— 父级 popup 有 `overflow:auto`，浮层会被裁掉；
   ③ 选中后把 id 记在 `input.dataset` 上，`blur`/手改文字时清掉，同名同姓才不会认错人。
+- **「修好了但用户说没修好」先查缓存，别急着改代码**（2026-11-04 真实踩坑）：
+  GitHub Pages 对静态资源发 `Cache-Control: max-age=600`，Cloudflare 再叠一层 edge 缓存
+  ⇒ 发版后 10 分钟内用户刷新页面，拿到的仍是旧 `seats-generator.js`，版本号也还是旧的。
+  排查顺序：① `curl -H 'Cache-Control: no-cache' 'https://…/x.js?x=随机'` 看线上真实内容；
+  ② 全新 browser context（无痕）跑一遍真实页面读 `#appVersion`；③ 看响应头
+  `last-modified` / `age` / `cf-cache-status` 判断是源站没发还是缓存没过期。
+  根治：入口 `<script type="module" src="seats-generator.js?v=<APP_VERSION>">` —— 每次发版换 URL。
+  代价是「改版本号要同步改 HTML」，所以配 `static/tests/unit_version_sync.mjs` 钉死三处一致。
 
 ---
 

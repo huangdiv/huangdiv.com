@@ -24,7 +24,7 @@
         <div class="app-info-dialog">
             <h4 id="appInfoTitle">班级座位表</h4>
             <dl class="app-info-list">
-                <div><dt>版本</dt><dd>v<span id="appInfoVersion">1.1.5</span></dd></div>
+                <div><dt>版本</dt><dd>v<span id="appInfoVersion">1.4.4</span></dd></div>
                 <div><dt>作者</dt><dd>huangdiv</dd></div>
                 <div><dt>网站</dt><dd><a href="https://huangdiv.com/" target="_blank" rel="noopener noreferrer">huangdiv.com</a></dd></div>
             </dl>
@@ -52,7 +52,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.3.1</span></span></h3>
+                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.4.4</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -462,7 +462,10 @@
     <!-- 引入html2canvas库用于导出图片 -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
-    <script type="module" src="seats-generator.js"></script>
+    <!-- 入口脚本带版本号查询串:每次发版 URL 变化 ⇒ 一定绕过浏览器/CDN 缓存
+         (GitHub Pages 对 JS 发 max-age=600,不加查询串会"发版后十分钟内仍是旧代码")。
+         ⚠️ 改版本号时这里必须同步,否则 /static/tests/unit_version_sync.mjs 会失败。 -->
+    <script type="module" src="seats-generator.js?v=1.4.4"></script>
 </body>
 
 </html>

@@ -19,7 +19,7 @@ import { ZONE_DEFS, ZONE_IDS, isZoneId, zoneName, seatZone } from './modules/zon
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.3';
+        const APP_VERSION = '1.4.4';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
