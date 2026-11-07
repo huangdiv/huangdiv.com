@@ -16,6 +16,12 @@ import asyncio, sys
 from playwright.async_api import async_playwright
 
 BASE = "http://127.0.0.1:8123/seats-generator.html"
+# 外链 CDN 在离线/受限网络下会拖住 load 事件 ⇒ 与 batch5/10/15/16 同款桩
+FAKE_XLSX = """window.XLSX = {
+    read: function () { return { SheetNames: [], Sheets: {} }; },
+    utils: { sheet_to_json: function () { return []; } }
+};"""
+FAKE_H2C = "window.html2canvas = () => Promise.reject(new Error('stub'));"
 results = []
 
 
@@ -47,8 +53,16 @@ async def main():
 
         page.on("dialog", on_dialog)
 
-        await page.goto(BASE)
-        await page.wait_for_timeout(1200)
+        await page.route("**/xlsx.full.min.js",
+                         lambda r: r.fulfill(status=200,
+                                             content_type="application/javascript; charset=utf-8",
+                                             body=FAKE_XLSX))
+        await page.route("**/html2canvas*.js",
+                         lambda r: r.fulfill(status=200,
+                                             content_type="application/javascript; charset=utf-8",
+                                             body=FAKE_H2C))
+        await page.goto(BASE, wait_until="domcontentloaded", timeout=45000)
+        await page.wait_for_timeout(1400)
 
         # ─── 场景 1:下拉已删除 ───
         print("=== 场景 1: 模式切换改为按钮轮换 ===")

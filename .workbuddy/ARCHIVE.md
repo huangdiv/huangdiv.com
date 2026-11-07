@@ -470,12 +470,43 @@ static/
 宽松的 `in ('none','','""')` 会漏掉这个回归（本次已踩过并收紧）。
 回退验证：恢复 marker 属性 + 旧开关名 ⇒ 2 项变红；单独恢复图例小三角 ⇒ 1 项变红。
 
+### 3.13 同桌连线走向统一（2026-11-07，v1.4.7）
+
+用户反馈：「已是同桌的两个座位的关联线，有时在俩座位上方，有时在俩座位下方，请保持统一」。
+
+**根因**：`pair-links.js#planOne()` 的 `sameRow` 分支原本用 `index % 2` 决定走上/下走廊
+（本意是让多条跨列连线错开），但 `index = links.length` 是**配对数组里的序号** ——
+增删一组配对、或导入配置的顺序不同，同一对同桌的线就从上方翻到下方；
+`off = ((index % 5) - 2) * jitter` 还让同排线额外有最多 3.2px 抖动。
+回退验证实测同一对从 `y=17.4`（上）跳到 `y=88.2`（下），精确复现用户描述。
+
+**修法**（`pair-links.js` 纯函数内闭环，`seats-generator.js` / CSS 一行未改）：
+- 新增 `decideDeskmateSide(hLanes, rects)`：全班只算一次侧别 —— 最顶行上方还有横向
+  走廊（`.classroom` padding 24px，正常都成立）就统一 `'above'`，否则整体 `'below'`。
+  **只依赖几何，不掺入配对顺序 / index**。
+- `planOne()` 用 `deskmateMap[fromIdx] === toIdx` 识别「这两人当前是同桌」：固定取该侧
+  最近走廊、`yA = yB = chosen`、**不加 off**；非同桌的同行连线保留 `index%2` 交错，
+  避免多条跨行/跨列长线叠在同一条走廊上（没有一刀切全改，是为了不误伤长线错层）。
+- 用 `deskmateMap`（排座引擎同桌语义）而非 `sameRow` 判定 ⇒ 顺带覆盖「同行座位高度
+  略有差异导致 `sameRow` 为 false、线一端上一端下」的隐患。
+- 返回对象加 `deskmate` / `laneSide` 两个诊断字段，测试可直接断言「全班统一」而不必反推几何。
+
+**保留**：淡蓝实线 / 红虚线 + 中点 ×、走廊几何、「不进任何座位矩形」不变量、
+打印/导出剔除图层、全部刷新点。
+
+**测试**：`unit_pair_links.mjs` 加 G 组 6 项（32→38，含顺序无关、同排等高、
+无顶部 padding 时统一走下方）；`batch31` 加 17c 组 5 项（34→39，浏览器侧从真实
+SVG path 反推走廊 y 与 above/below）。回退验证：把 `if (isDeskmate)` 临时改成
+`if (false && isDeskmate)` ⇒ G1/G2/G3/G4 变红，还原后全绿。
+顺带给老批次 `batch11` 补 CDN 桩 + `domcontentloaded`（原来裸 `goto()` 等 `load` 必超时）。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | **同桌连线走向统一**：`index%2` 交替上下改为「同桌线全班固定走座位上方、同排等高」，侧别只由几何决定；非同桌线保留交错避免长线重叠（v1.4.7，见 §3.13） |
 | 本轮 | **去掉连线箭头 + 开关改名**：两类配对线都只保留线本身（淡蓝实线 / 红色虚线 + 中点 ×），删掉全部 `<marker>` 与图例小三角；开关「配对关联箭头」→「配对关联线」（v1.4.6，见 §3.12） |
 | 上轮 | **配对约束唯一性 + 座位区关联箭头**：强制同桌一人一组（重复弹提示，载入清洗老配置）；每个强制配对画细淡蓝箭头、回避配对仅在被排成同桌时画红色虚线双向互斥箭头；连线只走座位空隙带不压座位；新增开关与图例（v1.4.5） |
 | 上轮 | **发版缓存修复**：入口脚本加 `?v=<版本>` 破缓存（GitHub Pages `max-age=600`）+ `unit_version_sync` 钉死 5 处版本号（v1.4.4） |
@@ -525,8 +556,9 @@ static/
 - 14 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
   `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone` /
-  `unit_version_sync` / **`unit_pair_links`**（32 项：唯一性校验、清洗、走廊几何、
-  「路径不进任何座位矩形」的 160 点采样不变量、与 `getDeskMatePairs` 交叉验证）。
+  `unit_version_sync` / **`unit_pair_links`**（38 项：唯一性校验、清洗、走廊几何、
+  「路径不进任何座位矩形」的 160 点采样不变量、与 `getDeskMatePairs` 交叉验证、
+  G 组「同桌线走向统一：固定同侧 / 顺序无关 / 同排等高 / 无顶部 padding 降级」）。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
@@ -559,7 +591,8 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   每个在 `page` 建好后 `page.route` 拦 `xlsx.full.min.js` + `html2canvas*.js`，
   并把 `load` / `networkidle` 改成 `domcontentloaded`。`e2e_happy_path` 的 Step 5
   要真实导出 PNG，所以**只桩 sheetjs，html2canvas 保持真加载**。
-  其余老批次（11~13 等）仍可能卡 30s 超时，跑法同上。
+  2026-11-07 再补 `batch11`（原来裸 `goto()` 等 `load`，连跑回归时 30s 超时）。
+  其余老批次（12/13 等）仍可能卡 30s 超时，跑法同上。
 - **新批次31 的几何断言**：浏览器侧用 `path.getTotalLength()` +
   `getPointAtLength()` 采样，把每个点与 `.seat` 的 `offsetLeft/Top/Width/Height`
   （相对 `.classroom` padding box，和 SVG viewBox 同坐标系）比对，
@@ -567,6 +600,10 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - **v1.4.6 起 batch31 共 34 项**：新增「无 marker 属性 / SVG 内 0 个 marker,defs /
   实线 vs 虚线 + 中点 × / 图例 `::after` content == 'none' / 开关文案」5 项。
   断言「伪元素不存在」时必须严格判 `content === 'none'`，别把 `'""'` 也算通过。
+- **v1.4.7 起 batch31 共 39 项**（17c 组）：从真实 SVG path 的 `d` 属性抠出折点，
+  用「水平段 y vs 起点 y」反推 `above` / `below`，断言多组同桌全部 `above`、同排
+  走廊 y 完全一致、反转配对数组顺序后 `d` 的多重集合不变。
+  ⇒ 这类「视觉方位」断言不必截图，纯 DOM 数值就能稳定自动化。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
 - `window.__seatsTest`：`rotateGroupSeats` / `randomSeatArrange`（驱动带撤销与 UI 回调的真实实例）。
@@ -592,6 +629,7 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 | **动态 DOM 内按钮失效** | banner 随重建被替换 ⇒ 按钮必须走容器事件委托；diff 不重建壳子时，纯内容变更需在渲染出口单独回填。 |
 | **落座后处理无视约束** | 随机排座「每位学生都不在原座」的后处理把合规同桌拆散 ⇒ 优先级必须明确：**性别规则 > 「必须换座」**。 |
 | **陈旧跟踪 ref** | 沙箱内 `git fetch`/`push` 后 origin/master 可能不落盘 ⇒ 只信 `git ls-remote` / `git fsck`，按 §2.2 双保险修。 |
+| **视觉方位由遍历序号驱动** | `planOne()` 用 `index % 2` 决定同桌线走上/下走廊 ⇒ 增删一组配对就翻面（v1.4.7，§3.13）。「让多条线错开」的抖动只能用在无语义的连线上；带业务语义（同桌 / 配对）的线，方位必须由几何或语义统一决定，与数组顺序彻底解耦。 |
 
 ### 6.2 测试技巧
 - 用 `localStorage.setItem('classroomConfig', JSON.stringify(cfg))` + `page.reload()` 注入数据；
@@ -652,6 +690,10 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - **打印 / 截图导出要单独决策**：屏幕坐标算出的叠加层在 `@media print`（padding/gap 被压缩）
   下必然错位，html2canvas 对内联 SVG marker 支持也不完整 ⇒ 打印用 CSS 隐藏、
   导出图片在 `cloneNode(true)` 后主动删掉图层；别指望「clone 会自然带上一切」。
+- **用户说「有时…有时…」时，先找「随什么在变」**（v1.4.7）：这类反馈背后几乎总有
+  一个隐藏的顺序/状态变量（这里是 `index = links.length`）。修法不是调参数把某一帧
+  调好看，而是把该变量从决策链里**彻底摘掉**；再用「增删前后 / 改数组顺序后结果
+  byte-for-byte 不变」的断言钉死，比截图对比更可靠。
 
 ---
 

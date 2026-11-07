@@ -18,6 +18,10 @@
 //   → 回到 B 座位边缘」，全程不进入任何座位矩形内部；图层本身再设
 //   pointer-events:none 且置于座位下方，双重保证不影响拖拽/点击。
 //
+//   同桌（deskmateMap 互指）的连线额外固定方位：全班统一走座位同一侧的最近
+//   一条横向走廊，且不加序号抖动（见 decideDeskmateSide）；非同桌连线仍按
+//   序号交错上下，避免多条跨行/跨列长线叠在同一条走廊上。
+//
 // 坐标约定：rects[i] = { left, top, width, height }，坐标系原点为 .classroom
 // 的 padding box 左上角（与 absolute inset:0 的 SVG 完全一致）。
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,6 +193,27 @@ function laneAbove(lanes, y) {
     return null;
 }
 
+/**
+ * 「同桌连线」全班统一走座位上方还是下方，只根据几何算一次。
+ *
+ * 历史 bug：同一行的连线曾按 `index % 2` 交替上下走廊（本意是让多条跨列连线
+ * 错开不重叠），但 index 是「配对数组里的序号」—— 增删一组配对、或导入配置里
+ * 顺序不同，同一对同桌的线就会从上方翻到下方。用户看到的就是「有时在俩座位
+ * 上方、有时在下方」。
+ *
+ * 因此侧别必须与配对顺序完全解耦：只要最顶行上方还有横向走廊（.classroom 有
+ * 24px padding，正常都成立），全班同桌线一律走上方；否则整体改走下方。
+ */
+function decideDeskmateSide(hLanes, rects) {
+    const valid = (rects || []).filter(r => r && r.width > 0 && r.height > 0);
+    if (!valid.length) return 'above';
+    const top = Math.min(...valid.map(r => r.top));
+    const bottom = Math.max(...valid.map(r => r.top + r.height));
+    if (laneAbove(hLanes, top) != null) return 'above';
+    if (laneBelow(hLanes, bottom) != null) return 'below';
+    return 'above';
+}
+
 function chooseVerticalLane(lanes, ax, bx, index, jitter) {
     if (!lanes.length) return (ax + bx) / 2;
     const lo = Math.min(ax, bx), hi = Math.max(ax, bx);
@@ -230,9 +255,21 @@ function planOne(fromIdx, toIdx, kind, ids, index, ctx) {
     const off = ((index % 5) - 2) * jitter;
     const downward = b.cy > a.cy;
     const sameRow = Math.abs(a.cy - b.cy) < 2;
+    // deskmateMap 来自排座引擎（走道隔开的不算同桌）。同桌的连线必须固定方位，
+    // 且不加 index 抖动：同排所有同桌线因此等高、同侧、与配对录入顺序无关。
+    const isDeskmate = !!(ctx.deskmateMap && ctx.deskmateMap[fromIdx] === toIdx);
 
     let yA, yB;
-    if (sameRow) {
+    if (isDeskmate) {
+        const above = laneAbove(ctx.hLanes, a.top);
+        const below = laneBelow(ctx.hLanes, a.bottom);
+        const primary = ctx.deskmateSide === 'below' ? below : above;
+        const secondary = ctx.deskmateSide === 'below' ? above : below;
+        const chosen = primary != null ? primary
+            : (secondary != null ? secondary : Math.max(0, a.top - 2));
+        yA = yB = chosen;
+    } else if (sameRow) {
+        // 非同桌的同行连线仍按序号交错上下，避免多条跨列连线叠在同一条走廊上
         const above = laneAbove(ctx.hLanes, a.top);
         const below = laneBelow(ctx.hLanes, a.bottom);
         const useAbove = index % 2 === 0;
@@ -270,6 +307,9 @@ function planOne(fromIdx, toIdx, kind, ids, index, ctx) {
         toIdx: toIdx,
         d: d,
         points: clean,
+        // 诊断/测试用：同桌连线固定侧别，断言「全班统一」时无需反推几何
+        deskmate: isDeskmate,
+        laneSide: isDeskmate ? (yA < a.cy ? 'above' : 'below') : '',
         // 互斥标记（回避同桌却已同桌）：放在水平走线段的中点，同样位于空隙带内
         cross: kind === 'avoid' ? { x: crossX, y: (yA + yB) / 2 } : null
     };
@@ -297,7 +337,15 @@ export function planPairLinks(o) {
         if (seats[i]) seatOf[seats[i]] = i;
     }
     const lanes = buildLaneMap(rects, o.width || 0, o.height || 0);
-    const ctx = { rects: rects, gapBand: lanes.gapBand, hLanes: lanes.hLanes, vLanes: lanes.vLanes };
+    const ctx = {
+        rects: rects,
+        gapBand: lanes.gapBand,
+        hLanes: lanes.hLanes,
+        vLanes: lanes.vLanes,
+        deskmateMap: dm,
+        // 全班只算一次，同桌线不再随配对数组顺序翻上翻下
+        deskmateSide: decideDeskmateSide(lanes.hLanes, rects)
+    };
     const links = [];
     let forcedCount = 0;
     let avoidCount = 0;

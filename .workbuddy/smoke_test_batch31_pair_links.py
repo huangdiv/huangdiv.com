@@ -9,7 +9,7 @@
   4. 「回避同桌」默认不画；两人真的被排成同桌时才画红色虚线 + 中点 ×（不带箭头）；
   5. 开关名字叫「配对关联线」。
 
-断言(共 34 项，按 19 组组织):
+断言(共 39 项，按 20 组组织):
   1. 首屏(未打开弹窗)即有 1 个 .pair-link-layer，3 条强制线 + 1 条互斥线
   2. 强制/互斥两种线的 computed stroke 颜色不同，且强制线更淡、更细
   3. 两类线都不带箭头：无 marker 属性、SVG 内无 <marker>/<defs>；
@@ -29,7 +29,9 @@
  16. 切换教师视角后连线仍在，且仍不压座位
  17. 打印样式下连线与图例隐藏
  17b. 导出图片的克隆体剔除 SVG 图层(避免 html2canvas 兼容问题)，座位仍完整
- 18. 版本号 1.4.6 + 全程无 JS 报错
+ 17c. 同桌连线走向统一：多组同桌一律走座位上方、同排共用走廊、
+      反转配对数组顺序后每条线 d 完全不变（v1.4.7 修复 index%2 交替上下）
+ 18. 版本号 1.4.7 + 全程无 JS 报错
 
 运行前先起本地服务:
   cd static && python -m http.server 8123 --bind 127.0.0.1
@@ -90,7 +92,7 @@ def make_config(forced, avoid, title="批次31", view="student", show_links=True
         "showPairLinks": show_links,
         "forcedPairs": forced,
         "avoidPairs": avoid,
-        "version": "1.4.6",
+        "version": "1.4.7",
     }
 
 
@@ -104,6 +106,13 @@ CFG_NO_CONFLICT = make_config(
     [["s1", "s12"], ["s3", "s10"], ["s5", "s9"]],
     [["s2", "s4"], ["s7", "s9"]],
 )
+
+# 19 组：4 组强制同桌都真的坐在相邻座位 + 1 组回避冲突同桌。
+# 3 行 4 列无走道 ⇒ 同桌为 (0,1)(2,3)(4,5)(6,7)(8,9)(10,11)
+DESKMATE_FORCED = [["s1", "s2"], ["s3", "s4"], ["s5", "s6"], ["s9", "s10"]]
+CFG_DESKMATES = make_config(DESKMATE_FORCED, [["s7", "s8"]], title="同桌走向")
+CFG_DESKMATES_REV = make_config(list(reversed(DESKMATE_FORCED)),
+                                [["s7", "s8"]], title="同桌走向-反序")
 
 
 async def link_info(page):
@@ -167,6 +176,35 @@ PATH_HITS = """() => {
         }
     });
     return hits;
+}"""
+
+
+# 从真实 SVG path 反推每条线的「走廊 y」与走向（above / below）。
+# startY 是座位边缘出发点的 y；水平段的 y 就是走廊 y：
+#   走廊 y < startY ⇒ 线绕座位上方；走廊 y > startY ⇒ 绕下方。
+LINK_GEOMETRY = """() => {
+    return Array.from(document.querySelectorAll('path.pair-link')).map(p => {
+        const d = p.getAttribute('d');
+        const nums = (d.match(/-?\\d+(?:\\.\\d+)?/g) || []).map(Number);
+        const pts = [];
+        for (let i = 0; i + 1 < nums.length; i += 2) pts.push([nums[i], nums[i+1]]);
+        const startY = pts.length ? pts[0][1] : NaN;
+        let laneY = null;
+        for (let i = 0; i + 1 < pts.length; i++) {
+            if (Math.abs(pts[i][1] - pts[i+1][1]) < 0.05 &&
+                Math.abs(pts[i][0] - pts[i+1][0]) > 0.05) {
+                laneY = pts[i][1];
+                break;
+            }
+        }
+        return {
+            d: d,
+            kind: p.classList.contains('pair-link-avoid') ? 'avoid' : 'forced',
+            startY: startY,
+            laneY: laneY,
+            direction: laneY === null ? 'flat' : (laneY < startY ? 'above' : 'below')
+        };
+    });
 }"""
 
 
@@ -402,9 +440,34 @@ async def main():
         check(exp["captured"] and exp["layers"] == 0 and exp["seats"] == 12,
               f"导出克隆剔除连线图层且座位完整（{exp}）")
 
+        # ═══ 17c. 同桌连线走向统一（v1.4.7）═══
+        print("=== 17c. 同桌连线走向统一 ===")
+        await mount(page, CFG_DESKMATES)
+        geom = await page.evaluate(LINK_GEOMETRY)
+        check(len(geom) == 5 and
+              sum(1 for g in geom if g["kind"] == "forced") == 4,
+              f"4 组强制同桌 + 1 组回避冲突同桌 ⇒ 5 条线（实际 {len(geom)}）")
+        check(all(g["direction"] == "above" for g in geom),
+              f"所有同桌线统一走座位上方（实际 {[g['direction'] for g in geom]}）")
+        lanes_by_row = {}
+        for g in geom:
+            if g["laneY"] is not None:
+                lanes_by_row.setdefault(round(g["startY"], 1), []).append(g["laneY"])
+        check(all(g["laneY"] is not None for g in geom) and
+              all(max(v) - min(v) < 0.05 for v in lanes_by_row.values()),
+              f"同一排的同桌线共用同一条走廊、无序号抖动（{lanes_by_row}）")
+        hits3 = await page.evaluate(PATH_HITS)
+        check(len(hits3) == 0,
+              f"统一走向后仍不压任何座位（命中 {len(hits3)} 处）")
+
+        await mount(page, CFG_DESKMATES_REV)
+        geom_rev = await page.evaluate(LINK_GEOMETRY)
+        check(sorted(g["d"] for g in geom) == sorted(g["d"] for g in geom_rev),
+              "反转配对数组顺序后，每条同桌线走向完全不变")
+
         # ═══ 18. 版本 + 无报错 ═══
         print("=== 18. 版本与控制台 ===")
-        check(teacher["version"] == "1.4.6", f"版本号 1.4.6（实际 {teacher['version']}）")
+        check(teacher["version"] == "1.4.7", f"版本号 1.4.7（实际 {teacher['version']}）")
         check(len(ERRORS) == 0, f"全程无 JS 报错（{ERRORS[:3]}）")
 
         await browser.close()

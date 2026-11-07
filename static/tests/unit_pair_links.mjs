@@ -73,27 +73,44 @@ function seatsOf(pairsOfIdx, n) {
     Object.keys(pairsOfIdx || {}).forEach(id => { seats[Number(id)] = pairsOfIdx[id]; });
     return seats;
 }
-function insideAnyRect(x, y) {
+function insideAnyRect(x, y, rects) {
     const eps = 0.25;
-    return RECTS.some(r =>
+    return (rects || RECTS).some(r =>
         x > r.left + eps && x < r.left + r.width - eps &&
         y > r.top + eps && y < r.top + r.height - eps);
 }
-function samplePath(points) {
+function samplePath(points, rects, width, height) {
+    const rs = rects || RECTS, w = width || WIDTH, h = height || HEIGHT;
     for (let s = 0; s < points.length - 1; s++) {
         const [x1, y1] = points[s], [x2, y2] = points[s + 1];
         for (let k = 0; k <= 60; k++) {
             const t = k / 60;
             const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
-            if (insideAnyRect(x, y)) {
+            if (insideAnyRect(x, y, rs)) {
                 throw new Error(`线段 ${s} 在 (${x.toFixed(1)},${y.toFixed(1)}) 穿过座位内部`);
             }
-            if (x < -1 || y < -1 || x > WIDTH + 1 || y > HEIGHT + 1) {
+            if (x < -1 || y < -1 || x > w + 1 || y > h + 1) {
                 throw new Error(`路径点 (${x.toFixed(1)},${y.toFixed(1)}) 越出教室`);
             }
         }
     }
 }
+// 同桌线固定同侧时，走廊 y 就是整条路径的极值 y（端点只比它更靠近座位）
+function laneY(link) {
+    return link.points.reduce((acc, p) => Math.min(acc, p[1]), Infinity);
+}
+// 用座位索引当学生 id，保证同一对同桌在不同数组顺序下 ids 不变
+function deskmateScenario(pairs) {
+    const seats = new Array(ROWS * COLS).fill(null);
+    const forced = [];
+    pairs.forEach(p => {
+        seats[p[0]] = 's' + p[0];
+        seats[p[1]] = 's' + p[1];
+        forced.push(['s' + p[0], 's' + p[1]]);
+    });
+    return { seats: seats, forced: forced };
+}
+const LINK_OPT = { avoid: [], deskmateMap: DM, rects: RECTS, width: WIDTH, height: HEIGHT };
 
 console.log('\n=== A. 强制同桌唯一性校验 ===');
 
@@ -330,6 +347,93 @@ test('F2 有走道（第 1、4 列后）：两边同桌表仍一致', () => {
     } finally {
         Object.assign(state, original);
     }
+});
+
+console.log('\n=== G. 同桌连线走向统一（v1.4.7）===');
+
+test('G1 同一行 3 组同桌：全部在座位上方、同排等高', () => {
+    const s = deskmateScenario([[0, 1], [2, 3], [4, 5]]);
+    const r = planPairLinks({ ...LINK_OPT, forced: s.forced, seats: s.seats });
+    assertEqual(r.links.length, 3);
+    r.links.forEach(l => {
+        assert(l.deskmate, '同桌线应标记 deskmate');
+        assertEqual(l.laneSide, 'above', '同桌线统一走上方');
+        assert(l.points.every(p => p[1] < RECTS[l.fromIdx].top + 0.5),
+            '整条线都在座位上方');
+    });
+    const ys = r.links.map(laneY);
+    assert(ys.every(y => Math.abs(y - ys[0]) < 0.01),
+        `同排同桌线走廊 y 完全一致（无 index 抖动）：${ys.join(',')}`);
+});
+
+test('G2 同一对同桌的线不随配对数组顺序翻转（核心回归）', () => {
+    const target = 's0|s1';
+    const base = deskmateScenario([[0, 1]]);
+    const d0 = planPairLinks({ ...LINK_OPT, forced: base.forced, seats: base.seats })
+        .links[0].d;
+    // 前置 1 组 / 前置 2 组 / 后置 1 组：目标线必须是同一条路径
+    [[[2, 3], [0, 1]], [[2, 3], [4, 5], [0, 1]], [[0, 1], [2, 3]]]
+        .forEach((pairs, k) => {
+            const s = deskmateScenario(pairs);
+            const r = planPairLinks({ ...LINK_OPT, forced: s.forced, seats: s.seats });
+            const l = r.links.find(x => x.ids.join('|') === target);
+            assert(l, `第 ${k + 1} 种顺序下目标同桌线应存在`);
+            assertEqual(l.d, d0, `第 ${k + 1} 种顺序下目标线走向不变`);
+        });
+});
+
+test('G3 不同行的同桌线也一律走上方（相对方位统一）', () => {
+    const s = deskmateScenario([[0, 1], [6, 7], [18, 19]]);
+    const r = planPairLinks({ ...LINK_OPT, forced: s.forced, seats: s.seats });
+    assertEqual(r.links.length, 3);
+    r.links.forEach(l => {
+        assertEqual(l.laneSide, 'above');
+        assert(l.points.every(p => p[1] < RECTS[l.fromIdx].top + 0.5),
+            '整条线在各自座位上方');
+        samplePath(l.points);
+    });
+});
+
+test('G4 回避冲突同桌线与强制同桌线同侧同高', () => {
+    const seats = seatsOf({ 0: 'a', 1: 'b', 2: 'c', 3: 'd' });
+    const r = planPairLinks({
+        ...LINK_OPT, forced: [['a', 'b']], avoid: [['c', 'd']], seats
+    });
+    assertEqual(r.links.length, 2);
+    r.links.forEach(l => {
+        assert(l.deskmate, '两类同桌线都应标记 deskmate');
+        assertEqual(l.laneSide, 'above');
+    });
+    assert(Math.abs(laneY(r.links[0]) - laneY(r.links[1])) < 0.01,
+        '两类同桌线共用同一条走廊');
+});
+
+test('G5 非同桌的强制配对保持原有交错逻辑（不误伤）', () => {
+    const s = deskmateScenario([[0, 1], [2, 23]]);
+    const r = planPairLinks({ ...LINK_OPT, forced: s.forced, seats: s.seats });
+    const near = r.links.find(l => l.ids.join('|') === 's0|s1');
+    const far = r.links.find(l => l.ids.join('|') === 's2|s23');
+    assert(near && far);
+    assertEqual(near.laneSide, 'above');
+    assertEqual(far.laneSide, '', '非同桌线不参与统一侧别');
+    assertEqual(far.deskmate, false);
+    samplePath(far.points);
+});
+
+test('G6 无顶部 padding 时全班改走下方，仍统一且不越界', () => {
+    const tight = RECTS.map(r => Object.assign({}, r, { top: r.top - PAD }));
+    const tightH = HEIGHT - PAD;      // 294：座位底 270，底部仍留 24
+    const s = deskmateScenario([[0, 1], [6, 7]]);
+    const opt = Object.assign({}, LINK_OPT, { rects: tight, height: tightH });
+    const r = planPairLinks({ ...opt, forced: s.forced, seats: s.seats });
+    assertEqual(r.links.length, 2);
+    r.links.forEach(l => {
+        const box = tight[l.fromIdx];
+        assertEqual(l.laneSide, 'below');
+        assert(l.points.every(p => p[1] > box.top + box.height - 0.5),
+            '整条线在座位下方');
+        samplePath(l.points, tight, WIDTH, tightH);
+    });
 });
 
 console.log(`\n${passed} 项通过，${failures.length} 项失败`);

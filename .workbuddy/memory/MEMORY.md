@@ -142,7 +142,7 @@
 - **配对选择框已改成自绘候选**(`.pair-suggest`):原生 datalist 无法把名次放右侧、条目过高;
   自绘要点 = mousedown+preventDefault、就地撑高(父级 overflow 会裁浮层)、选中 id 记 dataset
 
-## 配对唯一性 + 座位区「配对关联线」(2026-11-07, v1.4.5 / v1.4.6)
+## 配对唯一性 + 座位区「配对关联线」(2026-11-07, v1.4.5 / v1.4.6 / v1.4.7)
 - **一人只能有一组「强制同桌」**:`pair-links.js#validateForcedPair` 纯函数(返回 self/duplicate/conflict
   + `sharedId/partnerId/newPartnerId`),弹窗录入拦下并 alert `MESSAGES.PAIR_FORCED_CONFLICT`;
   `migrateConfig` 用 `sanitizeForcedPairs()` 清洗老配置,**UI 校验与载入清洗必须成对做**。
@@ -168,3 +168,8 @@
 - 开关 `data-toggle="pairlinks"`,**文案「配对关联线」**(v1.4.6 起,图标 🔗),配置字段
   `showPairLinks`(默认 true,纯 UI 顶层 let,不进 state);
   图例 `.pair-link-legend` 在教室下方,只在有线时显示、带两类计数。
+- **同桌线走向统一(v1.4.7)**:`planOne()` 里 `deskmateMap` 判定为同桌的连线,侧别由
+  `decideDeskmateSide()` 全班只算一次(默认座位上方、无顶部 padding 时整体降级下方),
+  `yA=yB` 且**不加 `index` 抖动**;**不得再用 `index%2` 交替上下**(配对数组一增删就翻面)。
+  只有「非同桌」的同行线保留交错,避免多条跨行长线叠在同一走廊。
+  改这块先跑 `unit_pair_links.mjs` G 组 + `batch31` 17c 组。

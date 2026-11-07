@@ -20,7 +20,7 @@ import { validateForcedPair, planPairLinks } from './modules/pair-links.js';
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.6';
+        const APP_VERSION = '1.4.7';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
