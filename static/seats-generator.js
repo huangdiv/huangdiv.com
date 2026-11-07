@@ -20,7 +20,7 @@ import { validateForcedPair, planPairLinks } from './modules/pair-links.js';
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.5';
+        const APP_VERSION = '1.4.6';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -58,7 +58,7 @@ let groupRotateOffset = 1;             // 分组轮换步长(默认 +1:轮换到
 let smartArrangeMixed = false;         // 男女同桌
 let smartArrangeSameGender = false;    // 男女不同桌(与「男女同桌」互斥)
 let smartArrangeRotate = false;        // 小组轮换(开启后智能排座会在排座后按步长轮换)
-let showPairLinks = true;              // 座位区配对关联箭头(默认开,配置可关)
+let showPairLinks = true;              // 座位区配对关联线(默认开,配置可关)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
 // 性别规则(男女同桌 / 男女不同桌)未达成的座位集合 —— 开座表闪烁提示用
@@ -1726,9 +1726,9 @@ function normalizeRotateOffset(value) {
             renderPairList(aList, avoidPairs, 'avoid');
         }
 
-        // ═══════════════ 座位区「配对关联指示箭头」═══════════════
-        // 目标:每个「强制同桌」配对的两个座位之间画一条细淡箭头；
-        //      「回避同桌」默认不画，只有两人真的被排成同桌时才画红色互斥箭头。
+        // ═══════════════ 座位区「配对关联线」═══════════════
+        // 目标:每个「强制同桌」配对的两个座位之间画一条细淡实线(无箭头)；
+        //      「回避同桌」默认不画，只有两人真的被排成同桌时才画红色虚线 + 中点 ×。
         // 约束:连线只走座位之间的空隙带(行间/列间/走道/四周 padding)，
         //      绝不压住中间的其他座位；图层 pointer-events:none 且位于座位下方。
         // 几何与校验规则全部在 modules/pair-links.js(纯函数，有单测)。
@@ -1741,25 +1741,8 @@ function normalizeRotateOffset(value) {
             svg = document.createElementNS(SVG_NS, 'svg');
             svg.setAttribute('class', 'pair-link-layer');
             svg.setAttribute('aria-hidden', 'true');
-            const defs = document.createElementNS(SVG_NS, 'defs');
-            [['pairArrowForced', 'pair-arrow-forced'], ['pairArrowAvoid', 'pair-arrow-avoid']]
-                .forEach(function (spec) {
-                    const marker = document.createElementNS(SVG_NS, 'marker');
-                    marker.setAttribute('id', spec[0]);
-                    marker.setAttribute('viewBox', '0 0 8 8');
-                    marker.setAttribute('refX', '7');
-                    marker.setAttribute('refY', '4');
-                    marker.setAttribute('markerWidth', '6');
-                    marker.setAttribute('markerHeight', '6');
-                    // auto-start-reverse ⇒ 双向箭头时起点箭头自动朝外，表达「互斥」
-                    marker.setAttribute('orient', 'auto-start-reverse');
-                    const tip = document.createElementNS(SVG_NS, 'path');
-                    tip.setAttribute('d', 'M0,0 L8,4 L0,8 z');
-                    tip.setAttribute('class', spec[1]);
-                    marker.appendChild(tip);
-                    defs.appendChild(marker);
-                });
-            svg.appendChild(defs);
+            // 纯连线，不带任何 <marker> / <defs>：端点方向由线的存在本身表达，
+            // 回避冲突靠中点 × 与红色虚线区分，箭头反而会让密集座位区显得杂乱。
             // 作为首个子节点 ⇒ 在 CSS 绘制顺序里排在所有 .seat(position:relative) 之前，
             // 即使某段线意外与座位相交也会被不透明座位盖住，不会遮挡姓名。
             classroom.insertBefore(svg, classroom.firstChild);
@@ -1810,11 +1793,8 @@ function normalizeRotateOffset(value) {
             svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
             svg.setAttribute('width', width);
             svg.setAttribute('height', height);
-            // 保留 <defs>，其余路径每次全量重建(数量少、成本低、逻辑最简单)
-            Array.prototype.slice.call(svg.childNodes).forEach(function (node) {
-                if (node.nodeType === 1 && node.tagName &&
-                    node.tagName.toLowerCase() !== 'defs') svg.removeChild(node);
-            });
+            // 路径每次全量重建(数量少、成本低、逻辑最简单)
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
             if (!showPairLinks) { updatePairLinkLegend(0, 0); return; }
 
             let plan = { links: [], forcedCount: 0, avoidCount: 0 };
@@ -1839,9 +1819,6 @@ function normalizeRotateOffset(value) {
                 const path = document.createElementNS(SVG_NS, 'path');
                 path.setAttribute('class', 'pair-link pair-link-' + link.kind);
                 path.setAttribute('d', link.d);
-                const markerId = link.kind === 'avoid' ? 'pairArrowAvoid' : 'pairArrowForced';
-                if (link.kind === 'avoid') path.setAttribute('marker-start', 'url(#pairArrowAvoid)');
-                path.setAttribute('marker-end', 'url(#' + markerId + ')');
                 const title = document.createElementNS(SVG_NS, 'title');
                 const nameA = pairStudentName(link.ids[0]);
                 const nameB = pairStudentName(link.ids[1]);
@@ -3631,8 +3608,9 @@ function isWholeWordMatch(label, keyword) {
                 exportWrapper.appendChild(titleRowClone);
             }
             const classroomClone = classroom.cloneNode(true);
-            // 关联箭头是屏幕端的辅助图层：html2canvas 对内联 SVG / marker 支持不完整，
-            // 且克隆体的 marker id 会与原页面重复。导出稿与打印稿保持一致，去掉它。
+            // 关联线是屏幕端的辅助图层：html2canvas 对内联 SVG 支持不完整，
+            // 且打印 CSS 会改 padding/gap，克隆体的连线坐标在导出稿里会错位。
+            // 导出稿与打印稿保持一致，去掉它。
             const cloneLinkLayer = classroomClone.querySelector('.pair-link-layer');
             if (cloneLinkLayer) cloneLinkLayer.parentNode.removeChild(cloneLinkLayer);
             exportWrapper.appendChild(classroomClone);

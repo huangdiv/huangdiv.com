@@ -27,7 +27,7 @@
     /* 行内「删除/移除」小叉号的统一占位尺寸：
        走道列表、分组行、详细设置学生行共用，保证三处观感一致 */
     --icon-remove-size: 18px;
-    /* 座位区配对关联箭头：强制=细淡蓝，回避冲突=醒目红 */
+    /* 座位区配对关联线：强制=细淡蓝，回避冲突=醒目红虚线 */
     --pair-link-forced: rgba(59, 130, 246, 0.45);
     --pair-link-avoid: rgba(220, 38, 38, 0.9);
 }
@@ -3859,13 +3859,14 @@ button:disabled {
     color: var(--text-primary);
 }
 
-/* ==================== 座位区「配对关联指示箭头」 ====================
+/* ==================== 座位区「配对关联线」 ====================
    连线由 modules/pair-links.js 规划，只沿座位之间的空隙带走，绝不进入
    任何座位矩形；SVG 作为 .classroom 的首个 absolute 子节点，绘制顺序在
    .seat(position:relative) 之前，且 pointer-events:none ⇒ 不挡姓名、不挡拖拽。
 
-   强制同桌：细(1.3px)、淡(45% 蓝)、单向箭头；
-   回避同桌且已同桌：稍粗(1.7px)、红色虚线 + 双向箭头 + 中点 ×，表达「互斥」。
+   两类线都不带箭头：
+   强制同桌：细(1.3px)、淡(45% 蓝)实线；
+   回避同桌且已同桌：稍粗(1.7px)、红色虚线 + 中点 ×，表达「互斥」。
    ==================================================================== */
 .pair-link-layer {
     position: absolute;
@@ -3891,9 +3892,6 @@ button:disabled {
     stroke-width: 1.7;
     stroke-dasharray: 4 3;
 }
-
-.pair-arrow-forced { fill: var(--pair-link-forced); }
-.pair-arrow-avoid  { fill: var(--pair-link-avoid); }
 
 .pair-link-cross {
     fill: none;
@@ -3931,15 +3929,7 @@ button:disabled {
     position: relative;
 }
 
-.pair-legend-line::after {
-    content: '';
-    position: absolute;
-    right: -1px;
-    top: -4px;
-    border-left: 5px solid currentColor;
-    border-top: 3px solid transparent;
-    border-bottom: 3px solid transparent;
-}
+/* 示意线与真实连线保持一致：不带箭头端点 */
 
 .pair-legend-forced { color: var(--pair-link-forced); }
 .pair-legend-avoid  {
@@ -3960,7 +3950,7 @@ button:disabled {
     }
 
     /* 打印时 .classroom 的 padding / gap 会被整体压缩，屏幕坐标算出的连线会错位；
-       且淡色细线印出来几乎看不见 ⇒ 打印稿保持干净的座位表，不输出关联箭头。 */
+       且淡色细线印出来几乎看不见 ⇒ 打印稿保持干净的座位表，不输出关联线。 */
     .pair-link-layer,
     .pair-link-legend { display: none !important; }
 

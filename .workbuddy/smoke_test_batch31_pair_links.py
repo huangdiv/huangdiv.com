@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-批次31 — 配对设置唯一性校验 + 座位区配对关联指示箭头
+批次31 — 配对设置唯一性校验 + 座位区「配对关联线」
 
 需求:
   1. 同一个人不能同时与两个人「强制同桌」，重复设置时弹出提示；
-  2. 每个「强制同桌」配对的两座位之间画细、淡的单向箭头；
+  2. 每个「强制同桌」配对的两座位之间画细、淡的实线（不带箭头）；
   3. 连线只走座位之间的空隙带，不能覆盖 / 影响中间的其他座位；
-  4. 「回避同桌」默认不画；只有两人真的被排成同桌时，才画颜色不同的互斥箭头。
+  4. 「回避同桌」默认不画；两人真的被排成同桌时才画红色虚线 + 中点 ×（不带箭头）；
+  5. 开关名字叫「配对关联线」。
 
-断言(共 31 项，按 19 组组织):
+断言(共 34 项，按 19 组组织):
   1. 首屏(未打开弹窗)即有 1 个 .pair-link-layer，3 条强制线 + 1 条互斥线
   2. 强制/互斥两种线的 computed stroke 颜色不同，且强制线更淡、更细
-  3. 强制线只有终点箭头；互斥线首尾双向箭头 + 中点 ×
+  3. 两类线都不带箭头：无 marker 属性、SVG 内无 <marker>/<defs>；
+     强制实线 / 互斥虚线 + 中点 × 保留；图例示意线也无箭头端点
   4. 图层 pointer-events:none，座位中心 elementFromPoint 命中的是 .seat
   5. 所有路径(getPointAtLength 采样)都不落在任何座位矩形内部  ← 核心
   6. 图例显示「强制同桌 3」「回避同桌冲突 1」
-  7. 「配对关联箭头」开关关闭 ⇒ 0 条线、图例隐藏；再开恢复
+  7. 开关名为「配对关联线」；关闭 ⇒ 0 条线、图例隐藏；再开恢复
   8. 开关状态自动保存后刷新仍保留
   9. 已有 s1-s12 时再添加 s1+s2 ⇒ alert 点名冲突双方与原配对，列表不变
  10. 冲突时输入框不清空(方便用户改)，且不产生新连线
@@ -25,9 +27,9 @@
  14. 删除一条强制配对 ⇒ 连线即时减 1
  15. 回避的两人没坐同桌的配置 ⇒ 0 条互斥线(强制线仍在)
  16. 切换教师视角后连线仍在，且仍不压座位
- 17. 打印样式下箭头与图例隐藏
+ 17. 打印样式下连线与图例隐藏
  17b. 导出图片的克隆体剔除 SVG 图层(避免 html2canvas 兼容问题)，座位仍完整
- 18. 版本号 1.4.5 + 全程无 JS 报错
+ 18. 版本号 1.4.6 + 全程无 JS 报错
 
 运行前先起本地服务:
   cd static && python -m http.server 8123 --bind 127.0.0.1
@@ -88,7 +90,7 @@ def make_config(forced, avoid, title="批次31", view="student", show_links=True
         "showPairLinks": show_links,
         "forcedPairs": forced,
         "avoidPairs": avoid,
-        "version": "1.4.5",
+        "version": "1.4.6",
     }
 
 
@@ -112,6 +114,8 @@ async def link_info(page):
         const css = el => el ? getComputedStyle(el) : null;
         const f = css(forced[0]), a = css(avoid[0]);
         const legend = document.getElementById('pairLinkLegend');
+        const legendLine = document.querySelector('.pair-legend-line');
+        const sw = document.querySelector('[data-toggle="pairlinks"] .dropdown-switch-label');
         return {
             layer: !!svg,
             viewBox: svg ? svg.getAttribute('viewBox') : '',
@@ -123,10 +127,15 @@ async def link_info(page):
             fWidth: f ? parseFloat(f.strokeWidth) : 0,
             aStroke: a ? a.stroke : '',
             aWidth: a ? parseFloat(a.strokeWidth) : 0,
+            fDash: f ? f.strokeDasharray : '',
+            aDash: a ? a.strokeDasharray : '',
             fStart: forced[0] ? forced[0].getAttribute('marker-start') : '',
             fEnd: forced[0] ? forced[0].getAttribute('marker-end') : '',
             aStart: avoid[0] ? avoid[0].getAttribute('marker-start') : '',
             aEnd: avoid[0] ? avoid[0].getAttribute('marker-end') : '',
+            arrows: svg ? svg.querySelectorAll('marker, defs').length : -1,
+            legendArrow: legendLine ? getComputedStyle(legendLine, '::after').content : '',
+            switchLabel: sw ? sw.textContent.trim() : '',
             legendHidden: legend ? legend.hidden : null,
             legendText: legend ? legend.innerText.replace(/\\s+/g, ' ').trim() : '',
             version: (document.getElementById('appVersion') || {}).textContent || ''
@@ -229,13 +238,18 @@ async def main():
         check("0.4" in info["fStroke"] and info["fStroke"] != info["aStroke"],
               "强制线是淡化色（含低 alpha）")
 
-        # ═══ 3. 箭头方向 ═══
-        print("=== 3. 箭头 ===")
-        check(not info["fStart"] and "pairArrowForced" in (info["fEnd"] or ""),
-              "强制线只有终点单向箭头")
-        check("pairArrowAvoid" in (info["aStart"] or "") and
-              "pairArrowAvoid" in (info["aEnd"] or ""),
-              "互斥线首尾双向箭头")
+        # ═══ 3. 两类线都不带箭头，虚线 / 中点 × 保留 ═══
+        print("=== 3. 无箭头端点 ===")
+        check(all(not info[k] for k in ("fStart", "fEnd", "aStart", "aEnd")),
+              "两类线都没有 marker-start / marker-end")
+        check(info["arrows"] == 0,
+              f"SVG 图层内没有 <marker>/<defs>（实际 {info['arrows']} 个）")
+        check(info["fDash"] in ("none", "") and
+              info["aDash"] not in ("none", "") and " " in (info["aDash"] or "") and
+              info["crosses"] == 1,
+              f"强制为实线、回避为虚线且中点 × 保留（{info['fDash']} / {info['aDash']}）")
+        check(info["legendArrow"] == "none",
+              f"图例示意线也没有箭头端点（::after content={info['legendArrow']}）")
 
         # ═══ 4. 不影响交互 ═══
         print("=== 4. 不遮挡 / 不影响座位 ===")
@@ -261,6 +275,8 @@ async def main():
         print("=== 7-8. 开关与持久化 ===")
         await open_dropdown(page)
         sw = page.locator('[data-toggle="pairlinks"]')
+        sw_label = (await sw.locator('.dropdown-switch-label').inner_text()).strip()
+        check(sw_label == "配对关联线", f"开关文案为「配对关联线」（实际 {sw_label}）")
         check(await sw.get_attribute("aria-checked") == "true", "开关初始为开")
         await sw.click()
         await page.wait_for_timeout(300)
@@ -358,7 +374,7 @@ async def main():
             legend: getComputedStyle(document.getElementById('pairLinkLegend')).display
         })""")
         check(disp["layer"] == "none" and disp["legend"] == "none",
-              f"打印时箭头与图例隐藏（{disp}）")
+              f"打印时连线与图例隐藏（{disp}）")
         await page.emulate_media(media="screen")
 
         # ═══ 17b. 导出图片克隆体不带 SVG 图层 ═══
@@ -384,11 +400,11 @@ async def main():
             } : { captured: false, layers: -1, seats: -1 };
         }""")
         check(exp["captured"] and exp["layers"] == 0 and exp["seats"] == 12,
-              f"导出克隆剔除箭头图层且座位完整（{exp}）")
+              f"导出克隆剔除连线图层且座位完整（{exp}）")
 
         # ═══ 18. 版本 + 无报错 ═══
         print("=== 18. 版本与控制台 ===")
-        check(teacher["version"] == "1.4.5", f"版本号 1.4.5（实际 {teacher['version']}）")
+        check(teacher["version"] == "1.4.6", f"版本号 1.4.6（实际 {teacher['version']}）")
         check(len(ERRORS) == 0, f"全程无 JS 报错（{ERRORS[:3]}）")
 
         await browser.close()

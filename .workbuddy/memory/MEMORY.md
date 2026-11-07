@@ -142,7 +142,7 @@
 - **配对选择框已改成自绘候选**(`.pair-suggest`):原生 datalist 无法把名次放右侧、条目过高;
   自绘要点 = mousedown+preventDefault、就地撑高(父级 overflow 会裁浮层)、选中 id 记 dataset
 
-## 配对唯一性 + 座位区关联箭头(2026-11-07, v1.4.5)
+## 配对唯一性 + 座位区「配对关联线」(2026-11-07, v1.4.5 / v1.4.6)
 - **一人只能有一组「强制同桌」**:`pair-links.js#validateForcedPair` 纯函数(返回 self/duplicate/conflict
   + `sharedId/partnerId/newPartnerId`),弹窗录入拦下并 alert `MESSAGES.PAIR_FORCED_CONFLICT`;
   `migrateConfig` 用 `sanitizeForcedPairs()` 清洗老配置,**UI 校验与载入清洗必须成对做**。
@@ -155,13 +155,16 @@
   别自己算「走道隔开算不算同桌」。
 - **图层三件套**:`pointer-events:none` + SVG 作为 `.classroom` **首个 absolute 子节点**
   (绘制顺序靠 DOM 顺序,座位是 `position:relative` ⇒ 天然盖住意外相交的线,不必给座位加 z-index)
-  + 几何上就避开所有座位。强制=淡蓝 1.3px 单向箭头;回避冲突=红色 1.7px 虚线双向箭头 + 中点 ×,
-  仅在两人真的同桌时才画。
+  + 几何上就避开所有座位。**v1.4.6 起两类线都不带箭头**(SVG 内 0 个 marker/defs):
+  强制=淡蓝 1.3px 实线;回避冲突=红色 1.7px 虚线 + 中点 ×,仅在两人真的同桌时才画。
+  改「去掉某个视觉符号」时**四处一起改**:SVG defs、path 属性、CSS 规则、图例伪元素。
+  测试断言 `getComputedStyle(el,'::after').content` 要严格 `== 'none'`(`content:''` 会返回 `'""'` 且仍画得出三角)。
 - **`fullRebuildSeats()` 会清空 `classroom.innerHTML`** ⇒ 常驻图层必须写成 `ensurePairLinkLayer()`
   每次检查再插入;刷新点 = `afterSeatsRender()` + 弹窗增删 + 开关 toggle + `initialize()` 末尾
   + `window.resize` / `ResizeObserver(classroom)`(rAF 合并)。
 - **打印/导出**:`@media print` 隐藏图层与图例(打印 CSS 改 padding/gap,坐标会错位);
   `exportSeatImage()` 在 `classroom.cloneNode(true)` 后**主动删掉 `.pair-link-layer`**
-  (html2canvas 对 SVG marker 支持不全 + 克隆体 id 重复)。
-- 开关 `data-toggle="pairlinks"`,配置字段 `showPairLinks`(默认 true,纯 UI 顶层 let,不进 state);
+  (html2canvas 对内联 SVG 支持不全 + 打印 CSS 改 padding/gap 会错位)。
+- 开关 `data-toggle="pairlinks"`,**文案「配对关联线」**(v1.4.6 起,图标 🔗),配置字段
+  `showPairLinks`(默认 true,纯 UI 顶层 let,不进 state);
   图例 `.pair-link-legend` 在教室下方,只在有线时显示、带两类计数。

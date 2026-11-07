@@ -17,6 +17,13 @@ from playwright.async_api import async_playwright
 
 BASE = "http://127.0.0.1:8123/seats-generator.html"
 
+# 本机代理常把外链 CDN 脚本拖到 30s 超时，页面本身不依赖它们来渲染按钮
+FAKE_XLSX = """window.XLSX = {
+    read: function () { return { SheetNames: [], Sheets: {} }; },
+    utils: { sheet_to_json: function () { return []; } }
+};"""
+FAKE_H2C = "window.html2canvas = () => Promise.reject(new Error('stub'));"
+
 passed = 0
 failed = 0
 
@@ -71,7 +78,15 @@ async def main():
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.on("dialog", lambda d: asyncio.ensure_future(d.accept()))
 
-        await page.goto(BASE)
+        await page.route("**/xlsx.full.min.js",
+                         lambda r: r.fulfill(status=200,
+                                             content_type="application/javascript; charset=utf-8",
+                                             body=FAKE_XLSX))
+        await page.route("**/html2canvas*.js",
+                         lambda r: r.fulfill(status=200,
+                                             content_type="application/javascript; charset=utf-8",
+                                             body=FAKE_H2C))
+        await page.goto(BASE, wait_until="domcontentloaded", timeout=45000)
         await page.wait_for_timeout(900)
 
         # ── 场景 1:三个快捷按钮等高 ──

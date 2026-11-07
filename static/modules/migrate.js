@@ -31,7 +31,7 @@ import { sanitizeForcedPairs, sanitizePairs } from './pair-links.js';
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.4.5';
+export const APP_VERSION = '1.4.6';
 
 // === 工具 ===
 function generateId(prefix) {
@@ -177,7 +177,7 @@ export function migrateConfig(config) {
 
     // ─── 11. v1.3.0 顶层字段默认 ───
     if (config.showStudentIcons === undefined) config.showStudentIcons = true;
-    // 座位区配对关联箭头：默认开启，显式 false 才关闭
+    // 座位区配对关联线：默认开启，显式 false 才关闭
     if (config.showPairLinks === undefined) config.showPairLinks = true;
     if (config.viewMode !== 'student' && config.viewMode !== 'teacher') config.viewMode = 'student';
     if (typeof config.title !== 'string' || !config.title.trim()) config.title = '班级座位表';

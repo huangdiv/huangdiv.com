@@ -167,9 +167,9 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 ### 3.1 文件与行数（2026-11-07 更新）
 ```
 static/
-├── seats-generator.html    487 行   入口（<script type="module" src="...?v=1.4.5"> + DOM 骨架 + 配对图例）
-├── seats-generator.css    4266 行   全部样式（含打印 @media、九宫格区域弹窗、配对箭头图层）
-├── seats-generator.js     5917 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉 + SVG 连线层）
+├── seats-generator.html    487 行   入口（<script type="module" src="...?v=1.4.6"> + DOM 骨架 + 配对图例）
+├── seats-generator.css    4256 行   全部样式（含打印 @media、九宫格区域弹窗、配对关联线图层）
+├── seats-generator.js     5895 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉 + SVG 连线层）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
 │   ├── migrate.js          189 行   migrateConfig（补默认/clamp/version，含 rank、区域偏好、配对清洗）+ APP_VERSION
@@ -177,7 +177,7 @@ static/
 │   ├── dragdrop.js         285 行   createDragdrop(deps)：拖放 7 事件 + 事件注册
 │   ├── random-arrange.js  1195 行   createRandomArrange(deps)：排座引擎 + 分组轮换 + 性别规则 + 配对修复 + 区域偏好后处理
 │   ├── zone.js             224 行   九宫格区域：seatZone / buildZoneMap / zoneStats / optimizeZones（纯函数）
-│   ├── pair-links.js       324 行   配对唯一性校验 + 座位区关联箭头几何（纯函数，v1.4.5 新增）
+│   ├── pair-links.js       324 行   配对唯一性校验 + 座位区关联线几何（纯函数，v1.4.5 新增）
 │   ├── csv-export.js       120 行   buildSeatCsv / 文件名 / 转义（纯函数）
 │   ├── student-rank.js     309 行   排名解析/排序/班委识别/蛇形均衡分组（纯函数）
 │   ├── group-balance.js    279 行   分组「均衡系数」（排名带覆盖 + 性别 + 班委，纯函数）
@@ -428,10 +428,11 @@ static/
   再用 `SVGPathElement.getPointAtLength` 复验一遍。
 - SVG 作为 `.classroom` 的**首个 absolute 子节点** + `z-index:0` + `pointer-events:none`：
   绘制顺序在 `.seat(position:relative)` 之前（意外相交也会被不透明座位盖住），且完全不拦拖拽/点击。
-- 强制：`rgba(59,130,246,.45)` / 1.3px / 单向 `marker-end`；
-  互斥：`rgba(220,38,38,.9)` / 1.7px 虚线 / `marker-start` + `marker-end`
-  （`orient="auto-start-reverse"` 让起点箭头朝外）+ 水平段中点一个 ×。
-- 图例 `.pair-link-legend` 放在教室下方，只在有线时显示并带计数。
+- 强制：`rgba(59,130,246,.45)` / 1.3px 实线；
+  互斥：`rgba(220,38,38,.9)` / 1.7px 虚线 + 水平段中点一个 ×。
+  （v1.4.5 初版两类都带 `marker` 箭头，v1.4.6 按用户要求全部去掉，详见 §3.12）
+- 图例 `.pair-link-legend` 放在教室下方，只在有线时显示并带计数；
+  示意线也不带箭头端点（v1.4.6 删掉 `.pair-legend-line::after` 小三角）。
 
 **刷新点（延续 §3.9 的教训，别只挂一处）**
 `afterSeatsRender()`（初始化 / 拖拽 / 随机排座 / 撤销 / 换视角 / 应用配置）、
@@ -442,10 +443,32 @@ static/
 
 **打印 / 导出**：`@media print` 把图层和图例 `display:none`（打印 CSS 改了 padding/gap，
 屏幕坐标算出的线会错位）；`exportSeatImage()` 克隆 classroom 后**主动删掉 `.pair-link-layer`**
-—— html2canvas 对内联 SVG/marker 支持不完整，且克隆体会造成 marker id 重复。
+—— html2canvas 对内联 SVG 支持不完整，且打印 CSS 改了 padding/gap 会让克隆体的线错位。
 
 **开关**：智能排座下拉新增 `data-toggle="pairlinks"`，默认开，配置字段 `showPairLinks`；
-`state.js` 不加字段（与 `smartArrange*` 一样是纯 UI 顶层 let）。
+`state.js` 不加字段（与 `smartArrange*` 一样是纯 UI 顶层 let）。v1.4.6 起文案为「配对关联线」。
+
+### 3.12 去掉连线箭头、开关改名「配对关联线」（2026-11-07，v1.4.6）
+
+用户反馈：密集座位区里箭头端点太杂，要求只保留「线」。改动很小但**分布在四处，容易漏**：
+
+| 位置 | 改动 |
+|------|------|
+| `seats-generator.js#ensurePairLinkLayer` | 删掉整块 `<defs>` + 两个 `<marker>`（含 `auto-start-reverse`）；SVG 只剩纯 `<path>` |
+| `seats-generator.js#refreshPairLinks` | 删 `marker-start`/`marker-end` 赋值；清理逻辑从「保留 defs 删其余」简化为 `while (svg.firstChild) removeChild` |
+| `seats-generator.css` | 删 `.pair-arrow-*` 两条规则；删 `.pair-legend-line::after`（图例小三角），否则示意线与真实线不一致 |
+| `seats-generator.html` | 开关 label + title 改「配对关联线」，图标 `➶` → `🔗`（不再出现箭头形状） |
+
+保留不变：淡蓝 1.3px 实线、红色 1.7px `stroke-dasharray:4 3` 虚线、中点 ×、
+图例、打印/导出剔除图层、所有刷新点、`planPairLinks()` 几何（纯函数完全没动）。
+
+**测试纪律**：`batch31` 的「强制线只有终点箭头 / 互斥线首尾双向箭头」两条断言
+改为 4 条「反向」断言（无 marker 属性、SVG 内 0 个 `marker/defs`、实线 vs 虚线 + ×、
+图例 `::after` content 为 `none`），另加 1 条开关文案断言 ⇒ 34 项。
+⚠️ `getComputedStyle(el,'::after').content` **必须严格判 `== 'none'`**：
+伪元素存在但 `content:''` 时返回 `'""'`，此时 `border` 画出的三角形依然可见，
+宽松的 `in ('none','','""')` 会漏掉这个回归（本次已踩过并收紧）。
+回退验证：恢复 marker 属性 + 旧开关名 ⇒ 2 项变红；单独恢复图例小三角 ⇒ 1 项变红。
 
 ---
 
@@ -453,7 +476,8 @@ static/
 
 | 提交 | 内容 |
 |------|------|
-| 本轮 | **配对约束唯一性 + 座位区关联箭头**：强制同桌一人一组（重复弹提示，载入清洗老配置）；每个强制配对画细淡蓝箭头、回避配对仅在被排成同桌时画红色虚线双向互斥箭头；连线只走座位空隙带不压座位；新增开关与图例（v1.4.5） |
+| 本轮 | **去掉连线箭头 + 开关改名**：两类配对线都只保留线本身（淡蓝实线 / 红色虚线 + 中点 ×），删掉全部 `<marker>` 与图例小三角；开关「配对关联箭头」→「配对关联线」（v1.4.6，见 §3.12） |
+| 上轮 | **配对约束唯一性 + 座位区关联箭头**：强制同桌一人一组（重复弹提示，载入清洗老配置）；每个强制配对画细淡蓝箭头、回避配对仅在被排成同桌时画红色虚线双向互斥箭头；连线只走座位空隙带不压座位；新增开关与图例（v1.4.5） |
 | 上轮 | **发版缓存修复**：入口脚本加 `?v=<版本>` 破缓存（GitHub Pages `max-age=600`）+ `unit_version_sync` 钉死 5 处版本号（v1.4.4） |
 | 本轮 | 修复「配对设置」菜单项计数徽标**刷新后不显示**（把文案同步抽成 `updatePairSettingsLabel()`，挂到 `afterSeatsRender` + `initialize` 末尾）（v1.4.3） |
 | 本轮 | 「模式切换」「打印/PDF」改为与「智能排座」同款**两段式按钮**：上段直接执行（轮换模式 / 打印），下段下拉直接选模式 / 选其他导出方式（v1.4.2） |
@@ -531,7 +555,7 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - **折叠面板里的控件不可见**：点击 `[data-target="ioPanel"]` / `[data-target="studentManagement"]`
   展开后再操作，否则 Playwright 报 `element is not visible`。
 - 浏览器启动加 `args=["--no-proxy-server"]`；Playwright 装在 system Python 的 site-packages。
-- **2026-11-07 已把常用批次统一打桩**（batch5 / 10 / 15 / 16 / 23 / e2e）：
+- **2026-11-07 已把常用批次统一打桩**（batch5 / 10 / 15 / 16 / 18 / 23 / e2e）：
   每个在 `page` 建好后 `page.route` 拦 `xlsx.full.min.js` + `html2canvas*.js`，
   并把 `load` / `networkidle` 改成 `domcontentloaded`。`e2e_happy_path` 的 Step 5
   要真实导出 PNG，所以**只桩 sheetjs，html2canvas 保持真加载**。
@@ -540,6 +564,9 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   `getPointAtLength()` 采样，把每个点与 `.seat` 的 `offsetLeft/Top/Width/Height`
   （相对 `.classroom` padding box，和 SVG viewBox 同坐标系）比对，
   断言 0 个点落在座位矩形内 —— 这是「连线不压座位」最直接的证据。
+- **v1.4.6 起 batch31 共 34 项**：新增「无 marker 属性 / SVG 内 0 个 marker,defs /
+  实线 vs 虚线 + 中点 × / 图例 `::after` content == 'none' / 开关文案」5 项。
+  断言「伪元素不存在」时必须严格判 `content === 'none'`，别把 `'""'` 也算通过。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
 - `window.__seatsTest`：`rotateGroupSeats` / `randomSeatArrange`（驱动带撤销与 UI 回调的真实实例）。
