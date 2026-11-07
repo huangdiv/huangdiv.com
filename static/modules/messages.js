@@ -47,6 +47,10 @@ export const MESSAGES = {
     // —— 配对 ——
     PAIR_SELECT_TWO_DIFFERENT: '请选择两位不同的学生',
     PAIR_ALREADY_EXISTS: '该配对已存在',
+    // 一人只能有一组强制同桌：提示里点名「谁」和「原来的搭档」，方便用户直接去删旧项
+    PAIR_FORCED_CONFLICT: (name, partnerName, oldPairLabel) =>
+        `「${name}」已经在强制同桌配对「${oldPairLabel}」中，不能再与「${partnerName}」强制同桌。\n` +
+        `一位学生只能有一组强制同桌，请先删除原配对再添加。`,
     PAIR_STUDENT_NOT_FOUND: (name) => `没有找到姓名为「${name}」的学生`,
     PAIR_STUDENT_AMBIGUOUS: (name, count) =>
         `「${name}」匹配到 ${count} 名学生，请把姓名输入得更完整`,

@@ -452,6 +452,34 @@ group('M. seats 长度矫正', () => {
 });
 
 // =====================================================================
+// N. 配对约束清洗 + 连线开关（v1.4.5）
+// =====================================================================
+group('N. 配对约束清洗 + 连线开关', () => {
+    test('冲突强制配对在载入时丢弃后者（一人只能有一组强制同桌）', () => {
+        const c = freshConfig({
+            forcedPairs: [['s1', 's2'], ['s1', 's3'], ['s4', 's5']]
+        });
+        assertEq(migrateConfig(c).forcedPairs, [['s1', 's2'], ['s4', 's5']]);
+    });
+    test('重复 / 自环 / 残缺的强制配对被清掉', () => {
+        const c = freshConfig({
+            forcedPairs: [['s1', 's2'], ['s2', 's1'], ['s3', 's3'], ['s9'], null]
+        });
+        assertEq(migrateConfig(c).forcedPairs, [['s1', 's2']]);
+    });
+    test('回避配对保留「一人回避多人」，只去重', () => {
+        const c = freshConfig({
+            avoidPairs: [['s1', 's2'], ['s2', 's1'], ['s1', 's3']]
+        });
+        assertEq(migrateConfig(c).avoidPairs, [['s1', 's2'], ['s1', 's3']]);
+    });
+    test('showPairLinks 缺省 → true；显式 false 保留', () => {
+        assertEq(migrateConfig({}).showPairLinks, true);
+        assertEq(migrateConfig(freshConfig({ showPairLinks: false })).showPairLinks, false);
+    });
+});
+
+// =====================================================================
 // 收尾
 // =====================================================================
 console.log('\n' + '='.repeat(60));

@@ -38,7 +38,7 @@ async def open_pair_popup(page):
 async def inject_config(page, config):
     """Reload page with given localStorage config."""
     await page.evaluate(f"localStorage.setItem('classroomConfig', JSON.stringify({json.dumps(config)}))")
-    await page.reload(wait_until="networkidle")
+    await page.reload(wait_until="domcontentloaded")
     await page.wait_for_timeout(800)
 
 
@@ -70,6 +70,13 @@ async def run():
         ))
         # 全局对话框接受(随机排座 confirm 等)
         page.on("dialog", lambda d: asyncio.create_task(d.accept()))
+        # 外部 CDN 脚本在受限网络下会卡住 networkidle ⇒ 本地桩 + domcontentloaded。
+        await page.route("**/xlsx.full.min.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.XLSX={read:()=>({SheetNames:[],Sheets:{}}),utils:{sheet_to_json:()=>[]}};"))
+        await page.route("**/html2canvas*.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.html2canvas=()=>Promise.reject(new Error('stub'));"))
 
         # ========== 场景 1: 配对弹窗已移除「批量配对」「排座选项」==========
         print("\n=== 场景 1: 配对设置弹窗只剩「强制同桌 / 回避同桌」===")
@@ -87,7 +94,7 @@ async def run():
         }
         for s in cfg_a["students"]:
             s["groupId"] = "grp1"
-        await page.goto(BASE_URL, wait_until="networkidle")
+        await page.goto(BASE_URL, wait_until="domcontentloaded")
         await inject_config(page, cfg_a)
         await page.wait_for_selector("#classroom .seat", timeout=10000)
         await open_pair_popup(page)

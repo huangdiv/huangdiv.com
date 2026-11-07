@@ -131,8 +131,10 @@ async def mount(page, cfg):
 async def main():
     global PASSED, FAILED
 
+    # v1.4.5 起「一人只能有一组强制同桌」：新增配对的双方必须都没出现在既有强制项里。
+    # 原夹具让 s5/s6 互为回避，且第 5 步要新增 s5+s6 的强制项 ⇒ 改成不冲突的回避组合。
     cfg_a = make_config("批次30-两组强制一组回避",
-                        [["s1", "s2"], ["s3", "s4"]], [["s5", "s6"]])
+                        [["s1", "s2"], ["s3", "s4"]], [["s2", "s5"]])
     cfg_b = make_config("批次30-只有回避", [], [["s1", "s2"], ["s3", "s4"]])
     cfg_c = make_config("批次30-无配对", [], [])
 
@@ -202,8 +204,9 @@ async def main():
 
         # ═══ 5. 新增一对强制 ⇒ 即时 +1 ═══
         print("=== 5. 弹窗内新增 1 组强制同桌 ===")
-        await page.fill(".pair-forced-a", "王强")
-        await page.fill(".pair-forced-b", "孙悦")
+        # 孙悦(s5)/陈晨(s6) 都不在既有强制配对里 ⇒ 新规则下允许添加
+        await page.fill(".pair-forced-a", "孙悦")
+        await page.fill(".pair-forced-b", "陈晨")
         await page.click(".pair-forced-add")
         await page.wait_for_timeout(500)
         info4 = await label_info(page)

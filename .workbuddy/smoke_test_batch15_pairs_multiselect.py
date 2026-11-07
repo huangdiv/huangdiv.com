@@ -179,7 +179,15 @@ async def main():
 
         page.on("dialog", on_dialog)
 
-        await page.goto(BASE)
+        # CDN 脚本在离线/受限网络下会拖住 load 事件 ⇒ 本地桩 + domcontentloaded。
+        # 本批次不测 Excel 导入 / 图片导出，桩足够。
+        await page.route("**/xlsx.full.min.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.XLSX={read:()=>({SheetNames:[],Sheets:{}}),utils:{sheet_to_json:()=>[]}};"))
+        await page.route("**/html2canvas*.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.html2canvas=()=>Promise.reject(new Error('stub'));"))
+        await page.goto(BASE, wait_until="domcontentloaded")
         await page.wait_for_timeout(800)
 
         # ══════════ 场景 A:普通模式多选 + 统计栏 + 点空白取消 ══════════
@@ -273,7 +281,8 @@ async def main():
         # 同桌关系(cols=6,无走道):(0,1)(2,3)(4,5)…
         #   强制 s1+s2 同桌(0,1)⇒ ok
         #   强制 s3(2)+s5(4)不同桌 ⇒ bad
-        #   强制 s5(已入座)+ s15(未入座)⇒ na
+        #   强制 s6(已入座)+ s15(未入座)⇒ na
+        #   v1.4.5 起一人只能有一组强制同桌，三组配对的学生必须互不重复。
         #   回避 s1+s2 同桌 ⇒ bad;回避 s7(6)+s9(8)不同桌 ⇒ ok
         seats_c = [None] * 30
         for i in range(1, 15):
@@ -281,7 +290,7 @@ async def main():
         await load(page, base_cfg(
             students=mk_students(16),
             seats=seats_c,
-            forcedPairs=[["s1", "s2"], ["s3", "s5"], ["s5", "s15"]],
+            forcedPairs=[["s1", "s2"], ["s3", "s5"], ["s6", "s15"]],
             avoidPairs=[["s1", "s2"], ["s7", "s9"]],
         ))
         await page.click("#randomDropdownBtn")

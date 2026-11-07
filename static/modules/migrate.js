@@ -26,11 +26,12 @@
 // zone.js 是纯几何模块（无 import），这里直接复用它的 id 白名单，
 // 避免「migrate 与 zone 各存一份区域 id」导致日后漂移。
 import { ZONE_IDS } from './zone.js';
+import { sanitizeForcedPairs, sanitizePairs } from './pair-links.js';
 
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.4.4';
+export const APP_VERSION = '1.4.5';
 
 // === 工具 ===
 function generateId(prefix) {
@@ -168,12 +169,16 @@ export function migrateConfig(config) {
         });
     }
 
-    // ─── 10. 配对约束默认 ───
-    if (!Array.isArray(config.forcedPairs)) config.forcedPairs = [];
-    if (!Array.isArray(config.avoidPairs)) config.avoidPairs = [];
+    // ─── 10. 配对约束默认 + 清洗 ───
+    // 「一人只能有一组强制同桌」是 UI 层硬规则，但老配置 / 手改 JSON 可能带进
+    // 互相冲突的项，会让排座引擎去满足数学上不可能的约束 ⇒ 载入时统一丢弃后者。
+    config.forcedPairs = sanitizeForcedPairs(config.forcedPairs);
+    config.avoidPairs = sanitizePairs(config.avoidPairs);
 
     // ─── 11. v1.3.0 顶层字段默认 ───
     if (config.showStudentIcons === undefined) config.showStudentIcons = true;
+    // 座位区配对关联箭头：默认开启，显式 false 才关闭
+    if (config.showPairLinks === undefined) config.showPairLinks = true;
     if (config.viewMode !== 'student' && config.viewMode !== 'teacher') config.viewMode = 'student';
     if (typeof config.title !== 'string' || !config.title.trim()) config.title = '班级座位表';
 

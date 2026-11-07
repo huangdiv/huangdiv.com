@@ -164,25 +164,26 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
 
 ## 3. 架构现状（2026-09-20 快照）
 
-### 3.1 文件与行数（2026-11-03 更新）
+### 3.1 文件与行数（2026-11-07 更新）
 ```
 static/
-├── seats-generator.html    468 行   入口（<link>/<script type="module"> + DOM 骨架）
-├── seats-generator.css    4165 行   全部样式（含打印 @media、:focus-visible、九宫格区域弹窗）
-├── seats-generator.js     5706 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉）
+├── seats-generator.html    487 行   入口（<script type="module" src="...?v=1.4.5"> + DOM 骨架 + 配对图例）
+├── seats-generator.css    4266 行   全部样式（含打印 @media、九宫格区域弹窗、配对箭头图层）
+├── seats-generator.js     5917 行   主 IIFE（占位工厂 + 事件委托 + 业务胶水 + 自绘候选下拉 + SVG 连线层）
 ├── modules/
 │   ├── state.js            117 行   state + bus + commit + subscribe + selectors
-│   ├── migrate.js          184 行   migrateConfig（老数据字段补默认/clamp/version，含 rank/区域偏好）+ APP_VERSION
+│   ├── migrate.js          189 行   migrateConfig（补默认/clamp/version，含 rank、区域偏好、配对清洗）+ APP_VERSION
 │   ├── seat-grid.js        557 行   createSeatGrid(deps)：座位渲染 + persistent-DOM diff + 排名/图标截断 + 统计
 │   ├── dragdrop.js         285 行   createDragdrop(deps)：拖放 7 事件 + 事件注册
 │   ├── random-arrange.js  1195 行   createRandomArrange(deps)：排座引擎 + 分组轮换 + 性别规则 + 配对修复 + 区域偏好后处理
 │   ├── zone.js             224 行   九宫格区域：seatZone / buildZoneMap / zoneStats / optimizeZones（纯函数）
+│   ├── pair-links.js       324 行   配对唯一性校验 + 座位区关联箭头几何（纯函数，v1.4.5 新增）
 │   ├── csv-export.js       120 行   buildSeatCsv / 文件名 / 转义（纯函数）
 │   ├── student-rank.js     309 行   排名解析/排序/班委识别/蛇形均衡分组（纯函数）
 │   ├── group-balance.js    279 行   分组「均衡系数」（排名带覆盖 + 性别 + 班委，纯函数）
 │   ├── group-layout.js     216 行   按组聚座的座位块规划（chooseBlockShape / planGroupSeatSlots，纯函数）
-│   └── messages.js         147 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
-└── tests/                         12 个 Node ESM 单元测试（见 §5）
+│   └── messages.js         151 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
+└── tests/                         14 个 Node ESM 单元测试（见 §5）
 ```
 
 ### 3.2 核心设计模式
@@ -398,13 +399,62 @@ static/
 `curl -s "https://huangdiv.com/seats-generator.js?x=$RANDOM" | grep APP_VERSION`（带随机查询串绕缓存），
 再用全新 browser context 打开页面读版本号；**不要**用普通刷新后的页面结论当作"没部署成功"。
 
+### 3.11 强制同桌唯一性 + 座位区配对关联箭头（2026-11-07，v1.4.5）
+
+**两条需求**：① 同一个人不能与两个人「强制同桌」，重复时弹提示；
+② 教室座位区画关联箭头 —— 每个强制配对都连、回避配对只在两人真的被排成同桌时连（互斥色）。
+
+**① 唯一性（纯函数 `pair-links.js`）**
+- `validateForcedPair(existing, a, b)` → `{ok, reason:'self'|'duplicate'|'conflict', conflicts}`；
+  conflict 里带 `sharedId / partnerId / newPartnerId`，UI 才能把「谁 + 原搭档」写进 alert。
+- 录入弹窗在「完全重复」判定之后调用；文案 `MESSAGES.PAIR_FORCED_CONFLICT`。
+- **载入也清洗**：`migrateConfig` 用 `sanitizeForcedPairs()` 丢掉后出现的撞车项
+  （老配置 / 手改 JSON 可能带进数学上不可能满足的约束）；`sanitizePairs()` 只给回避配对去重
+  —— 一人回避多人是合法的。
+- 连带改测试夹具：`batch15` 原本让 s5 出现在两组强制配对里、`batch30` 新增配对复用了 s3，
+  新规则下都会被拒 ⇒ 改成互不重复的学生（`unit_migrate` 新增 N 组守住清洗行为）。
+
+**② 箭头图层的几何（核心难点：不能压住中间座位）**
+```
+             ┌── 横向空隙带(行间) ────────┐
+   A 座位 ── 出边缘 → 行间走廊 → 纵向走廊换层 → 行间走廊 → 进 B 边缘
+             └────────────────────────────┘
+```
+- `buildLaneMap(rects, W, H)` 从**真实座位矩形**推导走廊：
+  行间/列间空隙的中点 + 四周 padding 带；走道占位只是把列间空隙撑宽，中点仍可走。
+- `planOne()` 按「B 在 A 上/下/同行」选 A 侧与 B 侧各一条横向走廊，
+  跨层时再选一条纵向走廊（优先落在 A、B 两列之间）。路径全段都在空隙带，
+  **单元测试 E1~E5 用 160 点采样断言不进入任何座位矩形**；浏览器侧 `PATH_HITS`
+  再用 `SVGPathElement.getPointAtLength` 复验一遍。
+- SVG 作为 `.classroom` 的**首个 absolute 子节点** + `z-index:0` + `pointer-events:none`：
+  绘制顺序在 `.seat(position:relative)` 之前（意外相交也会被不透明座位盖住），且完全不拦拖拽/点击。
+- 强制：`rgba(59,130,246,.45)` / 1.3px / 单向 `marker-end`；
+  互斥：`rgba(220,38,38,.9)` / 1.7px 虚线 / `marker-start` + `marker-end`
+  （`orient="auto-start-reverse"` 让起点箭头朝外）+ 水平段中点一个 ×。
+- 图例 `.pair-link-legend` 放在教室下方，只在有线时显示并带计数。
+
+**刷新点（延续 §3.9 的教训，别只挂一处）**
+`afterSeatsRender()`（初始化 / 拖拽 / 随机排座 / 撤销 / 换视角 / 应用配置）、
+弹窗 `renderAll()` 增删后、连线开关 toggle、`initialize()` 末尾兜底、
+`window.resize` + `ResizeObserver(classroom)` 走 rAF 合并。
+`fullRebuildSeats()` 会 `classroom.innerHTML=''` 清掉 SVG ⇒ `ensurePairLinkLayer()`
+每次都检查存在性并作为首子节点重新插入。
+
+**打印 / 导出**：`@media print` 把图层和图例 `display:none`（打印 CSS 改了 padding/gap，
+屏幕坐标算出的线会错位）；`exportSeatImage()` 克隆 classroom 后**主动删掉 `.pair-link-layer`**
+—— html2canvas 对内联 SVG/marker 支持不完整，且克隆体会造成 marker id 重复。
+
+**开关**：智能排座下拉新增 `data-toggle="pairlinks"`，默认开，配置字段 `showPairLinks`；
+`state.js` 不加字段（与 `smartArrange*` 一样是纯 UI 顶层 let）。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
-| 本轮 | **发版缓存修复**：入口脚本加 `?v=<版本>` 破缓存（GitHub Pages `max-age=600`）+ `unit_version_sync` 钉死 5 处版本号（v1.4.4） |
+| 本轮 | **配对约束唯一性 + 座位区关联箭头**：强制同桌一人一组（重复弹提示，载入清洗老配置）；每个强制配对画细淡蓝箭头、回避配对仅在被排成同桌时画红色虚线双向互斥箭头；连线只走座位空隙带不压座位；新增开关与图例（v1.4.5） |
+| 上轮 | **发版缓存修复**：入口脚本加 `?v=<版本>` 破缓存（GitHub Pages `max-age=600`）+ `unit_version_sync` 钉死 5 处版本号（v1.4.4） |
 | 本轮 | 修复「配对设置」菜单项计数徽标**刷新后不显示**（把文案同步抽成 `updatePairSettingsLabel()`，挂到 `afterSeatsRender` + `initialize` 末尾）（v1.4.3） |
 | 本轮 | 「模式切换」「打印/PDF」改为与「智能排座」同款**两段式按钮**：上段直接执行（轮换模式 / 打印），下段下拉直接选模式 / 选其他导出方式（v1.4.2） |
 | 本轮 | 区域设置里**已有设置项的当前满足情况**颜色提示（绿=已满足 / 红=未满足并描红具体那一栏 / 灰=未入座）+ 顶部达成汇总条（v1.4.1） |
@@ -448,13 +498,15 @@ static/
 
 ### 5.1 单元测试（Node ESM，零依赖）
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
-- 13 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
+- 14 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
-  `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone` / `unit_version_sync`。
+  `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone` /
+  `unit_version_sync` / **`unit_pair_links`**（32 项：唯一性校验、清洗、走廊几何、
+  「路径不进任何座位矩形」的 160 点采样不变量、与 `getDeskMatePairs` 交叉验证）。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 30 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 31 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -479,9 +531,15 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - **折叠面板里的控件不可见**：点击 `[data-target="ioPanel"]` / `[data-target="studentManagement"]`
   展开后再操作，否则 Playwright 报 `element is not visible`。
 - 浏览器启动加 `args=["--no-proxy-server"]`；Playwright 装在 system Python 的 site-packages。
-- ⚠️ **老批次（batch10~13 等）没打桩**：它们用 `page.goto(BASE)`（默认等 `load`），
-  在本机代理下会**卡 30s 超时**，不是代码回归。要跑它们得临时补两行 `page.route` 桩 +
-  改 `wait_until="domcontentloaded"`（2026-11-02 用临时副本验证 batch12 17/17 通过）。
+- **2026-11-07 已把常用批次统一打桩**（batch5 / 10 / 15 / 16 / 23 / e2e）：
+  每个在 `page` 建好后 `page.route` 拦 `xlsx.full.min.js` + `html2canvas*.js`，
+  并把 `load` / `networkidle` 改成 `domcontentloaded`。`e2e_happy_path` 的 Step 5
+  要真实导出 PNG，所以**只桩 sheetjs，html2canvas 保持真加载**。
+  其余老批次（11~13 等）仍可能卡 30s 超时，跑法同上。
+- **新批次31 的几何断言**：浏览器侧用 `path.getTotalLength()` +
+  `getPointAtLength()` 采样，把每个点与 `.seat` 的 `offsetLeft/Top/Width/Height`
+  （相对 `.classroom` padding box，和 SVG viewBox 同坐标系）比对，
+  断言 0 个点落在座位矩形内 —— 这是「连线不压座位」最直接的证据。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
 - `window.__seatsTest`：`rotateGroupSeats` / `randomSeatArrange`（驱动带撤销与 UI 回调的真实实例）。
@@ -554,6 +612,19 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   `last-modified` / `age` / `cf-cache-status` 判断是源站没发还是缓存没过期。
   根治：入口 `<script type="module" src="seats-generator.js?v=<APP_VERSION>">` —— 每次发版换 URL。
   代价是「改版本号要同步改 HTML」，所以配 `static/tests/unit_version_sync.mjs` 钉死三处一致。
+- **新增「一对一」业务规则时，UI 校验和载入清洗要成对做**（v1.4.5）：
+  只在弹窗里挡新增，老配置 / 手改 JSON / 云端同步仍能把冲突数据灌进排座引擎，
+  于是它去满足数学上不可能的约束。`migrateConfig` 里用同一个纯函数清洗，两边规则才不会漂移。
+  ⚠️ 连带效应：**已有测试夹具往往就是违反新规则的**（batch15 的 s5 出现在两组强制配对、
+  batch30 的新增项复用了 s3），别急着改产品代码，先把夹具换成合法组合并写清原因。
+- **画布式叠加层的安全三件套**：`pointer-events:none` + 绝对定位图层放在内容节点**之前**
+  （绘制顺序靠 DOM 顺序，不必给每个座位加 z-index 改堆叠上下文）+ 几何上就避开所有内容矩形。
+  单靠「线画得很淡」不算"不影响其他座位"，必须有可自动化的几何断言（采样 + 矩形相交）。
+- **`fullRebuildSeats()` 会 `classroom.innerHTML=''`**：任何挂在 classroom 里的常驻图层
+  都必须写成「每次渲染检查存在性再插入」的 ensure 函数，否则一次换视角/改行列就永久消失。
+- **打印 / 截图导出要单独决策**：屏幕坐标算出的叠加层在 `@media print`（padding/gap 被压缩）
+  下必然错位，html2canvas 对内联 SVG marker 支持也不完整 ⇒ 打印用 CSS 隐藏、
+  导出图片在 `cloneNode(true)` 后主动删掉图层；别指望「clone 会自然带上一切」。
 
 ---
 

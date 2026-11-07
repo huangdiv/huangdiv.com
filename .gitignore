@@ -5,3 +5,5 @@ videos
 .env
 __pycache__/
 *.pyc
+# 冒烟测试生成的临时产物（E2E 导出的 PNG 等），不入库
+.workbuddy/e2e_downloads/

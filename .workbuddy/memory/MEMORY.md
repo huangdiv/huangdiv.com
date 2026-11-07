@@ -42,9 +42,10 @@
 - 云端推送需 GitHub PAT(`repo` 权限),勿入库(`.env` 已在 `.gitignore`)。
 
 ## 测试约定
-- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 13 文件)
+- 单元:`bash .workbuddy/run_unit_tests.sh`(Node ESM,`static/tests/unit_*.mjs`,共 14 文件)
   - 含 `unit_version_sync`:钉死「两处 APP_VERSION + HTML 入口 `?v=` + 两个静态兜底 span」一致
-- 冒烟:Playwright,`.workbuddy/smoke_test_batch*.py`,需先在 `static/` 起
+  - 含 `unit_pair_links`:配对唯一性 + 连线走廊几何「不进任何座位矩形」的采样不变量
+- 冒烟:Playwright,`.workbuddy/smoke_test_batch*.py`(共 31 批次),需先在 `static/` 起
   `python -m http.server 8123 --bind 127.0.0.1`
   (跑 15~25 分钟会半挂:curl 200 但 goto 超时 ⇒ 重启即可)
 - URL 一律用 `127.0.0.1` 不用 `localhost`(后者可能解析到 ::1 导致挂起)
@@ -140,3 +141,27 @@
   `.zone-popup` 改 flex column + `.zone-list{flex:1 1 auto}` 消除双滚动条
 - **配对选择框已改成自绘候选**(`.pair-suggest`):原生 datalist 无法把名次放右侧、条目过高;
   自绘要点 = mousedown+preventDefault、就地撑高(父级 overflow 会裁浮层)、选中 id 记 dataset
+
+## 配对唯一性 + 座位区关联箭头(2026-11-07, v1.4.5)
+- **一人只能有一组「强制同桌」**:`pair-links.js#validateForcedPair` 纯函数(返回 self/duplicate/conflict
+  + `sharedId/partnerId/newPartnerId`),弹窗录入拦下并 alert `MESSAGES.PAIR_FORCED_CONFLICT`;
+  `migrateConfig` 用 `sanitizeForcedPairs()` 清洗老配置,**UI 校验与载入清洗必须成对做**。
+  回避配对不受此限(一人可回避多人),只 `sanitizePairs()` 去非法/重复。
+  ⇒ 改这类规则时**已有测试夹具常常本身就违规**(batch15 的 s5、batch30 的 s3),先改夹具。
+- **连线几何**:`planPairLinks()` 只走座位间空隙带 —— `buildLaneMap()` 从真实座位矩形推
+  行间/列间/四周 padding 走廊,路径 = A 边缘 → A 侧横向走廊 →(必要时)纵向走廊换层 →
+  B 侧横向走廊 → B 边缘。单测用 160 点采样断言「0 点进入任何座位矩形」,浏览器侧再用
+  `SVGPathElement.getPointAtLength` 复验。同桌判定直接复用 `randomArrange.getDeskMatePairs()`,
+  别自己算「走道隔开算不算同桌」。
+- **图层三件套**:`pointer-events:none` + SVG 作为 `.classroom` **首个 absolute 子节点**
+  (绘制顺序靠 DOM 顺序,座位是 `position:relative` ⇒ 天然盖住意外相交的线,不必给座位加 z-index)
+  + 几何上就避开所有座位。强制=淡蓝 1.3px 单向箭头;回避冲突=红色 1.7px 虚线双向箭头 + 中点 ×,
+  仅在两人真的同桌时才画。
+- **`fullRebuildSeats()` 会清空 `classroom.innerHTML`** ⇒ 常驻图层必须写成 `ensurePairLinkLayer()`
+  每次检查再插入;刷新点 = `afterSeatsRender()` + 弹窗增删 + 开关 toggle + `initialize()` 末尾
+  + `window.resize` / `ResizeObserver(classroom)`(rAF 合并)。
+- **打印/导出**:`@media print` 隐藏图层与图例(打印 CSS 改 padding/gap,坐标会错位);
+  `exportSeatImage()` 在 `classroom.cloneNode(true)` 后**主动删掉 `.pair-link-layer`**
+  (html2canvas 对 SVG marker 支持不全 + 克隆体 id 重复)。
+- 开关 `data-toggle="pairlinks"`,配置字段 `showPairLinks`(默认 true,纯 UI 顶层 let,不进 state);
+  图例 `.pair-link-legend` 在教室下方,只在有线时显示、带两类计数。

@@ -90,6 +90,13 @@ async def main():
         page.on("console", lambda m: ERRORS.append(f"console.{m.type}: {m.text}")
                 if m.type == "error" else None)
 
+        # 外部 CDN 脚本在受限网络下会卡住导航 ⇒ 本地桩。本批次只测 CSV 导出，不依赖它们。
+        await page.route("**/xlsx.full.min.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.XLSX={read:()=>({SheetNames:[],Sheets:{}}),utils:{sheet_to_json:()=>[]}};"))
+        await page.route("**/html2canvas*.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.html2canvas=()=>Promise.reject(new Error('stub'));"))
         await page.goto(BASE, wait_until="domcontentloaded")
         await page.wait_for_timeout(1200)
         await page.evaluate(

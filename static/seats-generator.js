@@ -14,12 +14,13 @@ import {
 import { computeGroupBalance, balanceLevel, roundScore } from './modules/group-balance.js';
 import { planGroupSeatSlots } from './modules/group-layout.js';
 import { ZONE_DEFS, ZONE_IDS, isZoneId, zoneName, seatZone } from './modules/zone.js';
+import { validateForcedPair, planPairLinks } from './modules/pair-links.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.4';
+        const APP_VERSION = '1.4.5';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -57,6 +58,7 @@ let groupRotateOffset = 1;             // 分组轮换步长(默认 +1:轮换到
 let smartArrangeMixed = false;         // 男女同桌
 let smartArrangeSameGender = false;    // 男女不同桌(与「男女同桌」互斥)
 let smartArrangeRotate = false;        // 小组轮换(开启后智能排座会在排座后按步长轮换)
+let showPairLinks = true;              // 座位区配对关联箭头(默认开,配置可关)
 let showStudentIcons = state.showStudentIcons;
 let isTouchDevice = state.isTouchDevice;
 // 性别规则(男女同桌 / 男女不同桌)未达成的座位集合 —— 开座表闪烁提示用
@@ -288,6 +290,7 @@ function normalizeRotateOffset(value) {
                 smartArrangeMixed: smartArrangeMixed,
                 smartArrangeSameGender: smartArrangeSameGender,
                 smartArrangeRotate: smartArrangeRotate,
+                showPairLinks: showPairLinks,
                 version: APP_VERSION
             };
         }
@@ -1723,12 +1726,163 @@ function normalizeRotateOffset(value) {
             renderPairList(aList, avoidPairs, 'avoid');
         }
 
+        // ═══════════════ 座位区「配对关联指示箭头」═══════════════
+        // 目标:每个「强制同桌」配对的两个座位之间画一条细淡箭头；
+        //      「回避同桌」默认不画，只有两人真的被排成同桌时才画红色互斥箭头。
+        // 约束:连线只走座位之间的空隙带(行间/列间/走道/四周 padding)，
+        //      绝不压住中间的其他座位；图层 pointer-events:none 且位于座位下方。
+        // 几何与校验规则全部在 modules/pair-links.js(纯函数，有单测)。
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+        let pairLinkFrame = 0;
+
+        function ensurePairLinkLayer() {
+            let svg = classroom.querySelector('.pair-link-layer');
+            if (svg) return svg;
+            svg = document.createElementNS(SVG_NS, 'svg');
+            svg.setAttribute('class', 'pair-link-layer');
+            svg.setAttribute('aria-hidden', 'true');
+            const defs = document.createElementNS(SVG_NS, 'defs');
+            [['pairArrowForced', 'pair-arrow-forced'], ['pairArrowAvoid', 'pair-arrow-avoid']]
+                .forEach(function (spec) {
+                    const marker = document.createElementNS(SVG_NS, 'marker');
+                    marker.setAttribute('id', spec[0]);
+                    marker.setAttribute('viewBox', '0 0 8 8');
+                    marker.setAttribute('refX', '7');
+                    marker.setAttribute('refY', '4');
+                    marker.setAttribute('markerWidth', '6');
+                    marker.setAttribute('markerHeight', '6');
+                    // auto-start-reverse ⇒ 双向箭头时起点箭头自动朝外，表达「互斥」
+                    marker.setAttribute('orient', 'auto-start-reverse');
+                    const tip = document.createElementNS(SVG_NS, 'path');
+                    tip.setAttribute('d', 'M0,0 L8,4 L0,8 z');
+                    tip.setAttribute('class', spec[1]);
+                    marker.appendChild(tip);
+                    defs.appendChild(marker);
+                });
+            svg.appendChild(defs);
+            // 作为首个子节点 ⇒ 在 CSS 绘制顺序里排在所有 .seat(position:relative) 之前，
+            // 即使某段线意外与座位相交也会被不透明座位盖住，不会遮挡姓名。
+            classroom.insertBefore(svg, classroom.firstChild);
+            return svg;
+        }
+
+        // offsetLeft/offsetTop 相对 .classroom 的 padding box，与 absolute inset:0 的
+        // SVG 坐标系完全一致；且不受 :hover 的 transform / 打印缩放影响。
+        function collectSeatRects() {
+            const rects = new Array(currentSeats.length);
+            classroom.querySelectorAll('.seat[data-index]').forEach(function (el) {
+                const i = parseInt(el.getAttribute('data-index'), 10);
+                if (!Number.isFinite(i) || i < 0 || i >= rects.length) return;
+                rects[i] = {
+                    left: el.offsetLeft,
+                    top: el.offsetTop,
+                    width: el.offsetWidth,
+                    height: el.offsetHeight
+                };
+            });
+            return rects;
+        }
+
+        function pairStudentName(id) {
+            const s = students.find(function (x) { return x.id === id; });
+            return s ? s.name : '(已删除)';
+        }
+
+        function updatePairLinkLegend(forcedCount, avoidCount) {
+            const legend = document.getElementById('pairLinkLegend');
+            if (!legend) return;
+            const show = showPairLinks && (forcedCount + avoidCount) > 0;
+            legend.hidden = !show;
+            if (!show) return;
+            [['forced', forcedCount], ['avoid', avoidCount]].forEach(function (pair) {
+                const item = legend.querySelector('[data-legend="' + pair[0] + '"]');
+                if (!item) return;
+                item.hidden = pair[1] === 0;
+                const badge = item.querySelector('.pair-legend-count');
+                if (badge) badge.textContent = pair[1];
+            });
+        }
+
+        function refreshPairLinks() {
+            const svg = ensurePairLinkLayer();
+            const width = classroom.clientWidth;
+            const height = classroom.clientHeight;
+            svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', height);
+            // 保留 <defs>，其余路径每次全量重建(数量少、成本低、逻辑最简单)
+            Array.prototype.slice.call(svg.childNodes).forEach(function (node) {
+                if (node.nodeType === 1 && node.tagName &&
+                    node.tagName.toLowerCase() !== 'defs') svg.removeChild(node);
+            });
+            if (!showPairLinks) { updatePairLinkLegend(0, 0); return; }
+
+            let plan = { links: [], forcedCount: 0, avoidCount: 0 };
+            try {
+                // 同桌定义直接复用排座引擎，避免「走道隔开算不算同桌」两处漂移
+                const deskmateMap = randomArrange.getDeskMatePairs().pairMap;
+                plan = planPairLinks({
+                    forced: forcedPairs,
+                    avoid: avoidPairs,
+                    seats: currentSeats,
+                    deskmateMap: deskmateMap,
+                    rects: collectSeatRects(),
+                    width: width,
+                    height: height
+                });
+            } catch (e) {
+                console.error('[pair-links] 规划失败', e);
+            }
+
+            const frag = document.createDocumentFragment();
+            plan.links.forEach(function (link) {
+                const path = document.createElementNS(SVG_NS, 'path');
+                path.setAttribute('class', 'pair-link pair-link-' + link.kind);
+                path.setAttribute('d', link.d);
+                const markerId = link.kind === 'avoid' ? 'pairArrowAvoid' : 'pairArrowForced';
+                if (link.kind === 'avoid') path.setAttribute('marker-start', 'url(#pairArrowAvoid)');
+                path.setAttribute('marker-end', 'url(#' + markerId + ')');
+                const title = document.createElementNS(SVG_NS, 'title');
+                const nameA = pairStudentName(link.ids[0]);
+                const nameB = pairStudentName(link.ids[1]);
+                title.textContent = link.kind === 'avoid'
+                    ? '回避同桌冲突：' + nameA + ' 与 ' + nameB + ' 目前被安排为同桌'
+                    : '强制同桌：' + nameA + ' ↔ ' + nameB;
+                path.appendChild(title);
+                frag.appendChild(path);
+
+                if (link.cross) {
+                    const x = link.cross.x, y = link.cross.y;
+                    const cross = document.createElementNS(SVG_NS, 'path');
+                    cross.setAttribute('class', 'pair-link-cross');
+                    cross.setAttribute('d',
+                        'M' + (x - 3).toFixed(1) + ',' + (y - 3).toFixed(1) +
+                        ' L' + (x + 3).toFixed(1) + ',' + (y + 3).toFixed(1) +
+                        ' M' + (x + 3).toFixed(1) + ',' + (y - 3).toFixed(1) +
+                        ' L' + (x - 3).toFixed(1) + ',' + (y + 3).toFixed(1));
+                    frag.appendChild(cross);
+                }
+            });
+            svg.appendChild(frag);
+            updatePairLinkLegend(plan.forcedCount, plan.avoidCount);
+        }
+
+        // resize / 布局变化走 rAF 合并；座位重绘走同步刷新，保证测试与视觉即时一致
+        function schedulePairLinksRefresh() {
+            if (pairLinkFrame) cancelAnimationFrame(pairLinkFrame);
+            pairLinkFrame = requestAnimationFrame(function () {
+                pairLinkFrame = 0;
+                try { refreshPairLinks(); } catch (e) { console.error('[pair-links] 刷新失败', e); }
+            });
+        }
+
         // 座位渲染统一出口:任何一次座位重绘后都要做的派生刷新
         function afterSeatsRender() {
             updatePairSettingsLabel();
             refreshPairPopupStatus();
             refreshZonePopupStatus();
             refreshGenderHints();
+            try { refreshPairLinks(); } catch (e) { console.error('[pair-links] afterSeatsRender', e); }
         }
 
         function openPairPopup(anchorEl) {
@@ -1812,6 +1966,20 @@ function normalizeRotateOffset(value) {
                     alert(MESSAGES.PAIR_ALREADY_EXISTS);
                     return;
                 }
+                // 「强制同桌」是一对一关系：一个人不能同时和两个人被强制安排同桌，
+                // 否则排座引擎要满足数学上不可能的约束。此处拦下并点名原搭档。
+                if (type === 'forced') {
+                    const check = validateForcedPair(forcedPairs, a, b);
+                    if (!check.ok && check.reason === 'conflict') {
+                        const hit = check.conflicts[0];
+                        alert(MESSAGES.PAIR_FORCED_CONFLICT(
+                            pairStudentName(hit.sharedId),
+                            pairStudentName(hit.newPartnerId),
+                            pairStudentName(hit.ids[0]) + ' ↔ ' + pairStudentName(hit.ids[1])
+                        ));
+                        return;
+                    }
+                }
                 pairs.push([a, b]);
                 inputA.value = '';
                 inputB.value = '';
@@ -1820,6 +1988,7 @@ function normalizeRotateOffset(value) {
                 closePairSuggest(inputA);
                 closePairSuggest(inputB);
                 renderAll();
+                refreshPairLinks();     // 增删配对不改座位，必须单独重画连线
                 autoSave();
                 // 连续录入：焦点回到 A
                 if (inputA.focus) inputA.focus();
@@ -1899,6 +2068,7 @@ function normalizeRotateOffset(value) {
                 if (type === 'forced') forcedPairs.splice(idx, 1);
                 else avoidPairs.splice(idx, 1);
                 renderAll();
+                refreshPairLinks();
                 autoSave();
             });
 
@@ -3460,7 +3630,12 @@ function isWholeWordMatch(label, keyword) {
                 titleRowClone.style.cssText = 'text-align:center;margin-bottom:16px;';
                 exportWrapper.appendChild(titleRowClone);
             }
-            exportWrapper.appendChild(classroom.cloneNode(true));
+            const classroomClone = classroom.cloneNode(true);
+            // 关联箭头是屏幕端的辅助图层：html2canvas 对内联 SVG / marker 支持不完整，
+            // 且克隆体的 marker id 会与原页面重复。导出稿与打印稿保持一致，去掉它。
+            const cloneLinkLayer = classroomClone.querySelector('.pair-link-layer');
+            if (cloneLinkLayer) cloneLinkLayer.parentNode.removeChild(cloneLinkLayer);
+            exportWrapper.appendChild(classroomClone);
 
             // 临时挂载到页面外
             exportWrapper.style.position = 'fixed';
@@ -3682,6 +3857,7 @@ function isWholeWordMatch(label, keyword) {
             setSwitchState('mixed', smartArrangeMixed);
             setSwitchState('samegender', smartArrangeSameGender);
             setSwitchState('rotate', smartArrangeRotate);
+            setSwitchState('pairlinks', showPairLinks);
             const stepRow = document.getElementById('rotateStepRow');
             if (stepRow) stepRow.style.display = smartArrangeRotate ? '' : 'none';
             syncRotateStepButtons();
@@ -3707,10 +3883,14 @@ function isWholeWordMatch(label, keyword) {
                 if (smartArrangeSameGender) smartArrangeMixed = false;
             } else if (name === 'rotate') {
                 smartArrangeRotate = !smartArrangeRotate;
+            } else if (name === 'pairlinks') {
+                showPairLinks = !showPairLinks;
             }
             syncSmartArrangeUI();
             // 性别开关一开一合 ⇒ 立刻重新检测并刷新闪烁提示
             refreshGenderHints();
+            // 连线开关只影响覆盖层，不改座位 ⇒ 单独重画，不必 generateSeats
+            refreshPairLinks();
             autoSave();
         }
 
@@ -4026,6 +4206,7 @@ function isWholeWordMatch(label, keyword) {
             showStudentIcons = config.showStudentIcons !== false;
             forcedPairs = config.forcedPairs || [];
             avoidPairs = config.avoidPairs || [];
+            showPairLinks = config.showPairLinks !== false;
 
             const targetLen = rows * cols;
             if (currentSeats.length < targetLen) {
@@ -4629,6 +4810,7 @@ function isWholeWordMatch(label, keyword) {
                     showStudentIcons = config.showStudentIcons !== false;
                     forcedPairs = config.forcedPairs || [];
                     avoidPairs = config.avoidPairs || [];
+                    showPairLinks = config.showPairLinks !== false;
                     isCheckinMode = !!config.isCheckinMode;
                     isGroupMode = !!config.isGroupMode;
                     groupRotateOffset = normalizeRotateOffset(config.groupRotateOffset);
@@ -4718,6 +4900,10 @@ function isWholeWordMatch(label, keyword) {
             isInitialized = true;
             // 兜底:首屏徽标必须正确(即使座位渲染链路后续重构不再派发 afterSeatsRender)
             updatePairSettingsLabel();
+            setSwitchState('pairlinks', showPairLinks);
+            // 兜底:连线依赖座位 DOM 的几何，等一帧确保布局稳定后再量一次
+            try { refreshPairLinks(); } catch (e) { console.error('[pair-links] 首屏刷新', e); }
+            schedulePairLinksRefresh();
         }
 
         // 导出配置按钮
@@ -4762,6 +4948,7 @@ function isWholeWordMatch(label, keyword) {
                     showStudentIcons = config.showStudentIcons !== false;
                     forcedPairs = config.forcedPairs || [];
                     avoidPairs = config.avoidPairs || [];
+                    showPairLinks = config.showPairLinks !== false;
                     isCheckinMode = !!config.isCheckinMode;
                     isGroupMode = !!config.isGroupMode;
                     groupRotateOffset = normalizeRotateOffset(config.groupRotateOffset);
@@ -5698,6 +5885,15 @@ function isWholeWordMatch(label, keyword) {
             // 滚动 / 尺寸变化时关闭，避免菜单飘离锚点
             window.addEventListener('scroll', hideStatActionMenu, true);
             window.addEventListener('resize', hideStatActionMenu);
+        }
+
+        // 座位表几何变化(窗口缩放 / 窄屏断点换 --seat-width / 面板挤压布局)⇒ 重画连线。
+        // SVG 是 absolute 子元素，不会反过来改变 .classroom 尺寸，故 ResizeObserver 不会自激。
+        window.addEventListener('resize', schedulePairLinksRefresh);
+        if (typeof ResizeObserver !== 'undefined') {
+            try {
+                new ResizeObserver(schedulePairLinksRefresh).observe(classroom);
+            } catch (e) { /* 老浏览器忽略，仍有 resize 兜底 */ }
         }
 
         // 执行初始化

@@ -85,8 +85,14 @@ async def main():
             await dialog.accept()
         page.on("dialog", lambda d: asyncio.create_task(handle_dialog(d)))
 
+        # sheetjs CDN 在受限网络下会拖住导航；本 E2E 不测 Excel 导入，用本地桩。
+        # html2canvas 保持真实加载（Step 5 要靠它导出 PNG）。
+        await page.route("**/xlsx.full.min.js", lambda r: r.fulfill(
+            status=200, content_type="application/javascript; charset=utf-8",
+            body="window.XLSX={read:()=>({SheetNames:[],Sheets:{}}),utils:{sheet_to_json:()=>[]}};"))
+
         # ── 加载页面 ──
-        resp = await page.goto(URL, wait_until="networkidle", timeout=30000)
+        resp = await page.goto(URL, wait_until="domcontentloaded", timeout=30000)
         results["steps"].append(("HTTP 状态", resp.status))
         assert resp.status == 200, f"页面未返回 200,got {resp.status}"
 

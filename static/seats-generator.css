@@ -27,6 +27,9 @@
     /* 行内「删除/移除」小叉号的统一占位尺寸：
        走道列表、分组行、详细设置学生行共用，保证三处观感一致 */
     --icon-remove-size: 18px;
+    /* 座位区配对关联箭头：强制=细淡蓝，回避冲突=醒目红 */
+    --pair-link-forced: rgba(59, 130, 246, 0.45);
+    --pair-link-avoid: rgba(220, 38, 38, 0.9);
 }
 
 * {
@@ -3856,12 +3859,110 @@ button:disabled {
     color: var(--text-primary);
 }
 
+/* ==================== 座位区「配对关联指示箭头」 ====================
+   连线由 modules/pair-links.js 规划，只沿座位之间的空隙带走，绝不进入
+   任何座位矩形；SVG 作为 .classroom 的首个 absolute 子节点，绘制顺序在
+   .seat(position:relative) 之前，且 pointer-events:none ⇒ 不挡姓名、不挡拖拽。
+
+   强制同桌：细(1.3px)、淡(45% 蓝)、单向箭头；
+   回避同桌且已同桌：稍粗(1.7px)、红色虚线 + 双向箭头 + 中点 ×，表达「互斥」。
+   ==================================================================== */
+.pair-link-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.pair-link {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.pair-link-forced {
+    stroke: var(--pair-link-forced);
+    stroke-width: 1.3;
+}
+
+.pair-link-avoid {
+    stroke: var(--pair-link-avoid);
+    stroke-width: 1.7;
+    stroke-dasharray: 4 3;
+}
+
+.pair-arrow-forced { fill: var(--pair-link-forced); }
+.pair-arrow-avoid  { fill: var(--pair-link-avoid); }
+
+.pair-link-cross {
+    fill: none;
+    stroke: var(--pair-link-avoid);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
+/* 图例：只在真的有线时出现，放在教室下方，不参与打印 / 图片导出 */
+.pair-link-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin: 8px 0 0 2px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.pair-link-legend[hidden],
+.pair-legend-item[hidden] { display: none !important; }
+
+.pair-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.pair-legend-line {
+    display: inline-block;
+    width: 22px;
+    height: 0;
+    border-top: 2px solid currentColor;
+    position: relative;
+}
+
+.pair-legend-line::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -4px;
+    border-left: 5px solid currentColor;
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+}
+
+.pair-legend-forced { color: var(--pair-link-forced); }
+.pair-legend-avoid  {
+    color: var(--pair-link-avoid);
+    border-top-style: dashed;
+}
+
+.pair-legend-count {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 /* ==================== 打印样式 ==================== */
 @media print {
     @page {
         size: A4 landscape;
         margin: 5mm;
     }
+
+    /* 打印时 .classroom 的 padding / gap 会被整体压缩，屏幕坐标算出的连线会错位；
+       且淡色细线印出来几乎看不见 ⇒ 打印稿保持干净的座位表，不输出关联箭头。 */
+    .pair-link-layer,
+    .pair-link-legend { display: none !important; }
 
     html, body {
         width: 287mm;
