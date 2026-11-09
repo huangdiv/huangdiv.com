@@ -268,6 +268,9 @@ static/
   批内在「一组建一人」约束下求 `性别差² + 班委数²` 最优排列（n≤7 穷举全排列，更大规模贪心），
   无性别/班委信息时保持恒等排列 ⇒ 严格等于「按排名顺序分配」。
   班委由标签文本识别（`isCadreStudent`，关键词见 `CADRE_KEYWORDS`）。
+  **v1.4.9 起人数不整除时，余下 r 人固定按「组号倒序」划归**：1组…(G-r)组恒为
+  `floor(N/G)` 人，只有最后 r 个组是 `floor(N/G)+1` 人；该规则与蛇形方向（批次奇偶）
+  解耦，详见 §3.15。整除时所有批次仍严格交替，行为不变。
   分组命名 `1组/2组/…`、配色取 `distinctColors` 前 N 个，会清空并重建全部分组（可撤销）。
 
 ### 3.6 按组聚座 + 分组均衡系数（2026-11-02 新增，2026-11-09 重写聚座算法）
@@ -570,12 +573,45 @@ SVG path 反推走廊 y 与 above/below）。回退验证：把 `if (isDeskmate)
 batch32 5 项变红（7/4/1 场景旧算法给 `[(2,4),(1,4),(1,1)]`，新算法 `[(4,2),(2,2),(1,1)]`；
 占座场景旧算法 6 人组 span 11，新算法 5），还原后全绿。
 
+### 3.15 均衡分组余数按组号倒序划归（2026-11-09，v1.4.9）
+
+用户需求：「总人数不能被组数整除时，多出来的几个人按分组的倒序划归 —— 排在前面的
+分组不多人，排在后面的组允许多 1 人」。
+
+**根因**：`planBalancedGroupAssignment()` 每批用 `slotOrder.slice(0, chunk.length)` 取目标组。
+满批时 `slotOrder` 按 `batch % 2` 正序/逆序交替（蛇形），但**最后不足一批**时只取前 r 个：
+- 最后一批恰为奇数批 ⇒ 前 r 个是 `[G-1 … G-r]` ⇒ 后面的组多人（碰巧符合要求）；
+- 最后一批恰为偶数批 ⇒ 前 r 个是 `[0 … r-1]` ⇒ **前面的组多人**（用户看到的不一致）。
+
+例：10 人 4 组 ⇒ 2 个满批 + 余数批 `batch=2`（偶数）⇒ 旧 `[3,3,2,2]`；
+14 人 4 组 ⇒ 3 个满批 + 余数批 `batch=3`（奇数）⇒ 旧 `[3,3,4,4]`。
+即「谁多 1 人」取决于 `floor(N/G)` 的奇偶，和组号毫无关系。
+
+**修法**（`student-rank.js` 一行语义改动，UI 流程未动）：
+```js
+const isPartial = chunk.length < g;                       // 未满一批 = 余数批
+const forward = !isPartial && batch % 2 === 0;            // 余数批一律按组号倒序
+```
+倒序 `slotOrder` 的前 r 个恰为 `[G-1 … G-r]`，于是 `stats.count` 恒等于
+`[q × (G-r), (q+1) × r]`；批内 `solveBatch` 的性别/班委优化目标换成后 r 组后仍在
+同一批内做，均衡效果不变。整除时 `isPartial` 恒 false ⇒ 蛇形序列**一字未改**。
+两个按钮 `title`（分组设置栏 + 分组模式 banner）同步说明这条规则。
+
+**测试**：`unit_student_rank.mjs` 新增 H 组 8 项（31→**39 项**）：1..36 人 × 1..8 组共
+260 组合的精确人数不变量、偶数批反例、奇数批回归、`r=1` / `r=G-1` 边界、整除时蛇形
+精确序列、前几个满批不受余数影响、余数名额恰落在倒数 r 组、有性别班委时均衡优化
+不能挪走名额。新增 `smoke_test_batch33_balance_remainder.py`（22 项，6 个 N/G 场景真实
+点击 `#balanceGroupBtn` 后从 `classroomConfig` 反推各组人数）。
+**回退验证**：把 `forward` 改回 `batch % 2 === 0` ⇒ 单测 4 项变红、batch33 4 项变红
+（10人4组 `[2,2,3,3]`→`[3,3,2,2]`；13人5组 `[2,2,3,3,3]`→`[3,3,3,2,2]`），还原后全绿。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | **均衡分组余数按组号倒序划归**：人数不整除时只有排在后面的 r 个组多 1 人，与批次奇偶（蛇形方向）解耦；整除场景行为不变（v1.4.9，见 §3.15） |
 | 本轮 | **按组聚座按每组人数取最紧凑矩形**：取消全班统一块，主目标「占用行数+列数」最小，6 人→3行×2列；逐组全表搜索落点、占座跳过、就近补位；toast 逐组给形状（v1.4.8，见 §3.14） |
 | 本轮 | **同桌连线走向统一**：`index%2` 交替上下改为「同桌线全班固定走座位上方、同排等高」，侧别只由几何决定；非同桌线保留交错避免长线重叠（v1.4.7，见 §3.13） |
 | 本轮 | **去掉连线箭头 + 开关改名**：两类配对线都只保留线本身（淡蓝实线 / 红色虚线 + 中点 ×），删掉全部 `<marker>` 与图例小三角；开关「配对关联箭头」→「配对关联线」（v1.4.6，见 §3.12） |
@@ -626,7 +662,9 @@ batch32 5 项变红（7/4/1 场景旧算法给 `[(2,4),(1,4),(1,1)]`，新算法
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
 - 14 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
-  `unit_student_rank` / **`unit_group_layout`**（v1.4.8 重写，21 组：题面 6 人精确座位、
+  **`unit_student_rank`**（v1.4.9 起 39 项，H 组 8 项钉死「余数倒序划归」：
+  260 组 N/g 组合的精确人数不变量、偶数批反例、整除时蛇形不变） /
+  **`unit_group_layout`**（v1.4.8 重写，21 组：题面 6 人精确座位、
   每组 span 等于该人数理论最优、形状彼此独立、组顺序/增删无关、blocked 不挪人、
   小教室不退化） / `unit_group_balance` / `unit_zone` /
   `unit_version_sync` / **`unit_pair_links`**（38 项：唯一性校验、清洗、走廊几何、
@@ -635,7 +673,7 @@ batch32 5 项变红（7/4/1 场景旧算法给 `[(2,4),(1,4),(1,1)]`，新算法
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 32 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 33 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -644,7 +682,9 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 - 页面路径是 `127.0.0.1:8123/seats-generator.html`（**不是** `/static/...`）；
   模块相对 URL 是 `/modules/state.js`。
 - **服务器半挂**：`http.server` 跑 15~25 分钟后 curl 可能仍 200 但 goto 超时 ⇒ `taskkill` 后重启即可，
-  不要怀疑页面代码。
+  不要怀疑页面代码。**但先排除「脚本自身没打桩/超时太短」**：2026-11-09 连跑 14 个批次后
+  E2E 报 `goto 30s` 超时，重启服务无效，实测 `html2canvas` CDN 单次响应约 10s（E2E 为
+  真实导出 PNG 故意不桩它）⇒ 把 `goto` 放宽到 90s、`wait_for_selector` 放宽到 30s 即恢复。
 - **`dialog` 必须全局接受**：`page.on("dialog", lambda d: asyncio.create_task(d.accept()))`，
   否则 random/轮换的 confirm 会让测试卡死。
 - **外链脚本会拖死 `goto`**：页面外链 `cdn.sheetjs.com/xlsx…` 与 `html2canvas.hertzen.com`。
@@ -681,6 +721,14 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   两种人数分布，真实点击 `#arrangeGroupBtn` 后从 `classroomConfig.seats` 反推每组外接矩形，
   断言形状 / span / 无空洞 / 从左到右 / toast 文案 / 幂等性 / 未分组学生占座不动。
   ⇒ 「几何形状」类断言同样只需读座位下标数组，不必截图；截图只作人工观感加分项。
+- **v1.4.9 新增 `batch33_balance_remainder`（22 项）**：`prompt` 的组数用可变字典
+  `prompt_value["g"]` 在每次点击前改（一个 `page.on("dialog")` 处理器服务 6 个场景），
+  每个场景 `localStorage` 播种 N 人 / 无分组 → reload → 点 `#balanceGroupBtn` →
+  从 `classroomConfig.groups + students[].groupId` 反推各组人数。
+  ⇒ 「人数分配」类断言只读 id 归属即可，不需要看 DOM 徽标。
+- **发版 bump 后记得搜 `.workbuddy/` 里的硬编码版本断言**：`batch31` / `batch32` 都
+  在 docstring、种子 `config.version` 和 `check(version == "x.y.z")` 三处写了版本号，
+  漏改会让回归批次假红（全局 Grep 默认跳过 `.workbuddy` 这类隐藏目录，要单独指定 path 搜）。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
 - `window.__seatsTest`：`rotateGroupSeats` / `randomSeatArrange`（驱动带撤销与 UI 回调的真实实例）。
@@ -695,6 +743,10 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   `export const chooseCompactShape = (n,R,C) => chooseBlockShape([n],R,C)`），
   再覆盖回原路径跑单测 + 冒烟 ⇒ 得到的是**行为差异**而不是「import 失败」的假红，
   验证完立刻 `cp` 回新版并复跑。
+- **单行语义改动**（v1.4.9 `student-rank.js`）：`cp` 新版到 `/tmp`，用 Python 精确替换
+  `const forward = !isPartial && batch % 2 === 0;` 为旧写法，单测 + 冒烟各跑一次，
+  再 `cp` 回来复跑。回退后只有「偶数批余数」场景变红、奇数批/整除场景仍绿 ⇒
+  正好证明测试钉死了用户描述的那条规则，而不是笼统地判「分组坏了」。
 
 ---
 
@@ -714,6 +766,7 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 | **视觉方位由遍历序号驱动** | `planOne()` 用 `index % 2` 决定同桌线走上/下走廊 ⇒ 增删一组配对就翻面（v1.4.7，§3.13）。「让多条线错开」的抖动只能用在无语义的连线上；带业务语义（同桌 / 配对）的线，方位必须由几何或语义统一决定，与数组顺序彻底解耦。 |
 | **用「全局最大值」给每个个体定形状** | 旧按组聚座按 `max(sizes)` 给所有组套统一矩形块 ⇒ 小组被大组绑架（4 人组变 `2×3` / `1×4`）。凡需求写「根据每组的…自动调整」，形状必须由**该组自身**的参数推导，全局参数只能用来做容量/边界检查（v1.4.8，§3.14）。 |
 | **名义几何 ≠ 实际几何** | 枚举候选矩形时，矩形内可能有 `blocked` 座位 ⇒ 前 n 个可用座位的**真实外接矩形**可能比名义矩形更低/更窄。评分必须用实际座位集合算，否则「左上角更早」的候选会误胜，布局看起来散。位置项只在平局时生效（0.001 级权重）。 |
+| **尾批方向被「批次序号」隐式决定** | 蛇形分批的最后一批不足 G 人时，直接 `slotOrder.slice(0, r)` 会让「谁多 1 人」取决于 `floor(N/G)` 的奇偶：10人4组 → `[3,3,2,2]`、14人4组 → `[3,3,4,4]`（v1.4.9，§3.15）。**凡是带业务语义的尾数（余数名额、末组大小、尾页留白），方向必须显式由规则给出，不能搭遍历顺序的便车**；判断方式是问「只改 N 让批次奇偶翻转，结果是否仍符合规则」。 |
 
 ### 6.2 测试技巧
 - 用 `localStorage.setItem('classroomConfig', JSON.stringify(cfg))` + `page.reload()` 注入数据；

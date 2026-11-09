@@ -288,7 +288,7 @@ export function createSeatGrid(deps) {
                 '<button class="mode-banner-btn group-mode-clear-btn" id="groupModeClearBtn"' +
                     ' style="display:none;" title="取消当前已选中的全部学生">取消选择</button>' +
                 '<button class="mode-banner-btn" id="groupModeBalanceBtn"' +
-                    ' title="按排名顺序均衡分成若干组（兼顾性别与班委）">按排名均衡分组</button>' +
+                    ' title="按排名顺序均衡分成若干组（兼顾性别与班委）；人数不整除时，多出的人分给排在后面的组">按排名均衡分组</button>' +
                 '<button class="mode-banner-btn" id="groupModeNewBtn">＋新建分组并分配</button>' +
                 '<button class="mode-banner-close" id="groupModeExitBtn">×</button>' +
             '</div>' +

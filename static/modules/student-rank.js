@@ -19,6 +19,10 @@
 //     再在每一批（每组各 1 人）内做一次小规模最优化，使各组的
 //     性别差 (男-女)² 与 班委数² 之和最小；无性别/班委信息时恒等排列，
 //     即严格保持 1..G 正序，符合「默认按排名顺序分配」的直觉。
+//   - 人数不能整除时，余下的 r 人**一律按组号倒序划归**：倒数第 1 组、
+//     倒数第 2 组……各多得 1 人，前面的组永远只有 floor(N/G) 人。
+//     这条规则与蛇形方向（批次奇偶）解耦，避免「有时前面的组多人、
+//     有时后面的组多人」（v1.4.9 修复）。
 //   - 批内最优解：组数 <= 7 时穷举全排列（最多 5040 种，代价可忽略）；
 //     更大规模退化为逐槽贪心，避免阶乘爆炸。
 // =====================================================================
@@ -265,7 +269,11 @@ function solveBatch(chunk, targets, stats, weights) {
  *   2. 每 G 人一批，第 1 批按 1..G 正序落到 1..G 组，第 2 批按 G..1 逆序，
  *      第 3 批再正序 …… 交替，保证各批都覆盖所有组；
  *   3. 每批内部在不破坏「一组建一人」的前提下，尽量让各组的
- *      男女差与班委数更均衡（无性别/班委信息时恒等排列 = 严格按排名顺序）。
+ *      男女差与班委数更均衡（无性别/班委信息时恒等排列 = 严格按排名顺序）；
+ *   4. 若 N 不能被 G 整除，最后一批（不足 G 人）固定按**组号倒序**落位：
+ *      组 G-1、G-2 … G-r 各多 1 人 ⇒ 前面的组人数恒为 floor(N/G)，
+ *      只有排在后面的 r 个组是 floor(N/G)+1，与该批次的蛇形方向无关。
+ *      整除时全部批次仍严格按规则 2 交替，行为不变。
  *
  * @param {Array<{id:string, rank?:number, gender?:string, tags?:Array}>} students
  * @param {number} groupCount
@@ -291,7 +299,10 @@ export function planBalancedGroupAssignment(students, groupCount, options) {
     let batch = 0;
     for (let start = 0; start < ordered.length; start += g, batch++) {
         const chunk = ordered.slice(start, start + g);
-        const forward = batch % 2 === 0;
+        // 不足一整批 = 余数批：名额固定从最后一组开始倒着发，保证
+        // 「前面的组不多人」；满批才按批次奇偶做正序/逆序蛇形交替。
+        const isPartial = chunk.length < g;
+        const forward = !isPartial && batch % 2 === 0;
         const slotOrder = [];
         for (let i = 0; i < g; i++) slotOrder.push(forward ? i : g - 1 - i);
         const targets = slotOrder.slice(0, chunk.length);

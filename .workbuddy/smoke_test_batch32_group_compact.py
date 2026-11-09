@@ -26,7 +26,7 @@
  14. 有占座时每组仍达到理论最优紧凑度
  15. 人数差更大时（7/4/1 人）各组依次为 4×2 / 2×2 / 1×1
  16. 人数差很大时每组仍达最优行列和（旧算法会把 4 人组拉成 1×4）
- 17. 版本号 1.4.8
+ 17. 版本号 1.4.9
  18. 全程无 JS 报错
 
 运行前先起本地服务:
@@ -123,7 +123,7 @@ def make_config(locked=False, sizes=None):
         "showPairLinks": True,
         "forcedPairs": [],
         "avoidPairs": [],
-        "version": "1.4.8",
+        "version": "1.4.9",
     }
 
 
@@ -277,7 +277,7 @@ async def main():
         print("=== 17~18. 版本与控制台 ===")
         version = await page.evaluate(
             "() => (document.getElementById('appVersion') || {}).textContent || ''")
-        check(version.strip() == "1.4.8", f"版本号 1.4.8（实际 {version!r}）")
+        check(version.strip() == "1.4.9", f"版本号 1.4.9（实际 {version!r}）")
         check(not ERRORS, f"全程无 JS 报错（{ERRORS[:3]}）")
 
         await browser.close()

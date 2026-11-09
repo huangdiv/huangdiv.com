@@ -31,7 +31,7 @@ import { sanitizeForcedPairs, sanitizePairs } from './pair-links.js';
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.4.8';
+export const APP_VERSION = '1.4.9';
 
 // === 工具 ===
 function generateId(prefix) {

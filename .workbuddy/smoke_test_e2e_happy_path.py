@@ -92,15 +92,17 @@ async def main():
             body="window.XLSX={read:()=>({SheetNames:[],Sheets:{}}),utils:{sheet_to_json:()=>[]}};"))
 
         # ── 加载页面 ──
-        resp = await page.goto(URL, wait_until="domcontentloaded", timeout=30000)
+        # html2canvas 走真实 CDN(Step 5 要导出 PNG),受限网络下可能 10s+ 才返回,
+        # 同步 script 会阻塞 DOMContentLoaded ⇒ 导航/渲染等待都要留足余量。
+        resp = await page.goto(URL, wait_until="domcontentloaded", timeout=90000)
         results["steps"].append(("HTTP 状态", resp.status))
         assert resp.status == 200, f"页面未返回 200,got {resp.status}"
 
         # 等待座位区渲染
-        await page.wait_for_selector("#classroom .seat", timeout=10000)
+        await page.wait_for_selector("#classroom .seat", timeout=30000)
         await page.wait_for_function(
             "() => document.querySelectorAll('#studentList .student-item').length > 0",
-            timeout=10000,
+            timeout=30000,
         )
 
         # ════════════════════════════════════════════════════════════════

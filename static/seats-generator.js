@@ -20,7 +20,7 @@ import { validateForcedPair, planPairLinks } from './modules/pair-links.js';
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.8';
+        const APP_VERSION = '1.4.9';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -685,7 +685,9 @@ function normalizeRotateOffset(value) {
 
         // 「按排名均衡分组」——分组设置栏 / 分组模式 banner 共用入口。
         // 询问组数后按排名蛇形顺序分配(每批 1..G 正序 / G..1 逆序交替),
-        // 批内兼顾性别与班委数量;分组自动命名 1组/2组/…,并配不同的预设色。
+        // 批内兼顾性别与班委数量;人数不整除时余下的人固定按组号倒序划归,
+        // 即前面的组不多人、只有排在后面的组允许多 1 人(见 student-rank.js)。
+        // 分组自动命名 1组/2组/…,并配不同的预设色。
         // 分组完成后**顺带按组聚座**：同组学生坐在一片连续座位上。
         function balanceGroupsByRank() {
             if (students.length === 0) {

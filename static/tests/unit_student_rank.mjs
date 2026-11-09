@@ -11,6 +11,7 @@
 //   E. planBalancedGroupAssignment — 蛇形分轮(1-6 正序 / 7-12 逆序 / 13-18 正序)
 //   F. 均衡 — 无信息时严格按排名顺序；有性别/班委时各组更均衡
 //   G. 边界 — 0 学生 / 组数越界 / 学生数非组数整数倍
+//   H. 余数倒序划归（v1.4.9）— 不整除时只有排在后面的组多 1 人，与批次奇偶解耦
 //
 // 运行: node static/tests/unit_student_rank.mjs
 // 退出码: 0 = 全部通过
@@ -279,7 +280,7 @@ group('F. planBalancedGroupAssignment — 性别 / 班委均衡', () => {
         assertEqual(plan.assignments.length, 14);
         const ids = new Set(plan.assignments.map(a => a.studentId));
         assertEqual(ids.size, 14);
-        // 4 批:4 正序 / 4 逆序 / 4 正序 / 2 逆序(落到第 4、3 组) ⇒ 3,3,4,4
+        // 3 个满批 + 余数 2 人倒序落到第 4、3 组 ⇒ 3,3,4,4
         assertDeepEqual(plan.stats.map(s => s.count), [3, 3, 4, 4]);
         // 人数差不超过 1,不会出现某组被塞爆
         const counts = plan.stats.map(s => s.count);
@@ -310,6 +311,102 @@ group('G. 边界', () => {
         assertEqual(plan.groupCount, 1);
         plan.assignments.forEach(a => assertEqual(a.groupIndex, 0));
         assertEqual(plan.stats[0].count, 3);
+    });
+});
+
+// ─────────────── H. 余数倒序划归（v1.4.9）───────────────
+function expectCounts(n, g) {
+    const q = Math.floor(n / g), r = n % g;
+    return Array.from({ length: g }, function (_, i) { return q + (i >= g - r ? 1 : 0); });
+}
+
+function planFor(n, g, extra) {
+    const students = [];
+    for (let i = 1; i <= n; i++) students.push(mkStudent(i, extra ? extra(i) : undefined));
+    return planBalancedGroupAssignment(students, g);
+}
+
+group('H. 余数按组号倒序划归（前面的组不多人）', () => {
+    test('全量组合不变量：1..36 人 × 1..8 组，人数精确为 [q×(G-r), (q+1)×r]', () => {
+        let cases = 0;
+        for (let n = 1; n <= 36; n++) {
+            for (let g = 1; g <= Math.min(n, 8); g++) {
+                const plan = planFor(n, g);
+                assertDeepEqual(plan.stats.map(s => s.count), expectCounts(n, g),
+                    n + ' 人 ' + g + ' 组的人数分配');
+                assertEqual(plan.assignments.length, n, n + ' 人 ' + g + ' 组的分配条数');
+                assertEqual(new Set(plan.assignments.map(a => a.studentId)).size, n,
+                    n + ' 人 ' + g + ' 组不得丢人/重复');
+                plan.assignments.forEach(function (a) {
+                    assert(a.groupIndex >= 0 && a.groupIndex < g, '组号越界');
+                });
+                cases++;
+            }
+        }
+        assertEqual(cases, 260);   // sum(1..8)=36 + 28×8 = 260
+    });
+
+    test('10 人 4 组（余数批为偶数批）：[2,2,3,3]，旧逻辑会误给 [3,3,2,2]', () => {
+        const plan = planFor(10, 4);
+        assertDeepEqual(plan.stats.map(s => s.count), [2, 2, 3, 3]);
+        const map = new Map(plan.assignments.map(a => [a.studentId, a.groupIndex]));
+        // 余数 2 人按组号倒序：倒数第 1 组(3) 先拿 s9，倒数第 2 组(2) 拿 s10
+        assertEqual(map.get('s9'), 3, 's9 应进最后一组');
+        assertEqual(map.get('s10'), 2, 's10 应进倒数第二组');
+    });
+
+    test('14 人 4 组（余数批为奇数批）：仍是 [3,3,4,4]，不回归', () => {
+        const plan = planFor(14, 4);
+        assertDeepEqual(plan.stats.map(s => s.count), [3, 3, 4, 4]);
+        const map = new Map(plan.assignments.map(a => [a.studentId, a.groupIndex]));
+        assertEqual(map.get('s13'), 3);
+        assertEqual(map.get('s14'), 2);
+    });
+
+    test('r=1 只有最后一组多人；r=G-1 只有第一组是 q 人', () => {
+        assertDeepEqual(planFor(9, 4).stats.map(s => s.count), [2, 2, 2, 3]);
+        assertDeepEqual(planFor(17, 6).stats.map(s => s.count), [2, 3, 3, 3, 3, 3]);
+        assertDeepEqual(planFor(13, 5).stats.map(s => s.count), [2, 2, 3, 3, 3]);
+    });
+
+    test('整除时蛇形顺序一字未改（18 人 6 组）', () => {
+        const plan = planFor(18, 6);
+        const map = new Map(plan.assignments.map(a => [a.studentId, a.groupIndex]));
+        for (let i = 1; i <= 18; i++) {
+            const batch = Math.floor((i - 1) / 6);
+            const pos = (i - 1) % 6;
+            const expected = batch % 2 === 0 ? pos : 5 - pos;
+            assertEqual(map.get('s' + i), expected, 's' + i);
+        }
+    });
+
+    test('余数批不改变前面满批的落位（10人4组 前 8 人 ≡ 8人4组）', () => {
+        const a = new Map(planFor(10, 4).assignments.map(x => [x.studentId, x.groupIndex]));
+        const b = new Map(planFor(8, 4).assignments.map(x => [x.studentId, x.groupIndex]));
+        for (let i = 1; i <= 8; i++) assertEqual(a.get('s' + i), b.get('s' + i), 's' + i);
+    });
+
+    test('余下的 r 个名额恰好落在倒数 r 个组、互不重复', () => {
+        for (const [n, g] of [[10, 4], [14, 4], [9, 4], [13, 5], [17, 6], [20, 7]]) {
+            const r = n % g;
+            if (r === 0) continue;
+            const tail = planFor(n, g).assignments.slice(-r).map(a => a.groupIndex).sort((x, y) => x - y);
+            assertDeepEqual(tail, Array.from({ length: r }, (_, k) => g - r + k),
+                n + ' 人 ' + g + ' 组的余数名额所在组');
+        }
+    });
+
+    test('有性别/班委数据时均衡优化不能把多出的名额挪到前面的组', () => {
+        const plan = planFor(11, 3, function (i) {
+            return {
+                gender: i % 2 ? 'male' : 'female',
+                tags: i <= 3 ? [{ label: '班长' }] : []
+            };
+        });
+        assertDeepEqual(plan.stats.map(s => s.count), [3, 4, 4]);
+        assertEqual(plan.assignments.length, 11);
+        assertEqual(plan.stats.reduce((sum, s) => sum + s.cadre, 0), 3, '班委总数守恒');
+        assertEqual(plan.stats.reduce((sum, s) => sum + s.male + s.female, 0), 11);
     });
 });
 

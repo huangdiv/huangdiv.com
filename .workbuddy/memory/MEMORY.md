@@ -13,7 +13,7 @@
 ## 测试 / 发版
 - 单测 `bash .workbuddy/run_unit_tests.sh`(Node ESM，`static/tests/unit_*.mjs`)；冒烟 Playwright `.workbuddy/smoke_test_batch*.py`，先在 `static/` 起 `python -m http.server 8123 --bind 127.0.0.1`(URL 用 127.0.0.1，别用 localhost)；服务跑久会半挂 ⇒ 重启。
 - **写完新测试必须回退验证**：临时改回旧写法确认会变红，再还原。
-- 改版本号 = **四处同步**：`migrate.js#APP_VERSION`、`seats-generator.js#APP_VERSION`、HTML 入口 `?v=`、两个静态兜底 span(`unit_version_sync` 钉死)。Pages `.js` 有 `max-age=600` + Cloudflare ⇒ 漏改 `?v=` 用户 10 分钟看不到新代码。
+- 改版本号 = **四处同步**：`migrate.js#APP_VERSION`、`seats-generator.js#APP_VERSION`、HTML 入口 `?v=`、两个静态兜底 span(`unit_version_sync` 钉死)；**另外还要单独搜 `.workbuddy/smoke_test_*.py` 里的硬编码版本断言**(全局 Grep 会跳过隐藏目录)。Pages `.js` 有 `max-age=600` + Cloudflare ⇒ 漏改 `?v=` 用户 10 分钟看不到新代码。
 - 判断线上是否发布：带随机查询串 curl 抓 JS 看 `APP_VERSION`，别信普通刷新。
 - 本地预览暴露 `window.__seatsTest`(rotateGroupSeats / randomSeatArrange)；`?debug=1` 暴露 `window.__undoTest`。
 
@@ -26,7 +26,7 @@
 ## 功能语义要点(细节见 ARCHIVE §3)
 - `students[i].rank` = 序号 1..N，无手工编辑入口，由导入决定；**导入 = 按姓名增量合并**(空值不覆盖、标签取并集、文件里没出现的学生连座位签到一起保留)。
 - 凡是「给学生看名单」的地方按 rank 升序(座位 CSV 例外)；配对 / 区域的学生选择框为自绘候选(`.pair-suggest`)，`mousedown + preventDefault` 防丢焦点。
-- 「按排名均衡分组」= `student-rank.js#planBalancedGroupAssignment`；「均衡系数」= 排名 0.6 + 性别 0.2 + 班委 0.2，排名维度必须用**排名带覆盖度**(「组均值 vs 全班均值」会假满分)。
+- 「按排名均衡分组」= `student-rank.js#planBalancedGroupAssignment`(蛇形分批 + 批内性别/班委最优排列)；**v1.4.9 起人数不整除时余下 r 人固定按组号倒序划归**：前面的组恒 `floor(N/G)` 人，只有最后 r 组多 1 人，与批次奇偶解耦(见 ARCHIVE §3.15)。「均衡系数」= 排名 0.6 + 性别 0.2 + 班委 0.2，排名维度必须用**排名带覆盖度**(「组均值 vs 全班均值」会假满分)。
 - **按组聚座 = `group-layout.js`(v1.4.8 起按每组人数各自取最紧凑矩形)**：主目标最小化「占用行数 + 列数」，其次空位 / 面积，同等优先更窄 ⇒ 6 人得 `3行×2列`；逐组在全表搜索不与已占座位冲突的最佳落点(左上优先)，`blocked` 跳过，极端情况补位 / 退化连续排。主 IIFE `arrangeSeatsByGroup()` 先清出待移动学生(未分组锁定) → 规划 → 就地写回。
 - 九宫格区域设置 `zonePref/zoneAvoid` 是**软约束**(`optimizeZones` 只做有人↔有人交换)，硬约束(配对 / 性别 / 旧座位)优先。
 - 折叠面板「布局设置」= 旧「座位设置」(id 仍是 `seatSettings`)；行内删除叉号统一 `--icon-remove-size` 18px；三个快捷按钮两段式 `.action-btn-split`，下拉互斥走 `allDropdownCtrls` 登记表。
