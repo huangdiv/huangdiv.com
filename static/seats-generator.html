@@ -24,7 +24,7 @@
         <div class="app-info-dialog">
             <h4 id="appInfoTitle">班级座位表</h4>
             <dl class="app-info-list">
-                <div><dt>版本</dt><dd>v<span id="appInfoVersion">1.4.7</span></dd></div>
+                <div><dt>版本</dt><dd>v<span id="appInfoVersion">1.4.8</span></dd></div>
                 <div><dt>作者</dt><dd>huangdiv</dd></div>
                 <div><dt>网站</dt><dd><a href="https://huangdiv.com/" target="_blank" rel="noopener noreferrer">huangdiv.com</a></dd></div>
             </dl>
@@ -62,7 +62,7 @@
 
         <div class="controls" id="controls">
             <div class="panel-header">
-                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.4.7</span></span></h3>
+                <h3>班级座位表 <span class="app-version" id="appVersionButton" role="button" tabindex="0" aria-label="查看作者、网站和版权信息">v<span id="appVersion">1.4.8</span></span></h3>
                 <span class="panel-subtitle">拖拽学生到座位即可排座</span>
             </div>
 
@@ -289,7 +289,7 @@
                         <div class="section-head">
                             <span>分组设置</span>
                             <div class="section-head-actions">
-                                <button id="arrangeGroupBtn" class="mini-btn" title="把同一组的学生收拢到一片连续座位上（不改变分组归属）">按组聚座</button>
+                                <button id="arrangeGroupBtn" class="mini-btn" title="按每组人数把同组学生收拢到最紧凑的矩形座位块（占用总行数+总列数最小，不改变分组归属）">按组聚座</button>
                                 <button id="balanceGroupBtn" class="mini-btn" title="按学生排名顺序均衡分组（兼顾性别与班委），分组后自动按组聚座">按排名均衡分组</button>
                             </div>
                         </div>
@@ -481,7 +481,7 @@
     <!-- 入口脚本带版本号查询串:每次发版 URL 变化 ⇒ 一定绕过浏览器/CDN 缓存
          (GitHub Pages 对 JS 发 max-age=600,不加查询串会"发版后十分钟内仍是旧代码")。
          ⚠️ 改版本号时这里必须同步,否则 /static/tests/unit_version_sync.mjs 会失败。 -->
-    <script type="module" src="seats-generator.js?v=1.4.7"></script>
+    <script type="module" src="seats-generator.js?v=1.4.8"></script>
 </body>
 
 </html>

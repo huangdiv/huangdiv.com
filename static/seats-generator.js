@@ -20,7 +20,7 @@ import { validateForcedPair, planPairLinks } from './modules/pair-links.js';
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.7';
+        const APP_VERSION = '1.4.8';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -586,8 +586,10 @@ function normalizeRotateOffset(value) {
         }
 
         // ─────────── 按组聚座（同一组的人坐成一片）───────────
-        // 分组之后把每组的座位收拢成一个矩形块（6 人 → 2行3列 / 3行2列），
-        // 块与块互不重叠、按「从左到右、从上到下」排列；块内按排名先后逐行落座。
+        // 分组之后把每组按**自己的实际人数**收拢成最紧凑的矩形块
+        // （主目标：占用总行数 + 总列数最小；6 人 → 3行2列），
+        // 各组形状彼此独立、互不重叠、按「从左到右、从上到下」排列；
+        // 块内按排名先后逐行落座。几何见 modules/group-layout.js。
         // 未分组的学生**原地不动**：只把参与重排的学生清出来再重新安放。
         function buildGroupMemberBuckets() {
             return groups.map(function (g) {
@@ -635,7 +637,7 @@ function normalizeRotateOffset(value) {
                 return false;
             }
 
-            // 3) 规划座位块
+            // 3) 规划各组的最紧凑座位块
             const blocked = nextSeats.map(function (v) { return v !== null; });
             const plan = planGroupSeatSlots(
                 buckets.map(function (b) { return b.members.length; }), rows, cols, blocked);
@@ -672,10 +674,13 @@ function normalizeRotateOffset(value) {
             pushSnapshot('arrange');
             const plan = arrangeSeatsByGroup();
             if (!plan) return;
-            const blocks = plan.blocks.length;
-            showStatToast('已按分组聚座' + (blocks > 0
-                ? '：' + blocks + ' 个组，每组 ' + plan.layout.bh + '行×' + plan.layout.bw + '列'
-                : ''));
+            // 各组形状不再统一，按「人数 → 实际收拢形状」逐个给出摘要
+            const shapes = (plan.layout && plan.layout.shapes) || [];
+            const brief = shapes.slice(0, 3).map(function (s) {
+                return s.size + '人:' + s.rows + '行×' + s.cols + '列';
+            }).join('、');
+            showStatToast('已按分组聚座：' + shapes.length + ' 个组，各组按人数收拢' +
+                (brief ? '（' + brief + (shapes.length > 3 ? '…' : '') + '）' : ''));
         }
 
         // 「按排名均衡分组」——分组设置栏 / 分组模式 banner 共用入口。

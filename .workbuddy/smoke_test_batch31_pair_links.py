@@ -31,7 +31,7 @@
  17b. 导出图片的克隆体剔除 SVG 图层(避免 html2canvas 兼容问题)，座位仍完整
  17c. 同桌连线走向统一：多组同桌一律走座位上方、同排共用走廊、
       反转配对数组顺序后每条线 d 完全不变（v1.4.7 修复 index%2 交替上下）
- 18. 版本号 1.4.7 + 全程无 JS 报错
+ 18. 版本号 1.4.8 + 全程无 JS 报错
 
 运行前先起本地服务:
   cd static && python -m http.server 8123 --bind 127.0.0.1
@@ -92,7 +92,7 @@ def make_config(forced, avoid, title="批次31", view="student", show_links=True
         "showPairLinks": show_links,
         "forcedPairs": forced,
         "avoidPairs": avoid,
-        "version": "1.4.7",
+        "version": "1.4.8",
     }
 
 
@@ -467,7 +467,7 @@ async def main():
 
         # ═══ 18. 版本 + 无报错 ═══
         print("=== 18. 版本与控制台 ===")
-        check(teacher["version"] == "1.4.7", f"版本号 1.4.7（实际 {teacher['version']}）")
+        check(teacher["version"] == "1.4.8", f"版本号 1.4.8（实际 {teacher['version']}）")
         check(len(ERRORS) == 0, f"全程无 JS 报错（{ERRORS[:3]}）")
 
         await browser.close()

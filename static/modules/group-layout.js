@@ -3,27 +3,27 @@
 //
 // 「按组聚座」的座位块规划（纯几何，无 DOM / 无全局状态，可 Node ESM 单测）。
 //
-// 目标：分组之后，让同一个组的学生在座位表上**连成一片**，
-//       而不是散落各处 —— 老师讲课时可以整组走动、整组讨论。
+// 目标：分组之后，让**每一组**按自己的实际人数收拢成最紧凑的一片座位，
+//       而不是按「最大组人数」给所有组套同一个矩形块。
+//
+// 「最紧凑」的判定（v1.4.8 起）：
+//   1. 主目标 = 该组所有座位占据的「总行数 + 总列数」最小（题面要求）；
+//   2. 同分时优先空位最少（外接矩形面积最小）；
+//   3. 仍同分时优先「更窄 / 更多行」—— 6 人稳定得到 3 行 × 2 列，
+//      与题面给出的 (1,1)(1,2)(2,1)(2,2)(3,1)(3,2) 一致。
 //
 // 做法：
-//   1. 为每组挑一个统一的矩形「座位块」bh 行 × bw 列。
-//      候选块必须能装下最大的组（bh·bw >= maxSize），并且按
-//      「每行能放 floor(cols/bw) 个块」铺开时，总行数放得下整张座位表。
-//      在可行候选里按代价函数取最优：
-//         代价 = 4·(块内空位)          // 越贴合组人数越好
-//              + 形状惩罚               // 组实际占用的行数/列数之差，
-//                                       // 超过 2 的部分重罚（题面要求）
-//              + 0.5·占用总行数         // 越紧凑越好（别把座位摊到 10 排）
-//              + 0.4·右侧剩余列数       // 贴着左边、少留空列
-//      代价相近时优先「更宽」的块 —— 教室通常是横向的，
-//      6 人 6 组会稳定得到 2 行 × 3 列（另一解 3 行 × 2 列同样合法）。
-//   2. 把块按「从左到右、从上到下」的顺序分配给各分组，
-//      块内按**逐行**（row-major）填座，学生的先后由调用方按排名给定。
-//   3. 若块内有座位已被「不参与本次重排」的学生占住，跳过该座，
-//      本组多出来的学生在最后按全表顺序补位（保证不丢人）。
-//   4. 只有在真的找不到可行块时（例如组数远多于座位），才退化为
-//      「顺序连续排」：每组占一段连续座位，仍然是聚在一起的。
+//   1. 逐组（按调用方给的顺序）在全表枚举候选矩形 (r0,c0,bh,bw)：
+//      bw ∈ 1..min(cols,n)，bh 从 ceil(n/bw) 起、最多再放宽 2 行
+//      （给「块内有未分组学生占座」留余量），矩形必须完整落在座位表内。
+//   2. 矩形内按 row-major 取前 n 个**可用**座位（跳过 blocked / 已分配），
+//      用这 n 个座位真实的外接矩形算紧凑代价：
+//          score = 1000·(rows+cols) + 10·area + holes + 极小·位置序号
+//      位置项只用外接矩形左上角打破平局 ⇒ 整体仍「从左到右、从上到下」铺开。
+//   3. 取代价最小的落点。若所有矩形都装不下 n 个可用座位（未分组学生占得太散），
+//      允许「块内 + 就近补位」：补位按到块中心的距离挑，保证不丢人，
+//      layout.kind 标为 sequential 表示退化。
+//   4. 未参与重排的学生（blocked）原地不动；容量不足直接 ok=false。
 //
 // 座位索引约定：row-major，index = row * cols + col（与主文件一致）。
 // =====================================================================
@@ -33,64 +33,129 @@ function toPositiveInt(value) {
     return Number.isFinite(num) && num > 0 ? num : 0;
 }
 
-/**
- * 为组大小挑选统一的座位块尺寸。
- * @param {number[]} sizes      各组人数（>0 的才参与）
- * @param {number} rows
- * @param {number} cols
- * @returns {{bh:number,bw:number,perBand:number,bands:number,needRows:number}|null}
- */
-export function chooseBlockShape(sizes, rows, cols) {
-    const R = toPositiveInt(rows);
-    const C = toPositiveInt(cols);
-    const list = (Array.isArray(sizes) ? sizes : [])
-        .map(function (v) { return Math.max(0, Math.floor(Number(v) || 0)); })
-        .filter(function (v) { return v > 0; });
-    if (!R || !C || list.length === 0) return null;
-
-    const maxSize = Math.max.apply(null, list);
-    const groupCount = list.length;
-    let best = null;
-
-    for (let bh = 1; bh <= R; bh++) {
-        for (let bw = 1; bw <= C; bw++) {
-            if (bh * bw < maxSize) continue;
-            const perBand = Math.floor(C / bw);
-            if (perBand < 1) continue;
-            const bands = Math.ceil(groupCount / perBand);
-            const needRows = bands * bh;
-            if (needRows > R) continue;
-
-            // 组「实际占用」的行列数（按逐行填），用来判断形状是否规整
-            const rowsUsed = Math.min(bh, Math.ceil(maxSize / bw));
-            const colsUsed = Math.min(bw, maxSize);
-            const aspect = Math.abs(rowsUsed - colsUsed);
-            const shapePenalty = aspect > 2 ? (aspect - 2) * 40 + aspect : aspect;
-            const waste = bh * bw - maxSize;
-
-            const cost = waste * 4
-                + shapePenalty
-                + needRows * 0.5
-                + (C - perBand * bw) * 0.4;
-
-            const candidate = {
-                bh: bh, bw: bw, perBand: perBand, bands: bands,
-                needRows: needRows, cost: cost
-            };
-            // 代价相近（<=0.5）时优先更宽的块：教室是横向的
-            if (!best
-                || cost < best.cost - 0.5
-                || (Math.abs(cost - best.cost) <= 0.5 && bw > best.bw)) {
-                best = candidate;
-            }
-        }
+/** 一组座位下标的外接矩形（含空洞数）。 */
+function boundingBox(cells, cols) {
+    if (!cells.length) {
+        return { r0: 0, c0: 0, rows: 0, cols: 0, area: 0, holes: 0 };
     }
-    if (!best) return null;
-    return { bh: best.bh, bw: best.bw, perBand: best.perBand, bands: best.bands, needRows: best.needRows };
+    let rMin = Infinity, rMax = -Infinity, cMin = Infinity, cMax = -Infinity;
+    for (let k = 0; k < cells.length; k++) {
+        const r = Math.floor(cells[k] / cols);
+        const c = cells[k] % cols;
+        if (r < rMin) rMin = r;
+        if (r > rMax) rMax = r;
+        if (c < cMin) cMin = c;
+        if (c > cMax) cMax = c;
+    }
+    const rows = rMax - rMin + 1;
+    const colCount = cMax - cMin + 1;
+    const area = rows * colCount;
+    return {
+        r0: rMin, c0: cMin,
+        rows: rows, cols: colCount,
+        area: area, holes: area - cells.length
+    };
 }
 
 /**
- * 规划各分组的座位槽位。
+ * n 人在空教室里能达到的最紧凑矩形（供 UI 摘要 / 单测使用）。
+ * 代价与 planGroupSeatSlots 的落点评分同源：
+ *   1000·(行数+列数) + 10·外接面积 + 空位数。
+ * 遍历 bw 从小到大 + 严格小于 ⇒ 同代价自动保留「更窄（行数更多）」的那个。
+ * @param {number} size
+ * @param {number} rows
+ * @param {number} cols
+ * @returns {{bh:number,bw:number,span:number,area:number}|null}
+ */
+export function chooseCompactShape(size, rows, cols) {
+    const n = Math.floor(Number(size) || 0);
+    const R = toPositiveInt(rows);
+    const C = toPositiveInt(cols);
+    if (n <= 0 || !R || !C) return null;
+
+    let best = null;
+    for (let bw = 1; bw <= Math.min(C, n); bw++) {
+        const bh = Math.ceil(n / bw);
+        if (bh > R) continue;              // 更宽的 bw 会降 bh，继续往后找
+        const span = bh + bw;
+        const area = bh * bw;
+        const cost = span * 1000 + area * 10 + (area - n);
+        if (!best || cost < best.cost) best = { bh: bh, bw: bw, span: span, area: area, cost: cost };
+    }
+    return best ? { bh: best.bh, bw: best.bw, span: best.span, area: best.area } : null;
+}
+
+/**
+ * 为 n 人找全局最紧凑的落点。
+ * @returns {{score:number,cells:number[],spill:number,box:object|null,r0:number,c0:number,bh:number,bw:number}}
+ */
+function findBestPlacement(n, R, C, used, isBlocked, extraRows) {
+    const maxBw = Math.min(C, n);
+    let best = null;
+
+    for (let bw = 1; bw <= maxBw; bw++) {
+        const bhMin = Math.ceil(n / bw);
+        const bhMax = Math.min(R, bhMin + extraRows);
+        for (let bh = bhMin; bh <= bhMax; bh++) {
+            for (let r0 = 0; r0 + bh <= R; r0++) {
+                for (let c0 = 0; c0 + bw <= C; c0++) {
+                    const cells = [];
+                    for (let r = r0; r < r0 + bh && cells.length < n; r++) {
+                        for (let c = c0; c < c0 + bw && cells.length < n; c++) {
+                            const idx = r * C + c;
+                            if (isBlocked(idx) || used[idx]) continue;
+                            cells.push(idx);
+                        }
+                    }
+                    const spill = n - cells.length;
+                    let box = null;
+                    let score;
+                    if (spill === 0) {
+                        box = boundingBox(cells, C);
+                        score = (box.rows + box.cols) * 1000
+                            + box.area * 10
+                            + box.holes
+                            + (box.r0 * C + box.c0) * 0.001;
+                    } else {
+                        // 退化候选：任何装得满的落点都优先于装不满的
+                        score = 1e9 + spill * 1e6
+                            + (bh + bw) * 1000
+                            + (r0 * C + c0) * 0.001;
+                    }
+                    if (!best || score < best.score) {
+                        best = {
+                            score: score, cells: cells, spill: spill, box: box,
+                            r0: r0, c0: c0, bh: bh, bw: bw
+                        };
+                    }
+                }
+            }
+        }
+    }
+    return best || {
+        score: Infinity, cells: [], spill: n, box: null,
+        r0: 0, c0: 0, bh: 0, bw: 0
+    };
+}
+
+/** 块内坐不下时，按到块中心的距离就近补位（保证不丢人、尽量仍聚在一起）。 */
+function appendNearbyCells(cells, n, choice, R, C, used, isBlocked) {
+    const taken = new Set(cells);
+    const centerR = choice.r0 + (choice.bh - 1) / 2;
+    const centerC = choice.c0 + (choice.bw - 1) / 2;
+    const pool = [];
+    for (let i = 0; i < R * C; i++) {
+        if (isBlocked(i) || used[i] || taken.has(i)) continue;
+        const dr = Math.floor(i / C) - centerR;
+        const dc = (i % C) - centerC;
+        pool.push({ idx: i, dist: dr * dr + dc * dc });
+    }
+    pool.sort(function (a, b) { return a.dist - b.dist || a.idx - b.idx; });
+    for (let k = 0; k < pool.length && cells.length < n; k++) cells.push(pool[k].idx);
+}
+
+/**
+ * 规划各分组的座位槽位（每组按自身人数取最紧凑矩形）。
  *
  * @param {number[]} sizes   各组人数（与调用方的分组顺序一一对应，可含 0）
  * @param {number} rows      座位行数
@@ -102,7 +167,9 @@ export function chooseBlockShape(sizes, rows, cols) {
  *   need?: number, free?: number,
  *   slots: number[][],          // 与 sizes 等长；slots[i] = 第 i 组按顺序应坐的座位下标
  *   blocks: Array<{groupIndex:number, r0:number, c0:number, rows:number, cols:number}>,
- *   layout: {kind:'block'|'sequential', bh?:number, bw?:number, perBand?:number, bands?:number}
+ *   layout: {kind:'compact'|'sequential',
+ *            shapes: Array<{groupIndex:number,size:number,rows:number,cols:number,span:number}>,
+ *            groupCount:number}
  * }}
  */
 export function planGroupSeatSlots(sizes, rows, cols, blocked) {
@@ -135,72 +202,57 @@ export function planGroupSeatSlots(sizes, rows, cols, blocked) {
     const used = new Array(totalSeats).fill(false);
     const slots = groups.map(function () { return []; });
     const blocks = [];
-    const shape = chooseBlockShape(groups, R, C);
+    const shapes = [];
+    let degraded = false;
+
     const activeIndices = [];
     groups.forEach(function (n, i) { if (n > 0) activeIndices.push(i); });
 
-    if (shape) {
-        // ── 块式布局 ──
-        let ordinal = 0;
-        for (let a = 0; a < activeIndices.length; a++) {
-            const gi = activeIndices[a];
-            const band = Math.floor(ordinal / shape.perBand);
-            const colSlot = ordinal % shape.perBand;
-            const r0 = band * shape.bh;
-            const c0 = colSlot * shape.bw;
-            blocks.push({ groupIndex: gi, r0: r0, c0: c0, rows: shape.bh, cols: shape.bw });
+    // 座位表很大时少放宽一行，控制枚举量（按钮点击仍应在毫秒级完成）
+    const extraRows = totalSeats > 200 ? 1 : 2;
 
-            for (let r = 0; r < shape.bh && slots[gi].length < groups[gi]; r++) {
-                for (let c = 0; c < shape.bw && slots[gi].length < groups[gi]; c++) {
-                    const rr = r0 + r;
-                    const cc = c0 + c;
-                    if (rr >= R || cc >= C) continue;
-                    const idx = rr * C + cc;
-                    if (isBlocked(idx) || used[idx]) continue;
-                    used[idx] = true;
-                    slots[gi].push(idx);
-                }
-            }
-            ordinal++;
+    for (let a = 0; a < activeIndices.length; a++) {
+        const gi = activeIndices[a];
+        const n = groups[gi];
+        const choice = findBestPlacement(n, R, C, used, isBlocked, extraRows);
+        const cells = choice.cells.slice();
+
+        if (cells.length < n) {
+            degraded = true;
+            appendNearbyCells(cells, n, choice, R, C, used, isBlocked);
         }
-        // 块内被占 / 块太小装不下的补位：全表顺序补
-        for (let a = 0; a < activeIndices.length; a++) {
-            const gi = activeIndices[a];
-            for (let i = 0; i < totalSeats && slots[gi].length < groups[gi]; i++) {
-                if (isBlocked(i) || used[i]) continue;
-                used[i] = true;
-                slots[gi].push(i);
+        // 兜底：容量检查已保证够用，这里只防御极端情况，绝不丢人
+        if (cells.length < n) {
+            const taken = new Set(cells);
+            for (let i = 0; i < totalSeats && cells.length < n; i++) {
+                if (isBlocked(i) || used[i] || taken.has(i)) continue;
+                cells.push(i);
             }
         }
-        return {
-            ok: true,
-            slots: slots,
-            blocks: blocks,
-            layout: {
-                kind: 'block',
-                bh: shape.bh, bw: shape.bw,
-                perBand: shape.perBand, bands: shape.bands,
-                needRows: shape.needRows
-            }
-        };
+
+        cells.forEach(function (idx) { used[idx] = true; });
+        slots[gi] = cells;
+        const box = boundingBox(cells, C);
+        blocks.push({
+            groupIndex: gi, r0: box.r0, c0: box.c0,
+            rows: box.rows, cols: box.cols
+        });
+        shapes.push({
+            groupIndex: gi, size: n,
+            rows: box.rows, cols: box.cols,
+            span: box.rows + box.cols
+        });
     }
 
-    // ── 兜底：顺序连续排（仍是「一组一段连续座位」） ──
-    let cursor = 0;
-    for (let gi = 0; gi < groups.length; gi++) {
-        while (slots[gi].length < groups[gi] && cursor < totalSeats) {
-            if (!isBlocked(cursor) && !used[cursor]) {
-                used[cursor] = true;
-                slots[gi].push(cursor);
-            }
-            cursor++;
-        }
-    }
     return {
         ok: true,
         slots: slots,
-        blocks: [],
-        layout: { kind: 'sequential' }
+        blocks: blocks,
+        layout: {
+            kind: degraded ? 'sequential' : 'compact',
+            shapes: shapes,
+            groupCount: activeIndices.length
+        }
     };
 }
 

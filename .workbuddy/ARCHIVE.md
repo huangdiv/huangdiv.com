@@ -206,7 +206,7 @@ static/
 │   ├── csv-export.js       120 行   buildSeatCsv / 文件名 / 转义（纯函数）
 │   ├── student-rank.js     309 行   排名解析/排序/班委识别/蛇形均衡分组（纯函数）
 │   ├── group-balance.js    279 行   分组「均衡系数」（排名带覆盖 + 性别 + 班委，纯函数）
-│   ├── group-layout.js     216 行   按组聚座的座位块规划（chooseBlockShape / planGroupSeatSlots，纯函数）
+│   ├── group-layout.js     268 行   按组聚座：逐组最紧凑矩形规划（chooseCompactShape / planGroupSeatSlots，纯函数，v1.4.8 重写）
 │   └── messages.js         151 行   MESSAGES：全部用户可见文案集中层（i18n 雏形）
 └── tests/                         14 个 Node ESM 单元测试（见 §5）
 ```
@@ -270,16 +270,22 @@ static/
   班委由标签文本识别（`isCadreStudent`，关键词见 `CADRE_KEYWORDS`）。
   分组命名 `1组/2组/…`、配色取 `distinctColors` 前 N 个，会清空并重建全部分组（可撤销）。
 
-### 3.6 按组聚座 + 分组均衡系数（2026-11-02 新增）
+### 3.6 按组聚座 + 分组均衡系数（2026-11-02 新增，2026-11-09 重写聚座算法）
 
-**按组聚座**（`group-layout.js`，纯几何）——把同组学生收拢成一片连续座位：
-- `chooseBlockShape(sizes, rows, cols)` 为每组选统一的矩形块 `bh × bw`（必须 `bh·bw ≥ 最大组人数`），
-  在可行候选里按代价取最优：`4·块内空位 + 形状惩罚 + 0.5·占用总行数 + 0.4·右侧余列`，
-  形状惩罚基于「组**实际占用**的行列数之差」，超过 2 的部分重罚（题目要求）。
-  代价相差 ≤0.5 时优先更宽的块 ⇒ 6 人 6 组稳定得到 `2×3`（`3×2` 同样合法）。
-- `planGroupSeatSlots(sizes, rows, cols, blocked)` 把块按「从左到右、从上到下」分配给各组，
-  块内 **row-major** 填座；`blocked` 座位（未分组/不参与重排的学生）直接跳过，块内坐不满的
-  再全表补位；实在铺不下块时退化为「顺序连续排」（一组一段连续座位，仍算聚拢）。
+**按组聚座**（`group-layout.js`，纯几何）——把同组学生收拢成一片连续座位。
+**v1.4.8 起每组按自己的实际人数独立取最紧凑矩形**，详见 §3.14；此前（v1.3.x~v1.4.7）是
+按「最大组人数」给所有组套**同一个** `bh × bw` 块（`chooseBlockShape`），小组被迫塞进大块的
+前几个格子 ⇒ 4 人组在 6 人块里变成 `2×3`（span 5）而不是最优的 `2×2`（span 4）。
+
+- `chooseCompactShape(size, rows, cols)`：单人组的理想形状，代价
+  `1000·(占用行数+列数) + 10·外接面积 + 空位数`；`bw` 从小到大遍历 + 严格小于比较
+  ⇒ 同代价保留「更窄」，6 人得 `3行×2列`（题面示例）。
+- `planGroupSeatSlots(sizes, rows, cols, blocked)`：逐组在全表枚举候选矩形
+  `(r0,c0,bh,bw)`，矩形内 row-major 取前 n 个可用座位，用**这 n 个座位的真实外接矩形**
+  打分；位置项 `(box.r0·C + box.c0)·0.001` 只用于打破平局 ⇒ 整体仍从左到右、从上到下。
+  `blocked` / 已分配座位跳过；`bh` 最多比 `ceil(n/bw)` 放宽 2 行以吸收占座空洞；
+  实在装不下时按到块中心距离就近补位并标 `layout.kind='sequential'`（退化，绝不丢人）。
+  返回 `layout.shapes[]` 逐组给出「人数 → 实际收拢形状」，供 toast 摘要用。
 - 主 IIFE 的 `arrangeSeatsByGroup()`：**先把要重排的学生清出来**（其余人锁定不动）→ 容量检查 →
   规划 → 逐组落座 → **就地写回 `currentSeats`**（保持引用，勿整体重赋值）→ `commit({seats})` +
   `generateSeats()` + `generateStudentList()` + `autoSave()`。
@@ -525,12 +531,52 @@ SVG path 反推走廊 y 与 above/below）。回退验证：把 `if (isDeskmate)
 `if (false && isDeskmate)` ⇒ G1/G2/G3/G4 变红，还原后全绿。
 顺带给老批次 `batch11` 补 CDN 桩 + `domcontentloaded`（原来裸 `goto()` 等 `load` 必超时）。
 
+### 3.14 按组聚座改为「每组按人数取最紧凑矩形」（2026-11-09，v1.4.8）
+
+用户需求：「点击后根据每组的人数自动将每组座位调整为最聚集状态，比如 6 人集中在
+1排1列 / 1排2列 / 2排1列 / 2排2列 / 3排1列 / 3排2列；算法可以是该组座位占据的
+总排数 + 总列数之和最小，也可以按最聚集要求调整；其他组依次类推」。
+
+**旧实现的问题**：`chooseBlockShape(sizes, ...)` 只看 `max(sizes)` 给**全班所有组**定一个
+统一块，再让每组按 row-major 填前 n 格。结果小组形状被大组绑架 —— 6/4/2 三组时
+4 人组落在 `2×3` 块的前 4 格 ⇒ 实际 `2×3`（span 5、2 个空洞），理论最优是 `2×2`（span 4）；
+人数差更大（7/4/1）时 4 人组甚至变成 `1×4`。另外旧代价偏好「更宽」，6 人常给 `2×3`
+而非题面示例的 `3×2`。
+
+**新算法**（`group-layout.js` 整体重写，`planGroupSeatSlots` 签名与 `blocked` 语义不变）：
+- **紧凑度定义**（可解释、可单测）：
+  ① 主目标 `占用行数 + 占用列数` 最小（题面要求）；
+  ② 同分 → 外接矩形面积最小（空位最少）；
+  ③ 仍同分 → 更窄 / 更多行（**题面 6 人 → `3行×2列`**）。
+  ⇒ `chooseCompactShape(6)` = `3×2`；7 人 = `4×2`（8 格只空 1 位，优于 `3×3` 空 2 位）；
+  9 人 = `3×3`。
+- **逐组独立 + 全表搜索落点**：`bw ∈ 1..min(C,n)`，`bh` 从 `ceil(n/bw)` 起最多 +2 行
+  （给未分组学生占座留余量），枚举所有 `(r0,c0)`；矩形内 row-major 取前 n 个**可用**座位，
+  以这 n 个座位**真实外接矩形**打分 `1000·span + 10·area + holes + 0.001·位置序号`。
+  严禁用「名义矩形」打分：名义矩形从 `r0` 起但前几行被占时，真实座位可能整体下移。
+- **位置项只做平局裁决**（权重 0.001，最大不足 0.1，远小于整数代价差），因此紧凑度永远
+  优先，同时保证整体仍从左到右、从上到下铺开，不会随机跳位。
+- **占座 / 退化**：`blocked`（未分组学生）与前面各组已用座位一律跳过；所有矩形都装不下时
+  按「到块中心距离」就近补位并标 `sequential`；容量检查前置保证绝不丢人。
+  200 组随机教室/占座压测 0 违规、总耗时 31ms（按钮点击无感）。
+- `layout.shapes[]` 逐组给出 `{groupIndex,size,rows,cols,span}`；主 IIFE 的 toast 从
+  「每组 X行×Y列」改为「N 个组，各组按人数收拢（6人:3行×2列、4人:2行×2列…）」，
+  按钮 `title` 同步说明；`arrangeSeatsByGroup()` 的清人 / 就地写回流程**未动**。
+
+**测试**：`unit_group_layout.mjs` 重写（21 组，含题面示例精确座位下标、每组 span 等于
+单人理论最优、组顺序/增删无关、blocked 不挪人、小教室不退化）；新增
+`smoke_test_batch32_group_compact.py`（18 项，真实点击 + 视觉形状 + 幂等性 + 占座 + 版本）。
+**回退验证**：把模块换回旧算法（加一层 `chooseCompactShape` 兼容导出）⇒ 单测 12 组变红、
+batch32 5 项变红（7/4/1 场景旧算法给 `[(2,4),(1,4),(1,1)]`，新算法 `[(4,2),(2,2),(1,1)]`；
+占座场景旧算法 6 人组 span 11，新算法 5），还原后全绿。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | **按组聚座按每组人数取最紧凑矩形**：取消全班统一块，主目标「占用行数+列数」最小，6 人→3行×2列；逐组全表搜索落点、占座跳过、就近补位；toast 逐组给形状（v1.4.8，见 §3.14） |
 | 本轮 | **同桌连线走向统一**：`index%2` 交替上下改为「同桌线全班固定走座位上方、同排等高」，侧别只由几何决定；非同桌线保留交错避免长线重叠（v1.4.7，见 §3.13） |
 | 本轮 | **去掉连线箭头 + 开关改名**：两类配对线都只保留线本身（淡蓝实线 / 红色虚线 + 中点 ×），删掉全部 `<marker>` 与图例小三角；开关「配对关联箭头」→「配对关联线」（v1.4.6，见 §3.12） |
 | 上轮 | **配对约束唯一性 + 座位区关联箭头**：强制同桌一人一组（重复弹提示，载入清洗老配置）；每个强制配对画细淡蓝箭头、回避配对仅在被排成同桌时画红色虚线双向互斥箭头；连线只走座位空隙带不压座位；新增开关与图例（v1.4.5） |
@@ -580,14 +626,16 @@ SVG path 反推走廊 y 与 above/below）。回退验证：把 `if (isDeskmate)
 - 入口：`bash .workbuddy/run_unit_tests.sh`（遍历 `static/tests/*.mjs`，聚合通过/失败）。
 - 14 个文件：`unit_defaults` / `unit_migrate` / `unit_messages` / `unit_random_arrange` /
   `unit_rotate_groups` / `unit_gender_rule` / `unit_gender_arrange_quality` / `unit_seat_csv` /
-  `unit_student_rank` / `unit_group_layout` / `unit_group_balance` / `unit_zone` /
+  `unit_student_rank` / **`unit_group_layout`**（v1.4.8 重写，21 组：题面 6 人精确座位、
+  每组 span 等于该人数理论最优、形状彼此独立、组顺序/增删无关、blocked 不挪人、
+  小教室不退化） / `unit_group_balance` / `unit_zone` /
   `unit_version_sync` / **`unit_pair_links`**（38 项：唯一性校验、清洗、走廊几何、
   「路径不进任何座位矩形」的 160 点采样不变量、与 `getDeskMatePairs` 交叉验证、
   G 组「同桌线走向统一：固定同侧 / 顺序无关 / 同排等高 / 无顶部 padding 降级」）。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 31 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 32 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -629,6 +677,10 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   用「水平段 y vs 起点 y」反推 `above` / `below`，断言多组同桌全部 `above`、同排
   走廊 y 完全一致、反转配对数组顺序后 `d` 的多重集合不变。
   ⇒ 这类「视觉方位」断言不必截图，纯 DOM 数值就能稳定自动化。
+- **v1.4.8 新增 `batch32_group_compact`（18 项）**：用 `localStorage` 播种 6/4/2 与 7/4/1
+  两种人数分布，真实点击 `#arrangeGroupBtn` 后从 `classroomConfig.seats` 反推每组外接矩形，
+  断言形状 / span / 无空洞 / 从左到右 / toast 文案 / 幂等性 / 未分组学生占座不动。
+  ⇒ 「几何形状」类断言同样只需读座位下标数组，不必截图；截图只作人工观感加分项。
 
 ### 5.3 测试专用桩（仅本地 127.0.0.1/localhost 暴露）
 - `window.__seatsTest`：`rotateGroupSeats` / `randomSeatArrange`（驱动带撤销与 UI 回调的真实实例）。
@@ -638,6 +690,11 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 写完/改完测试后，**临时把被测代码改回 buggy 写法跑一遍，确认测试会红**，再改回来。
 - 例：教师视角拖拽修复回退后 5 项失败且报错信息正是根因；
   批次21 性别达成率必须「同时停掉守卫 + 收尾修复」才转红（只停守卫仍绿 ⇒ 定位到哪个改动才是关键）。
+- **整文件重写型改造**（v1.4.8 `group-layout.js`）：用 `git show HEAD:<path>` 取回旧文件，
+  若新测试 import 了新导出名，给旧文件临时追加一层兼容导出（如
+  `export const chooseCompactShape = (n,R,C) => chooseBlockShape([n],R,C)`），
+  再覆盖回原路径跑单测 + 冒烟 ⇒ 得到的是**行为差异**而不是「import 失败」的假红，
+  验证完立刻 `cp` 回新版并复跑。
 
 ---
 
@@ -655,6 +712,8 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 | **落座后处理无视约束** | 随机排座「每位学生都不在原座」的后处理把合规同桌拆散 ⇒ 优先级必须明确：**性别规则 > 「必须换座」**。 |
 | **陈旧跟踪 ref** | 沙箱内 `git fetch`/`push` 后 origin/master 可能不落盘 ⇒ 只信 `git ls-remote` / `git fsck`，按 §2.2 双保险修。 |
 | **视觉方位由遍历序号驱动** | `planOne()` 用 `index % 2` 决定同桌线走上/下走廊 ⇒ 增删一组配对就翻面（v1.4.7，§3.13）。「让多条线错开」的抖动只能用在无语义的连线上；带业务语义（同桌 / 配对）的线，方位必须由几何或语义统一决定，与数组顺序彻底解耦。 |
+| **用「全局最大值」给每个个体定形状** | 旧按组聚座按 `max(sizes)` 给所有组套统一矩形块 ⇒ 小组被大组绑架（4 人组变 `2×3` / `1×4`）。凡需求写「根据每组的…自动调整」，形状必须由**该组自身**的参数推导，全局参数只能用来做容量/边界检查（v1.4.8，§3.14）。 |
+| **名义几何 ≠ 实际几何** | 枚举候选矩形时，矩形内可能有 `blocked` 座位 ⇒ 前 n 个可用座位的**真实外接矩形**可能比名义矩形更低/更窄。评分必须用实际座位集合算，否则「左上角更早」的候选会误胜，布局看起来散。位置项只在平局时生效（0.001 级权重）。 |
 
 ### 6.2 测试技巧
 - 用 `localStorage.setItem('classroomConfig', JSON.stringify(cfg))` + `page.reload()` 注入数据；
