@@ -23,15 +23,15 @@
 // =====================================================================
 
 // === 依赖 ===
-// zone.js 是纯几何模块（无 import），这里直接复用它的 id 白名单，
+// zone.js 是纯几何模块（无 import），这里直接复用它的白名单与归一化函数，
 // 避免「migrate 与 zone 各存一份区域 id」导致日后漂移。
-import { ZONE_IDS } from './zone.js';
+import { normalizeZoneList } from './zone.js';
 import { sanitizeForcedPairs, sanitizePairs } from './pair-links.js';
 
 // === 常量 ===
 export const DEFAULT_ROWS = 8;
 export const DEFAULT_COLS = 8;
-export const APP_VERSION = '1.4.9';
+export const APP_VERSION = '1.4.10';
 
 // === 工具 ===
 function generateId(prefix) {
@@ -78,10 +78,14 @@ export function migrateConfig(config) {
             if (s.checkedIn == null) s.checkedIn = false;
             if (s.gender == null) s.gender = '';
             if (!Array.isArray(s.tags)) s.tags = [];
-            // 九宫格区域偏好（智能排座 → 区域设置）：'front-left' 等，'' = 未设置。
-            // 非法值一律清空，避免老配置/手改 JSON 把脏数据带进排座引擎。
-            if (s.zonePref !== '' && ZONE_IDS.indexOf(s.zonePref) < 0) s.zonePref = '';
-            if (s.zoneAvoid !== '' && ZONE_IDS.indexOf(s.zoneAvoid) < 0) s.zoneAvoid = '';
+            // 九宫格区域偏好（智能排座 → 区域设置）：v1.4.10 起为区域 id 数组，
+            // 倾向 / 避开均支持多选，[] = 未设置。老配置的单值字符串（含 ''）
+            // 统一升级为数组，非法值过滤、去重；倾向与避开不允许重叠，
+            // 手改 JSON 造成的交集以「倾向优先」从避开里剔除。
+            s.zonePref = normalizeZoneList(s.zonePref);
+            s.zoneAvoid = normalizeZoneList(s.zoneAvoid).filter(function (z) {
+                return s.zonePref.indexOf(z) < 0;
+            });
         });
         // 排名:老配置没有 rank ⇒ 按名单顺序补 1..N(已有的合法排名保持不动)
         let maxRank = 0;

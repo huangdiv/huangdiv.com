@@ -148,5 +148,5 @@ export const MESSAGES = {
             ? `区域设置全部满足(${total} 项)`
             : `区域设置达成 ${met}/${total}(受人数与座位限制,已尽量安排)`,
     ZONE_PICK_ZONE_FIRST: '请先设置倾向或避开区域',
-    ZONE_SAME_BOTH: '倾向与避开不能是同一个区域'
+    ZONE_SAME_BOTH: '同一区域不能同时设为倾向和避开（请取消另一边的勾选）'
 };

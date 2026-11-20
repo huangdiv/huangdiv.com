@@ -12,10 +12,10 @@
 断言(共 15 项):
   1. 智能排座下拉里有「区域设置」菜单项
   2. 弹窗打开后：9 个区域格、表头、学生行数 = 名单人数
-  3. 设置「倾向区域」→ 立即写入 localStorage（zonePref）
+  3. 设置「倾向区域」→ 立即写入 localStorage（zonePref 数组）
   4. 菜单项角标显示已设置人数 [n]
   5. 区域格计数随设置更新（前左显示「1 想坐」）
-  6. 倾向与避开设成同一区域 → 被拒绝（alert），且下拉回退到原值
+  6. 倾向与避开设成同一区域 → 被拒绝（alert），且 checkbox 回退、配置不变
   7. 点「智能排座」后，设了「倾向」的学生确实落在该区域
   8. 设了「避开」的学生确实不在该区域
   9. 配对候选每项行高 ≤ 26px（原生 datalist 之前约 30px+，一屏装不下几项）
@@ -91,6 +91,23 @@ def bad(msg):
 async def read_config(page):
     return await page.evaluate(
         "() => JSON.parse(localStorage.getItem('classroomConfig') || '{}')")
+
+
+async def pick_zone(page, row_idx, field, zone_id, checked=True):
+    """点开某行某字段的多选面板 → 勾选/取消一个区域 → 点面板外收起。
+
+    v1.4.10 起区域设置是多选复选框，不再是 <select> + select_option()。
+    """
+    cls = "zone-pref" if field == "zonePref" else "zone-avoid"
+    await page.locator(".zone-popup .zone-row").nth(row_idx).locator("." + cls).click()
+    await page.wait_for_timeout(120)
+    cb = page.locator(
+        f'.zone-popup .zone-picker .zone-pick-cell[data-zone-id="{zone_id}"] input')
+    if await cb.is_checked() != checked:
+        await cb.click()
+    await page.wait_for_timeout(120)
+    await page.locator(".zone-popup .zone-hint").click()
+    await page.wait_for_timeout(120)
 
 
 async def main():
@@ -178,13 +195,12 @@ async def main():
 
         # ═══ 3. 设置倾向 → 立即保存 ═══
         print("=== 3. 设置倾向区域并即时保存 ===")
-        row0 = page.locator(".zone-popup .zone-row").nth(0)   # 张伟 rank1
-        await row0.locator(".zone-pref").select_option("front-left")
-        await page.wait_for_timeout(800)
+        await pick_zone(page, 0, "zonePref", "front-left")   # 张伟 rank1
+        await page.wait_for_timeout(800)                      # autoSave 防抖 500ms
         saved = await read_config(page)
         z0 = next(s for s in saved.get("students", []) if s["name"] == "张伟")
-        if z0.get("zonePref") == "front-left":
-            ok("张伟 zonePref=front-left 已写入 localStorage")
+        if z0.get("zonePref") == ["front-left"]:
+            ok("张伟 zonePref=['front-left'] 已写入 localStorage（多选数组格式）")
         else:
             bad(f"未保存：zonePref={z0.get('zonePref')}")
 
@@ -196,12 +212,10 @@ async def main():
         else:
             bad(f"角标不对：{label.strip()}（期望包含 [1]）")
 
-        # 再设两个：李娜 倾向 back-right、王强 避开 front-left
-        await page.locator(".zone-popup .zone-row").nth(1).locator(".zone-pref").select_option("back-right")
-        await page.wait_for_timeout(200)
-        await page.locator(".zone-popup .zone-row").nth(2).locator(".zone-avoid").select_option("front-left")
-        await page.wait_for_timeout(200)
-        await page.locator(".zone-popup .zone-row").nth(3).locator(".zone-avoid").select_option("back-center")
+        # 再设三个：李娜 倾向 back-right、王强 避开 front-left、赵敏 避开 back-center
+        await pick_zone(page, 1, "zonePref", "back-right")
+        await pick_zone(page, 2, "zoneAvoid", "front-left")
+        await pick_zone(page, 3, "zoneAvoid", "back-center")
         await page.wait_for_timeout(500)
 
         # ═══ 5. 区域格计数 ═══
@@ -215,19 +229,23 @@ async def main():
 
         # ═══ 6. 倾向/避开同一个区域 → 拒绝 ═══
         print("=== 6. 倾向与避开冲突被拒 ===")
-        before = await read_config(page)
-        b0 = next(s for s in before["students"] if s["name"] == "张伟")
         DIALOGS.clear()
-        await page.locator(".zone-popup .zone-row").nth(0).locator(".zone-avoid").select_option("front-left")
-        await page.wait_for_timeout(500)
+        await page.locator(".zone-popup .zone-row").nth(0).locator(".zone-avoid").click()
+        await page.wait_for_timeout(150)
+        cb = page.locator(
+            '.zone-popup .zone-picker .zone-pick-cell[data-zone-id="front-left"] input')
+        await cb.click()        # 不用 check()：冲突时 JS 会回退，check() 会抛错
+        await page.wait_for_timeout(700)
         after = await read_config(page)
         a0 = next(s for s in after["students"] if s["name"] == "张伟")
-        avoid_value = await page.locator(".zone-popup .zone-row").nth(0).locator(".zone-avoid").input_value()
-        if (a0.get("zoneAvoid") == "" and avoid_value == ""
+        cb_checked = await cb.is_checked()
+        if (a0.get("zoneAvoid") == [] and not cb_checked
                 and any("冲突" in d or "同一" in d for d in DIALOGS)):
-            ok("冲突被拒：zoneAvoid 未写入、下拉已回退，提示=" + DIALOGS[-1][:24])
+            ok("冲突被拒：zoneAvoid 保持 []、checkbox 回退，提示=" + DIALOGS[-1][:24])
         else:
-            bad(f"冲突没被拦住：zoneAvoid={a0.get('zoneAvoid')} 下拉={avoid_value} 弹窗={DIALOGS}")
+            bad(f"冲突没被拦住：zoneAvoid={a0.get('zoneAvoid')} checked={cb_checked} 弹窗={DIALOGS}")
+        await page.locator(".zone-popup .zone-hint").click()   # 收起面板，Esc 才能关弹窗
+        await page.wait_for_timeout(150)
 
         # 关掉弹窗
         await page.keyboard.press("Escape")

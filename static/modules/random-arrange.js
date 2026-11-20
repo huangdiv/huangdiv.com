@@ -20,7 +20,7 @@
 
 import { state, commit } from './state.js';
 import { MESSAGES } from './messages.js';
-import { optimizeZones, zoneStats } from './zone.js';
+import { optimizeZones, zoneStats, studentZonePrefs } from './zone.js';
 
 export function createRandomArrange(deps) {
     const { helpers, callbacks } = deps;
@@ -886,8 +886,11 @@ export function createRandomArrange(deps) {
         //   2. 不破坏性别规则（男女同桌 / 男女不同桌）
         //   3. 不把学生放回排座前的旧座位（保住「完全换座」的观感）
         var zone = null;
+        // v1.4.10：zonePref/zoneAvoid 是数组，空数组是 truthy ⇒ 不能再用裸真值判断，
+        // 否则没有区域设置时也会白跑一次 optimizeZones。
         var hasZonePrefs = state.students.some(function (s) {
-            return (s && s.zonePref) || (s && s.zoneAvoid);
+            var p = studentZonePrefs(s);
+            return p.prefer.length > 0 || p.avoid.length > 0;
         });
         if (hasZonePrefs) {
             var baselinePair = computePairViolations(pairMap);

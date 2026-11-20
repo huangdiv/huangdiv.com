@@ -13,14 +13,14 @@ import {
 } from './modules/student-rank.js';
 import { computeGroupBalance, balanceLevel, roundScore } from './modules/group-balance.js';
 import { planGroupSeatSlots } from './modules/group-layout.js';
-import { ZONE_DEFS, ZONE_IDS, isZoneId, zoneName, seatZone } from './modules/zone.js';
+import { ZONE_DEFS, ZONE_IDS, zoneName, zoneNames, seatZone, normalizeZoneList, orderZoneList } from './modules/zone.js';
 import { validateForcedPair, planPairLinks } from './modules/pair-links.js';
 
     (function () {
         'use strict';
 
         // ==================== 应用版本号 ====================
-        const APP_VERSION = '1.4.9';
+        const APP_VERSION = '1.4.10';
 
         // ==================== 数据模型 ====================
         // students: [{ id: 's1', name: '张三', groupId: null }]
@@ -2116,18 +2116,99 @@ function normalizeRotateOffset(value) {
             }
         });
 
-        // ==================== 区域设置（智能排座 → 九宫格） ====================
+        // ==================== 区域设置（智能排座 → 九宫格，支持多选） ====================
         // 教室按 行数三等分（前/中/后）× 列数三等分（左/中/右）划成 9 个区域。
-        // 每名学生可设一个「倾向区域」（尽量安排进去）和一个「避开区域」（尽量不安排进去），
+        // 每名学生的「倾向区域」「避开区域」都是**区域 id 数组**（v1.4.10 起可多选）：
+        //   · 倾向：落在其中任意一个区域即算满足
+        //   · 避开：落在其中任意一个区域即算未满足
         // 二者都是**软约束**：排座引擎在保证配对/性别等硬约束的前提下做等价换座。
+        // UI 用「按钮 + 就地展开的 3×3 复选面板」代替原来的单选 <select>：
+        // 面板挂在行内（flex-wrap 换行），不会被 .zone-list 的 overflow 裁掉。
         let activeZonePopup = null;
+        let zonePickerEl = null;   // 全局共享一个 picker，打开时挂载到目标行
 
-        function zoneOptionsHtml(selected) {
-            const cur = isZoneId(selected) ? selected : '';
-            return '<option value="">不设置</option>' + ZONE_DEFS.map(function (d) {
-                return '<option value="' + d.id + '"' + (d.id === cur ? ' selected' : '') + '>' +
-                    d.name + '</option>';
+        function zonePickerCellsHtml() {
+            return ZONE_DEFS.map(function (d) {
+                return '<label class="zone-pick-cell" data-zone-id="' + d.id + '">' +
+                    '<input type="checkbox" value="' + d.id + '">' +
+                    '<span>' + d.name + '</span>' +
+                '</label>';
             }).join('');
+        }
+
+        // 触发器摘要：0 个 → 「未设置」，1 个 → 区域中文名，N 个 → 「N 区」
+        function zoneFieldText(list) {
+            const ids = normalizeZoneList(list);
+            if (ids.length === 0) return '未设置';
+            if (ids.length === 1) return zoneName(ids[0]);
+            return ids.length + ' 区';
+        }
+
+        function zoneFieldTitle(list, label) {
+            const names = zoneNames(list);
+            return names.length
+                ? label + '：' + names.join('、') + '（可多选）'
+                : label + '：未设置（可多选）';
+        }
+
+        function ensureZonePicker() {
+            if (zonePickerEl) return zonePickerEl;
+            const el = document.createElement('div');
+            el.className = 'zone-picker';
+            el.innerHTML =
+                '<div class="zone-picker-head">' +
+                    '<span class="zone-picker-title"></span>' +
+                    '<button type="button" class="zone-pick-clear">清空</button>' +
+                '</div>' +
+                '<div class="zone-pick-grid">' + zonePickerCellsHtml() + '</div>';
+            zonePickerEl = el;
+            return el;
+        }
+
+        function closeZonePicker() {
+            if (!zonePickerEl) return;
+            const row = zonePickerEl.parentNode;
+            if (row && row.classList && row.classList.contains('zone-row')) {
+                const btn = row.querySelector('.zone-select[aria-expanded="true"]');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+            if (zonePickerEl.parentNode) zonePickerEl.parentNode.removeChild(zonePickerEl);
+            zonePickerEl.removeAttribute('data-field');
+            zonePickerEl.removeAttribute('data-student-id');
+        }
+
+        function syncZonePickerCheckboxes(picker, list) {
+            const ids = normalizeZoneList(list);
+            picker.querySelectorAll('.zone-pick-cell input').forEach(function (cb) {
+                cb.checked = ids.indexOf(cb.value) >= 0;
+            });
+        }
+
+        // 点击行内的「倾向 / 避开」按钮：切换该字段的复选面板（同一时刻只开一个）
+        function toggleZonePicker(btn) {
+            const row = btn.closest('.zone-row');
+            if (!row) return;
+            const field = btn.getAttribute('data-field');
+            const wasOpen = zonePickerEl && zonePickerEl.parentNode === row &&
+                zonePickerEl.getAttribute('data-field') === field;
+            closeZonePicker();
+            if (wasOpen) return;   // 再点一次 = 收起
+            const student = getStudentById(row.getAttribute('data-student-id'));
+            if (!student) return;
+
+            const el = ensureZonePicker();
+            const isPref = field === 'zonePref';
+            const label = (isPref ? '倾向' : '避开') + '区域（可多选）';
+            el.setAttribute('data-field', field);
+            el.setAttribute('data-student-id', student.id);
+            el.setAttribute('role', 'group');
+            el.setAttribute('aria-label', label);
+            el.querySelector('.zone-picker-title').textContent = label;
+            syncZonePickerCheckboxes(el, student[field]);
+            row.appendChild(el);   // 就地撑高该行，随列表一起滚动
+            btn.setAttribute('aria-expanded', 'true');
+            const first = el.querySelector('.zone-pick-cell input');
+            if (first) first.focus();
         }
 
         // ─────────── 区域设置的「当前满足情况」（颜色提示） ───────────
@@ -2147,11 +2228,11 @@ function normalizeRotateOffset(value) {
             return map;
         }
 
-        // 单个学生的满足情况
+        // 单个学生的满足情况（多选：倾向命中任一即满足，避开命中任一即未满足）
         //   status: '' 未设置 | ok 全满足 | bad 有未满足 | na 未入座无法判定
         function zoneStudentStatus(student, at) {
-            const pref = isZoneId(student.zonePref) ? student.zonePref : '';
-            const avoid = isZoneId(student.zoneAvoid) ? student.zoneAvoid : '';
+            const pref = normalizeZoneList(student.zonePref);
+            const avoid = normalizeZoneList(student.zoneAvoid);
             const info = {
                 pref: pref,
                 avoid: avoid,
@@ -2160,10 +2241,10 @@ function normalizeRotateOffset(value) {
                 prefBad: false,
                 avoidBad: false
             };
-            if (!pref && !avoid) return info;
+            if (!pref.length && !avoid.length) return info;
             if (!info.zone) { info.status = 'na'; return info; }
-            info.prefBad = !!pref && info.zone !== pref;
-            info.avoidBad = !!avoid && info.zone === avoid;
+            info.prefBad = pref.length > 0 && pref.indexOf(info.zone) < 0;
+            info.avoidBad = avoid.indexOf(info.zone) >= 0;
             info.status = (info.prefBad || info.avoidBad) ? 'bad' : 'ok';
             return info;
         }
@@ -2175,23 +2256,29 @@ function normalizeRotateOffset(value) {
             if (info.status === 'ok') return at + (at ? ' ' : '') + '✓ 区域设置已满足';
             const parts = [];
             if (info.prefBad) {
-                parts.push('没在倾向区域「' + zoneName(info.pref) + '」');
+                parts.push('没在倾向区域「' + zoneNames(info.pref).join('、') + '」任一区');
             }
             if (info.avoidBad) {
-                parts.push('落在了避开区域「' + zoneName(info.avoid) + '」');
+                parts.push('落在了避开区域「' + zoneNames(info.avoid).join('、') + '」之一');
             }
             return at + (at ? ' ' : '') + '✗ ' + parts.join(';');
         }
 
         function zoneRowHtml(student) {
             const r = parseInt(student.rank, 10);
+            const pref = normalizeZoneList(student.zonePref);
+            const avoid = normalizeZoneList(student.zoneAvoid);
             return '<div class="zone-row" data-student-id="' + escapeHtml(student.id) + '">' +
                 '<span class="zone-row-name">' + escapeHtml(student.name) + '</span>' +
                 '<span class="zone-row-rank">' + (Number.isFinite(r) ? r : '') + '</span>' +
-                '<select class="zone-select zone-pref" data-field="zonePref" aria-label="倾向区域">' +
-                    zoneOptionsHtml(student.zonePref) + '</select>' +
-                '<select class="zone-select zone-avoid" data-field="zoneAvoid" aria-label="避开区域">' +
-                    zoneOptionsHtml(student.zoneAvoid) + '</select>' +
+                '<button type="button" class="zone-select zone-pref" data-field="zonePref"' +
+                    ' aria-haspopup="true" aria-expanded="false" aria-label="倾向区域（可多选）"' +
+                    ' title="' + escapeHtml(zoneFieldTitle(pref, '倾向')) + '">' +
+                    escapeHtml(zoneFieldText(pref)) + '</button>' +
+                '<button type="button" class="zone-select zone-avoid" data-field="zoneAvoid"' +
+                    ' aria-haspopup="true" aria-expanded="false" aria-label="避开区域（可多选）"' +
+                    ' title="' + escapeHtml(zoneFieldTitle(avoid, '避开')) + '">' +
+                    escapeHtml(zoneFieldText(avoid)) + '</button>' +
             '</div>';
         }
 
@@ -2200,8 +2287,9 @@ function normalizeRotateOffset(value) {
             const counts = {};
             ZONE_IDS.forEach(function (id) { counts[id] = { prefer: 0, avoid: 0 }; });
             students.forEach(function (s) {
-                if (isZoneId(s.zonePref)) counts[s.zonePref].prefer++;
-                if (isZoneId(s.zoneAvoid)) counts[s.zoneAvoid].avoid++;
+                // 多选：一个学生选了几个区域，就给这几个格子各 +1
+                normalizeZoneList(s.zonePref).forEach(function (z) { counts[z].prefer++; });
+                normalizeZoneList(s.zoneAvoid).forEach(function (z) { counts[z].avoid++; });
             });
             return counts;
         }
@@ -2233,8 +2321,17 @@ function normalizeRotateOffset(value) {
             }
             const prefSel = row.querySelector('.zone-pref');
             const avoidSel = row.querySelector('.zone-avoid');
-            if (prefSel) prefSel.classList.toggle('zone-field-bad', info.prefBad);
-            if (avoidSel) avoidSel.classList.toggle('zone-field-bad', info.avoidBad);
+            if (prefSel) {
+                prefSel.classList.toggle('zone-field-bad', info.prefBad);
+                // 触发器文字即时反映多选结果（只改 textContent，不重建 ⇒ 焦点不丢）
+                prefSel.textContent = zoneFieldText(info.pref);
+                prefSel.title = zoneFieldTitle(info.pref, '倾向');
+            }
+            if (avoidSel) {
+                avoidSel.classList.toggle('zone-field-bad', info.avoidBad);
+                avoidSel.textContent = zoneFieldText(info.avoid);
+                avoidSel.title = zoneFieldTitle(info.avoid, '避开');
+            }
         }
 
         // 弹窗顶部的达成汇总（「倾向 2/3 达成 · 避开 1/2 守住」）
@@ -2244,13 +2341,16 @@ function normalizeRotateOffset(value) {
             students.forEach(function (s) {
                 const at = seatMap[s.id];
                 const zone = at && at.zone ? at.zone : '';
-                if (isZoneId(s.zonePref)) {
+                // 达成数按「学生」计，命中判定按「集合」算
+                const pref = normalizeZoneList(s.zonePref);
+                const avoid = normalizeZoneList(s.zoneAvoid);
+                if (pref.length > 0) {
                     sum.prefTotal++;
-                    if (zone === s.zonePref) sum.prefMet++;
+                    if (pref.indexOf(zone) >= 0) sum.prefMet++;
                 }
-                if (isZoneId(s.zoneAvoid)) {
+                if (avoid.length > 0) {
                     sum.avoidTotal++;
-                    if (zone === s.zoneAvoid) sum.avoidHit++;
+                    if (avoid.indexOf(zone) >= 0) sum.avoidHit++;
                 }
             });
             sum.missed = (sum.prefTotal - sum.prefMet) + sum.avoidHit;
@@ -2305,7 +2405,8 @@ function normalizeRotateOffset(value) {
             const label = document.querySelector('[data-action="zoneSettings"] .zone-settings-label');
             if (!label) return;
             const n = students.filter(function (s) {
-                return isZoneId(s.zonePref) || isZoneId(s.zoneAvoid);
+                return normalizeZoneList(s.zonePref).length > 0 ||
+                    normalizeZoneList(s.zoneAvoid).length > 0;
             }).length;
             label.textContent = '区域设置' + (n > 0 ? ' [' + n + ']' : '');
         }
@@ -2324,9 +2425,9 @@ function normalizeRotateOffset(value) {
             const ordered = students.slice().sort(compareByRank);
             popup.innerHTML =
                 '<div class="pair-popup-title">区域设置</div>' +
-                '<div class="zone-hint">共 9 个区域（行三等分 前/中/后 × 列三等分 左/中/右）。' +
-                    '「倾向」尽量坐进去，「避开」尽量避开；排座时优先保证配对与性别规则。' +
-                    '已设置的项若当前<b>未满足</b>，整行标红并描红对应那一栏。</div>' +
+                '<div class="zone-hint">9 个区域（前/中/后 × 左/中/右），点「倾向 / 避开」可<b>多选</b>：' +
+                    '倾向命中任一即满足，避开命中任一即未满足；同一区域不能两边都选，排座时硬约束优先。' +
+                    '当前<b>未满足</b>的项整行标红。</div>' +
                 '<div class="zone-status-line" hidden></div>' +
                 '<div class="zone-grid"></div>' +
                 '<input type="text" class="zone-filter" placeholder="搜索姓名（留空显示全部）"' +
@@ -2358,42 +2459,89 @@ function normalizeRotateOffset(value) {
             activeZonePopup = { popupEl: popup };
             requestAnimationFrame(function () { popup.classList.add('visible'); });
 
-            // 姓名过滤：直接切换行的显隐，不重建 DOM（保留已选的 select 状态）
+            // 姓名过滤：直接切换行的显隐，不重建 DOM（保留已选的区域设置）
             popup.addEventListener('input', function (e) {
                 const t = e.target;
                 if (!t || !t.classList.contains('zone-filter')) return;
                 const q = String(t.value || '').trim();
+                if (q) closeZonePicker();   // 行可能被隐藏，先收起面板
                 popup.querySelectorAll('.zone-row').forEach(function (row) {
                     const name = row.querySelector('.zone-row-name').textContent || '';
                     row.hidden = !!q && name.indexOf(q) < 0;
                 });
             });
 
-            // 区域选择：即时写入 + 自动保存
+            // 点击：打开/收起该行的多选面板、清空、点面板外自动收起
+            popup.addEventListener('click', function (e) {
+                const t = e.target;
+                if (!t) return;
+                const btn = t.closest ? t.closest('.zone-select') : null;
+                if (btn && popup.contains(btn)) {
+                    toggleZonePicker(btn);
+                    return;
+                }
+                const clear = t.closest ? t.closest('.zone-pick-clear') : null;
+                if (clear && zonePickerEl && zonePickerEl.contains(clear)) {
+                    const row = zonePickerEl.closest('.zone-row');
+                    const student = row && getStudentById(row.getAttribute('data-student-id'));
+                    if (student) {
+                        const field = zonePickerEl.getAttribute('data-field');
+                        student[field] = [];
+                        syncZonePickerCheckboxes(zonePickerEl, []);
+                        autoSave();
+                        refreshZoneGrid(popup);
+                        refreshZoneStatuses(popup);
+                        updateZoneMenuLabel();
+                    }
+                    return;
+                }
+                // 面板内部（checkbox / label / 标题）保持打开
+                if (zonePickerEl && zonePickerEl.contains(t)) return;
+                if (zonePickerEl && zonePickerEl.parentNode) closeZonePicker();
+            });
+
+            // 勾选区域：即时写入数组 + 自动保存；倾向/避开不允许有交集
             popup.addEventListener('change', function (e) {
-                const sel = e.target;
-                if (!sel || !sel.classList || !sel.classList.contains('zone-select')) return;
-                const row = sel.closest('.zone-row');
+                const cb = e.target;
+                if (!cb || !cb.matches || !cb.matches('.zone-pick-cell input[type="checkbox"]')) return;
+                const picker = cb.closest('.zone-picker');
+                if (!picker) return;
+                const row = picker.closest('.zone-row');
                 if (!row) return;
                 const student = getStudentById(row.getAttribute('data-student-id'));
                 if (!student) return;
-                const field = sel.getAttribute('data-field');
-                const value = isZoneId(sel.value) ? sel.value : '';
+                const field = picker.getAttribute('data-field');
                 const otherField = field === 'zonePref' ? 'zoneAvoid' : 'zonePref';
+                const zoneId = cb.value;
 
-                // 倾向与避开不能是同一个区域
-                if (value && student[otherField] === value) {
+                // 同一区域不能既倾向又避开
+                if (cb.checked && normalizeZoneList(student[otherField]).indexOf(zoneId) >= 0) {
                     alert(MESSAGES.ZONE_SAME_BOTH);
-                    sel.value = student[field] || '';
+                    cb.checked = false;
                     return;
                 }
 
-                student[field] = value;
+                const next = normalizeZoneList(student[field]).filter(function (z) { return z !== zoneId; });
+                if (cb.checked) next.push(zoneId);
+                student[field] = orderZoneList(next);   // 稳定顺序，与点击次序无关
                 autoSave();
+                syncZonePickerCheckboxes(picker, student[field]);
                 refreshZoneGrid(popup);
-                // 行底色就地刷新(不重建行 ⇒ 焦点仍留在刚操作的下拉上)
+                // 行底色 / 触发器文字就地刷新（不重建行 ⇒ 面板与焦点都不丢）
                 refreshZoneStatuses(popup);
                 updateZoneMenuLabel();
+            });
+
+            // Esc 先收起多选面板，再按一次才关闭整个弹窗
+            popup.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && zonePickerEl && zonePickerEl.parentNode) {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    const row = zonePickerEl.parentNode;
+                    const btn = row && row.querySelector('.zone-select[aria-expanded="true"]');
+                    closeZonePicker();
+                    if (btn) btn.focus();
+                }
             });
 
             const zoneFocusTrap = installFocusTrap(popup, closeZonePopup);
@@ -2402,6 +2550,7 @@ function normalizeRotateOffset(value) {
 
         function closeZonePopup() {
             if (!activeZonePopup) return;
+            closeZonePicker();   // 别把共享面板留在已销毁的 DOM 里
             const cur = activeZonePopup;
             activeZonePopup = null;
             if (cur.focusTrap && typeof cur.focusTrap.restoreFocus === 'function') {

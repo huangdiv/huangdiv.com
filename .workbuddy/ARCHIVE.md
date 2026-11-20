@@ -306,7 +306,7 @@ static/
   分组设置顶部整体汇总（整体分 + 极差 + 最弱组）、分组模式 banner 分组按钮内徽标；
   `title` 里给出逐维度分数与「男X/女Y、班委 N 人、平均排名」，便于解释「为什么这组 82 分」。
 
-### 3.7 九宫格区域设置（2026-11-02 新增，`zone.js`）
+### 3.7 九宫格区域设置（2026-11-02 新增；2026-11-20 起支持多选，`zone.js`）
 
 **区域划分**：把教室按 `rows` 三等分（前/中/后）× `cols` 三等分（左/中/右），得到 9 个区域
 （`front-left` … `back-right`，中文名「前左…后右」）。`bandIndex(i, total)` 的边界处理：
@@ -314,8 +314,12 @@ static/
 - `total === 2` → 归 `0` / `2` 两档（不产生空的中间档）；
 - 其余 → `floor(i*3/total)` 钳到 0..2（8 行得 前3/中3/后2）。
 
-**数据**：`student.zonePref` / `student.zoneAvoid`（区域 id，`''` = 未设置）。
-`migrate.js` 会把非法值清成 `''`（白名单来自 `zone.js#ZONE_IDS`，不另存一份）。
+**数据（v1.4.10 起多选，详见 §3.16）**：`student.zonePref` / `student.zoneAvoid`
+都是**区域 id 数组** `string[]`（`[]` = 未设置）。老配置的单值字符串 / `''`
+由 `normalizeZoneList()` 无损升级为数组（过滤非法 id、去重、保序）；
+`orderZoneList()` 按九宫格固定顺序稳定化，避免点击次序影响落盘结果。
+`migrate.js` 复用这两个函数，并把「倾向 ∩ 避开」的交集从避开里剔除（倾向优先）。
+白名单始终来自 `zone.js#ZONE_IDS`，不另存一份。
 
 **算法**（`optimizeZones`，纯函数、就地改 `seats`、只做「有人↔有人」等价交换 ⇒ 占座集合不变）：
 - 代价：倾向未达成 +2、避开命中 +3（避开更硬一点）；一次交换的收益 =
@@ -335,17 +339,20 @@ static/
 
 **UI**：智能排座下拉的「区域设置」菜单项（`data-action="zoneSettings"`，角标显示已设置人数）
 → `.zone-popup`（复用 `.pair-popup` 外壳）：3×3 区域预览（含「n 想坐 / n 避开」计数）、
-姓名过滤框、按 rank 排序的学生行（姓名 + 排名 + 倾向/避开两个 `<select>`）。
-改动即时写 `student.zonePref/zoneAvoid` + `autoSave()`；倾向与避开设成同一区域会 alert 并回退。
+姓名过滤框、按 rank 排序的学生行（姓名 + 排名 + 倾向/避开两个**多选触发器 button**）。
+点触发器就地展开一个 3×3 复选面板（**全局只共享一个 picker，打开时挂到目标行**），
+勾选即时写 `student.zonePref/zoneAvoid` 数组 + `autoSave()`；同一区域既倾向又避开会 alert 并回退。
+触发器摘要：0 个「未设置」/ 1 个显示区域名 / N 个显示「N 区」，完整清单放 `title`。
+旧版这里是两个单选 `<select>` + `select_option()`，v1.4.10 已完全移除（见 §3.16）。
 
 **「当前满足情况」颜色提示（与配对设置同一套 ok/bad/na 语言）**：
 - 判定入口只有两处函数：`currentZoneSeatMap()`（座位表 → `{sid: {index, zone}}`，用 `seatZone`）
   与 `zoneStudentStatus(student, at)` → `{status, prefBad, avoidBad, zone}`；
   `status` 三态：`''` 未设置（**不着色**，免得整屏泛绿）、`ok` 全满足、`bad` 有未满足、`na` 已设但未入座。
-- 粒度到「列」：`prefBad`（倾向未达成）/ `avoidBad`（落在避开区）分别给对应 `<select>` 加
-  `.zone-field-bad` 描红 ⇒ 老师一眼知道该动哪一栏，而不是只知道这行有问题。
-- `applyZoneRowStatus()` **就地改 class / title**，不重建行 —— 改完某个下拉后焦点仍留在那个 select 上；
-  重建 DOM 的写法会掉焦点（键盘连续改多行时很难用）。
+- 粒度到「列」：`prefBad`（倾向列表一个都没命中）/ `avoidBad`（落在避开列表任一区）分别给对应
+  触发器 button 加 `.zone-field-bad` 描红 ⇒ 老师一眼知道该动哪一栏。
+- `applyZoneRowStatus()` **就地改 class / title / 触发器文字**，不重建行 ——
+  勾选后展开的多选面板与 checkbox 状态都完整保留；重建 DOM 的写法会把面板一起销毁。
 - 刷新时机：① 打开弹窗；② `change` 事件后；③ `afterSeatsRender()` → `refreshZonePopupStatus()`
   （拖拽 / 排座 / 轮换 / 撤销都会经过这个统一出口）。
   ⚠️ `refreshZonePopupStatus` 内必须 `try/catch`：`activeZonePopup` 是声明在文件后段的 `let`，
@@ -605,12 +612,53 @@ const forward = !isPartial && batch % 2 === 0;            // 余数批一律按�
 **回退验证**：把 `forward` 改回 `batch % 2 === 0` ⇒ 单测 4 项变红、batch33 4 项变红
 （10人4组 `[2,2,3,3]`→`[3,3,2,2]`；13人5组 `[2,2,3,3,3]`→`[3,3,3,2,2]`），还原后全绿。
 
+### 3.16 区域设置「倾向 / 避开」支持多选（2026-11-20，v1.4.10）
+
+**需求**：每个学生的倾向区域、避开区域都能同时选多个九宫格区域。
+
+**语义**（多选后必须重新定义，不能沿用单值）：
+- 倾向 = 「命中**任意一个**即满足」：`zoneCost` 里 `prefer.indexOf(zone) >= 0` 才不扣分；
+- 避开 = 「命中**任意一个**即未满足」：`avoid.indexOf(zone) >= 0` 就扣分；
+- **达成数按学生计**（一人一条倾向设置 / 一条避开设置），而 `zoneStats.counts`
+  是**按区域计**（一人选 3 个区域就给 3 个格子各 +1）⇒ 顶部汇总条「倾向 1/3」不会因为
+  多选变成「1/7」。`unmet[]` 新增 `zones: string[]`，同时保留 `zone` 单值字段兼容旧消费方。
+
+**数据模型升级**（关键兼容决策）：字段**不改名**，把 `zonePref/zoneAvoid` 从 `string` 升级为
+`string[]`。`zone.js#normalizeZoneList(value)` 同时接受数组 / 单值字符串 / null，统一输出
+合法去重保序的数组 ⇒ ① 老配置无需数据迁移脚本；② 未经 `migrate` 的对象、单测夹具、
+手改 JSON 也都安全；③ 现有 31 项旧单测（用 `.zonePref = 'front-left'`）**一行不改仍全绿**。
+`migrate.js` 在载入时把字段规范化（并清洗倾向/避开交集，倾向优先），保证新数据落盘统一。
+`zoneCost` 用轻量 `toList()` 适配（内部热路径只做数组/字符串判断，不过白名单），
+避免 `O(passes × 人数 × 座位数)` 里重复过滤。
+
+**UI**（`seats-generator.js` 区域段整体改写）：
+- 两个单选 `<select>` → 两个 `button.zone-select` 触发器；点击就地展开一个
+  **3×3 复选面板** `.zone-picker`（9 个 `<label><input type=checkbox>`）。
+- **全局共享一个 picker**：`ensureZonePicker()` 只建一次，`toggleZonePicker()` 打开时
+  `row.appendChild(el)` 挂到目标行，关闭时 `removeChild`。`.zone-row` 加 `flex-wrap: wrap` +
+  picker `flex: 0 0 100%` ⇒ 面板作为整行换行显示，**就地撑高、随列表滚动**，
+  不会被 `.zone-list { overflow-y:auto }` 裁掉（项目里「浮层被 overflow 裁剪」的老坑，见 §6.1）。
+- 同一时刻只开一个：`closeZonePicker()` 先关旧的；Esc 第一次只收面板（用
+  `stopImmediatePropagation()` 抢在 `installFocusTrap` 之前）、第二次才关弹窗。
+- `installFocusTrap` 每次 Tab 都重新 `querySelectorAll` 且用 `offsetParent !== null` 过滤
+  ⇒ 动态挂载的 checkbox 自动纳入键盘循环，无需额外接线；打开时 `first.focus()`。
+- 交集校验从「两个值相等」改为「两个集合有交集」，仍用 `MESSAGES.ZONE_SAME_BOTH` alert，
+  并把 checkbox 回退为未勾选。
+- `applyZoneRowStatus()` 就地刷新触发器文字 / title，**不重建行** ⇒ 勾选后面板不消失。
+- 布局收紧（实测列表可视高度 180px → 227px）：hint 4 行压到 3 行、`.zone-cell`
+  `min-height 34→28px`，把空间还给逐生设置的学生列表。
+
+**回退验证**：把 `normalizeZoneList()` 临时改成 `return out.slice(0, 1)`（精确模拟退化为单选）
+⇒ `unit_zone` J 组 4 项、`unit_migrate` O 组 4 项、`batch34` 7 项变红
+（`['front-left','front-center']` 退化成 `['front-left']`），还原后全绿。
+
 ---
 
 ## 4. 已上线功能清单（按 commit 时间倒序）
 
 | 提交 | 内容 |
 |------|------|
+| 本轮 | **区域设置倾向/避开均支持多选**：字段升级为区域 id 数组（老单值无损兼容）、3×3 复选面板就地展开、交集校验、多选语义下的达成/计数/颜色提示；收紧弹窗布局（v1.4.10，见 §3.16） |
 | 本轮 | **均衡分组余数按组号倒序划归**：人数不整除时只有排在后面的 r 个组多 1 人，与批次奇偶（蛇形方向）解耦；整除场景行为不变（v1.4.9，见 §3.15） |
 | 本轮 | **按组聚座按每组人数取最紧凑矩形**：取消全班统一块，主目标「占用行数+列数」最小，6 人→3行×2列；逐组全表搜索落点、占座跳过、就近补位；toast 逐组给形状（v1.4.8，见 §3.14） |
 | 本轮 | **同桌连线走向统一**：`index%2` 交替上下改为「同桌线全班固定走座位上方、同排等高」，侧别只由几何决定；非同桌线保留交错避免长线重叠（v1.4.7，见 §3.13） |
@@ -666,14 +714,16 @@ const forward = !isPartial && batch % 2 === 0;            // 余数批一律按�
   260 组 N/g 组合的精确人数不变量、偶数批反例、整除时蛇形不变） /
   **`unit_group_layout`**（v1.4.8 重写，21 组：题面 6 人精确座位、
   每组 span 等于该人数理论最优、形状彼此独立、组顺序/增删无关、blocked 不挪人、
-  小教室不退化） / `unit_group_balance` / `unit_zone` /
+  小教室不退化） / `unit_group_balance` /
+  **`unit_zone`**（v1.4.10 起 40 项，J 组 8 项钉死多选：归一化 / 代价 / 统计 / 换座 / 新旧混用） /
+  **`unit_migrate`**（44 项，O 组 5 项钉死数组归一化、非法值过滤与倾向避开交集清洗） /
   `unit_version_sync` / **`unit_pair_links`**（38 项：唯一性校验、清洗、走廊几何、
   「路径不进任何座位矩形」的 160 点采样不变量、与 `getDeskMatePairs` 交叉验证、
   G 组「同桌线走向统一：固定同侧 / 顺序无关 / 同排等高 / 无顶部 padding 降级」）。
 - **加载顺序陷阱**：state.js 读 `location.search`，测试须先 `globalThis.location = {search:'dev=quiet'}`
   再 `await import('../modules/state.js')`；ESM 静态 import 会被 hoist ⇒ **全部用动态 `await import()`**。
 
-### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 33 个批次文件）
+### 5.2 冒烟测试（Playwright，`.workbuddy/smoke_test_batch*.py`，共 34 个批次文件）
 ```bash
 cd static && python -m http.server 8123 --bind 127.0.0.1    # 文档根 = static/
 cd .workbuddy && python smoke_test_batchXX_*.py
@@ -726,6 +776,11 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   每个场景 `localStorage` 播种 N 人 / 无分组 → reload → 点 `#balanceGroupBtn` →
   从 `classroomConfig.groups + students[].groupId` 反推各组人数。
   ⇒ 「人数分配」类断言只读 id 归属即可，不需要看 DOM 徽标。
+- **v1.4.10 新增 `batch34_zone_multi`（28 项）**：真实点击多选触发器 → 勾/取消 checkbox →
+  读 `classroomConfig.students[].zonePref/zoneAvoid` 断言数组内容，覆盖旧单值兼容、
+  多选满足判定、交集双向拦截、清空、Esc 两段式关闭、刷新持久化、键盘空格勾选。
+  ⚠️ 两个坑见 §6.2：**autoSave 500ms 防抖**（每次读盘前等 750ms）、
+  **冲突回退时 `locator.check()` 会抛错**（改用 `click()` + `is_checked()`）。
 - **发版 bump 后记得搜 `.workbuddy/` 里的硬编码版本断言**：`batch31` / `batch32` 都
   在 docstring、种子 `config.version` 和 `check(version == "x.y.z")` 三处写了版本号，
   漏改会让回归批次假红（全局 Grep 默认跳过 `.workbuddy` 这类隐藏目录，要单独指定 path 搜）。
@@ -747,6 +802,12 @@ cd .workbuddy && python smoke_test_batchXX_*.py
   `const forward = !isPartial && batch % 2 === 0;` 为旧写法，单测 + 冒烟各跑一次，
   再 `cp` 回来复跑。回退后只有「偶数批余数」场景变红、奇数批/整除场景仍绿 ⇒
   正好证明测试钉死了用户描述的那条规则，而不是笼统地判「分组坏了」。
+- **数据模型升级型改造**（v1.4.10 多选）：把 `normalizeZoneList()` 临时改成
+  `return out.slice(0, 1)` 精确模拟「退化为单选」⇒ `unit_zone` J 组 4 项、
+  `unit_migrate` O 组 4 项、`batch34` 7 项变红（如 `['front-left','front-center']`
+  退化成 `['front-left']`），而旧的 31 项单值用例仍绿 ⇒ 精确证明新断言钉的是「多选」
+  而不是「区域功能坏了」。这种「一行退化」比整文件换回旧版更干净，也不会产生
+  import 失败的假红。
 
 ---
 
@@ -767,10 +828,19 @@ cd .workbuddy && python smoke_test_batchXX_*.py
 | **用「全局最大值」给每个个体定形状** | 旧按组聚座按 `max(sizes)` 给所有组套统一矩形块 ⇒ 小组被大组绑架（4 人组变 `2×3` / `1×4`）。凡需求写「根据每组的…自动调整」，形状必须由**该组自身**的参数推导，全局参数只能用来做容量/边界检查（v1.4.8，§3.14）。 |
 | **名义几何 ≠ 实际几何** | 枚举候选矩形时，矩形内可能有 `blocked` 座位 ⇒ 前 n 个可用座位的**真实外接矩形**可能比名义矩形更低/更窄。评分必须用实际座位集合算，否则「左上角更早」的候选会误胜，布局看起来散。位置项只在平局时生效（0.001 级权重）。 |
 | **尾批方向被「批次序号」隐式决定** | 蛇形分批的最后一批不足 G 人时，直接 `slotOrder.slice(0, r)` 会让「谁多 1 人」取决于 `floor(N/G)` 的奇偶：10人4组 → `[3,3,2,2]`、14人4组 → `[3,3,4,4]`（v1.4.9，§3.15）。**凡是带业务语义的尾数（余数名额、末组大小、尾页留白），方向必须显式由规则给出，不能搭遍历顺序的便车**；判断方式是问「只改 N 让批次奇偶翻转，结果是否仍符合规则」。 |
+| **字段类型升级缺兼容层 / 空集合真值** | `zonePref: string → string[]`（v1.4.10，§3.16）：只改 `migrate` 不够，单测夹具、手改 JSON、旧缓存都可能绕过它 ⇒ **在读路径的纯函数边界放归一化**（`normalizeZoneList` 同时吃数组与单值），写路径再统一规范化，老测试可一行不改仍全绿。另一个必踩坑：**空数组是 truthy**，所有 `if (s.zonePref)` 都要改 `.length > 0`（`random-arrange#hasZonePrefs` 否则会白跑一次优化）。 |
 
 ### 6.2 测试技巧
 - 用 `localStorage.setItem('classroomConfig', JSON.stringify(cfg))` + `page.reload()` 注入数据；
   cfg 结构见 `getCurrentConfig()`。
+- ⚠️ **读 localStorage 前必须等过 `autoSave` 的 500ms 防抖**：连续勾 3 个 checkbox、
+  每步只等 180ms ⇒ 定时器被反复重置，UI 内存状态全对（title/文字/计数都更新了）
+  但 localStorage 一直是播种时的旧值，**看起来像「保存功能坏了」其实是测试读得太快**。
+  统一封装 `saved_config(page)`（先 `wait_for_timeout(750)` 再读），别在每步硬编码等待。
+- ⚠️ **断言「被 JS 回退的 checkbox」时别用 `locator.check()`**：交集冲突场景里 JS 会
+  `cb.checked = false`，Playwright 的 `check()` 校验最终状态并抛
+  `Clicking the checkbox did not change its state` ⇒ 用 `cb.click()` + `cb.is_checked()`
+  自己断言，才能把「预期被拒」测成一项通过而不是一次崩溃。
 - ⚠️ **`page.add_init_script` 每次导航都会重跑**：拿它播种 `localStorage` 后，
   任何 `reload()` 都会被重新覆盖回初始配置 ⇒「改动 → 自动保存 → 刷新」这类链路**永远测不到**
   （表现：刷新后仍是初始值，看着像自动保存坏了）。修：播种脚本加 `sessionStorage` 标记，

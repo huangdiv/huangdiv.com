@@ -16,6 +16,7 @@
 //   J. students[i] 字段补全(checkedIn/gender/tags)
 //   K. version 升级到 APP_VERSION
 //   L. viewMode 非法值 → 默认 'student'
+//   O. 区域设置多选归一化(v1.4.10)：老单值升级 / 过滤去重 / 倾向避开交集清洗
 //
 // 运行:  node static/tests/unit_migrate.mjs
 // 退出码:0 = 全部通过;非 0 = 有失败。
@@ -476,6 +477,64 @@ group('N. 配对约束清洗 + 连线开关', () => {
     test('showPairLinks 缺省 → true；显式 false 保留', () => {
         assertEq(migrateConfig({}).showPairLinks, true);
         assertEq(migrateConfig(freshConfig({ showPairLinks: false })).showPairLinks, false);
+    });
+});
+
+// =====================================================================
+// O. 区域设置多选归一化（v1.4.10）
+// =====================================================================
+group('O. 区域设置多选归一化', () => {
+    const mk = (extra) => freshConfig({
+        students: [Object.assign({ id: 's1', name: '甲', rank: 1 }, extra)]
+    });
+
+    test('O1 老配置单值字符串自动升级为数组；空值/缺失 → []', () => {
+        const r = migrateConfig(mk({ zonePref: 'front-left', zoneAvoid: 'back-right' }));
+        assertEq(r.students[0].zonePref, ['front-left']);
+        assertEq(r.students[0].zoneAvoid, ['back-right']);
+        const empty = migrateConfig(mk({ zonePref: '', zoneAvoid: '' })).students[0];
+        assertEq(empty.zonePref, []);
+        assertEq(empty.zoneAvoid, []);
+        const missing = migrateConfig(mk({})).students[0];
+        assertEq(missing.zonePref, []);
+        assertEq(missing.zoneAvoid, []);
+    });
+
+    test('O2 数组内非法值过滤 + 去重 + 保序', () => {
+        const r = migrateConfig(mk({
+            zonePref: ['back-right', 'xxx', 'back-right', 'front-left'],
+            zoneAvoid: [123, null, 'front-right', 'front-right']
+        }));
+        assertEq(r.students[0].zonePref, ['back-right', 'front-left']);
+        assertEq(r.students[0].zoneAvoid, ['front-right']);
+    });
+
+    test('O3 倾向与避开交集 → 以倾向优先从避开里剔除', () => {
+        const r = migrateConfig(mk({
+            zonePref: ['front-left', 'front-center'],
+            zoneAvoid: ['front-center', 'back-right']
+        }));
+        assertEq(r.students[0].zonePref, ['front-left', 'front-center']);
+        assertEq(r.students[0].zoneAvoid, ['back-right']);
+    });
+
+    test('O4 合法数组原样保留，二次迁移幂等', () => {
+        const c = mk({ zonePref: ['front-left', 'front-center'], zoneAvoid: ['back-right'] });
+        const r1 = migrateConfig(c);
+        assertEq(r1.students[0].zonePref, ['front-left', 'front-center']);
+        const r2 = migrateConfig(r1);
+        assertEq(r2.students[0].zonePref, ['front-left', 'front-center']);
+        assertEq(r2.students[0].zoneAvoid, ['back-right']);
+    });
+
+    test('O5 多名学生各自独立归一化', () => {
+        const r = migrateConfig(freshConfig({ students: [
+            { id: 's1', name: '甲', rank: 1, zonePref: 'front-left', zoneAvoid: '' },
+            { id: 's2', name: '乙', rank: 2, zonePref: ['mid-center', 'back-right'], zoneAvoid: ['front-left'] },
+            { id: 's3', name: '丙', rank: 3 }
+        ] }));
+        assertEq(r.students.map(s => s.zonePref), [['front-left'], ['mid-center', 'back-right'], []]);
+        assertEq(r.students.map(s => s.zoneAvoid), [[], ['front-left'], []]);
     });
 });
 

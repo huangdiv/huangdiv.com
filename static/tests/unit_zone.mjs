@@ -8,11 +8,12 @@
 //   B. bandIndex — 1 行/列归中、2 列归左右、常规三等分
 //   C. seatZone — 8×8 / 3×3 / 1×N / 越界
 //   D. buildZoneMap — 9 个 key 恒定、并集覆盖全部座位、互不重叠
-//   E. studentZonePrefs — 非法值归一为空
+//   E. studentZonePrefs — 非法值归一为空；老单值字符串升级为数组
 //   F. zoneStats — 倾向达成数 / 避开命中数 / 未满足清单
 //   G. optimizeZones — 能把学生换进倾向区域、换出避开区域
 //   H. optimizeZones 硬约束 — guard 返回 false 时不换；占座集合不变（不丢人）
 //   I. optimizeZones 边界 — 空输入 / 全部已满足 / 座位不足
+//   J. 多选(v1.4.10) — 归一化/代价/统计/换座/新旧配置混用
 //
 // 运行: node static/tests/unit_zone.mjs
 // 退出码: 0 = 全部通过
@@ -22,6 +23,7 @@ const zoneMod = await import('../modules/zone.js');
 const {
     ZONE_IDS, ZONE_DEFS, isZoneId, zoneName, bandIndex, seatZone,
     buildZoneMap, studentZonePrefs, zoneCost, zoneStats, optimizeZones,
+    normalizeZoneList, orderZoneList, zoneNames,
 } = zoneMod;
 
 let passed = 0;
@@ -197,20 +199,25 @@ test('D2 每个非空区域内的座位都属于该区域', function () {
 });
 
 // ═══════════ E. studentZonePrefs ═══════════
-test('E1 非法值统一归一为空', function () {
+test('E1 非法值统一归一为空；老单值字符串自动升级为数组', function () {
+    // v1.4.10 起两个字段都是数组；历史配置里的单值字符串必须无损升级
     assertDeepEqual(studentZonePrefs({ zonePref: 'front-left', zoneAvoid: 'back-right' }),
-        { prefer: 'front-left', avoid: 'back-right' });
+        { prefer: ['front-left'], avoid: ['back-right'] });
     assertDeepEqual(studentZonePrefs({ zonePref: 'xxx', zoneAvoid: null }),
-        { prefer: '', avoid: '' });
-    assertDeepEqual(studentZonePrefs(null), { prefer: '', avoid: '' });
+        { prefer: [], avoid: [] });
+    assertDeepEqual(studentZonePrefs(null), { prefer: [], avoid: [] });
 });
 
 test('E2 zoneCost：倾向不满足 +2，避开命中 +3，可叠加', function () {
+    // 单值字符串入参仍兼容（zoneCost 内部 toList 适配）
     const p = { prefer: 'front-left', avoid: 'back-right' };
     assertEqual(zoneCost(p, 'front-left'), 0);
     assertEqual(zoneCost(p, 'mid-center'), 2);
     assertEqual(zoneCost(p, 'back-right'), 5);
     assertEqual(zoneCost({ prefer: '', avoid: '' }, 'back-right'), 0);
+    // 数组入参（新格式）等价
+    assertEqual(zoneCost({ prefer: ['front-left'], avoid: ['back-right'] }, 'front-left'), 0);
+    assertEqual(zoneCost({ prefer: [], avoid: [] }, 'back-right'), 0);
 });
 
 // ═══════════ F. zoneStats ═══════════
@@ -369,6 +376,120 @@ test('I4 9 个区域都有人想去且能各就各位', function () {
     optimizeZones(seats, students, 3, 3);
     const st = zoneStats(seats, students, 3, 3);
     assertEqual(st.prefMet, 9, '9 个倾向应全部达成');
+});
+
+// ═══════════ J. 多选（v1.4.10）═══════════
+test('J1 normalizeZoneList / orderZoneList / zoneNames', function () {
+    assertDeepEqual(normalizeZoneList(['front-left', 'xxx', 'front-left', 'back-right']),
+        ['front-left', 'back-right'], '过滤非法值 + 去重 + 保序');
+    assertDeepEqual(normalizeZoneList('front-left'), ['front-left'], '老单值字符串升级为数组');
+    assertDeepEqual(normalizeZoneList(''), [], "老配置 '' = 未设置");
+    assertDeepEqual(normalizeZoneList(null), []);
+    assertDeepEqual(normalizeZoneList(123), []);
+    assertDeepEqual(normalizeZoneList(undefined), []);
+    assertDeepEqual(orderZoneList(['back-right', 'front-left', 'front-left']),
+        ['front-left', 'back-right'], '按九宫格固定顺序稳定化，与点击次序无关');
+    assertDeepEqual(zoneNames(['front-left', 'back-right']), ['前左', '后右']);
+});
+
+test('J2 zoneCost 多选：倾向命中任一即满足，避开命中任一即扣分', function () {
+    const p = {
+        prefer: ['front-left', 'front-center'],
+        avoid: ['back-left', 'back-right', 'mid-center']
+    };
+    assertEqual(zoneCost(p, 'front-left'), 0);
+    assertEqual(zoneCost(p, 'front-center'), 0, '第二个倾向区域同样算满足');
+    assertEqual(zoneCost(p, 'front-right'), 2, '一个倾向都没命中 ⇒ +2');
+    assertEqual(zoneCost(p, 'mid-center'), 5, '倾向没命中 + 避开命中 = 2+3');
+    assertEqual(zoneCost(p, 'back-right'), 5, '第二个避开区域同样扣分');
+    assertEqual(zoneCost({ prefer: [], avoid: ['front-left', 'front-right'] }, 'front-right'), 3);
+    assertEqual(zoneCost({ prefer: ['front-left'], avoid: [] }, 'front-left'), 0);
+});
+
+test('J3 zoneStats 多选：达成按学生计，counts 按区域各 +1', function () {
+    const students = mkStudents(2);
+    students[0].zonePref = ['front-left', 'front-center', 'front-right'];
+    students[1].zonePref = ['front-left', 'back-right'];
+    // 3×3：s1 坐前左(命中)，s2 坐前中(两个倾向都没命中)
+    const seats = ['s1', 's2', null, null, null, null, null, null, null];
+    const st = zoneStats(seats, students, 3, 3);
+    assertEqual(st.prefTotal, 2, '2 名学生有倾向设置，不是 5 个区域');
+    assertEqual(st.prefMet, 1);
+    assertEqual(st.met, 1);
+    assertEqual(st.counts['front-left'].prefer, 2, '两人都选了前左 ⇒ 该格 +2');
+    assertEqual(st.counts['front-center'].prefer, 1);
+    assertEqual(st.counts['front-right'].prefer, 1);
+    assertEqual(st.counts['back-right'].prefer, 1);
+    assertEqual(st.counts['mid-left'].prefer, 0);
+    assertEqual(st.unmet.length, 1);
+    assertDeepEqual(st.unmet[0].zones, ['front-left', 'back-right'], '未满足项带上完整多选清单');
+    assertEqual(st.unmet[0].zone, 'front-left', '保留 zone 单值字段兼容旧消费方');
+});
+
+test('J4 zoneStats 多选避开：命中任一即算「没守住」', function () {
+    const students = mkStudents(2);
+    students[0].zoneAvoid = ['front-left', 'front-center', 'front-right'];
+    students[1].zoneAvoid = ['back-left', 'back-right'];
+    // s1 坐前中(命中第 2 个避开区)、s2 坐中中(守住)
+    const seats = [null, 's1', null, null, 's2', null, null, null, null];
+    const st = zoneStats(seats, students, 3, 3);
+    assertEqual(st.avoidTotal, 2);
+    assertEqual(st.avoidHit, 1);
+    assertEqual(st.counts['front-center'].avoid, 1);
+    assertEqual(st.counts['front-right'].avoid, 1);
+    assertEqual(st.counts['back-left'].avoid, 1);
+    assertEqual(st.unmet.length, 1);
+    assertEqual(st.unmet[0].kind, 'avoid');
+    assertDeepEqual(st.unmet[0].zones, ['front-left', 'front-center', 'front-right']);
+});
+
+test('J5 optimizeZones 多选倾向：换进「任意一个」倾向区域', function () {
+    // 2×2 ⇒ 前左/前右/后左/后右（无中间档）
+    const students = mkStudents(4);
+    students[0].zonePref = ['front-left', 'front-right'];
+    const seats = ['s2', 's3', 's4', 's1'];   // s1 现在在后右
+    const res = optimizeZones(seats, students, 2, 2);
+    const z = seatZone(seatOfStudent(seats, 's1'), 2, 2);
+    assert(res.moved >= 1, '至少发生一次交换');
+    assert(['front-left', 'front-right'].indexOf(z) >= 0,
+        '应落在两个倾向区域之一，实际 ' + z);
+});
+
+test('J6 optimizeZones 多选避开：换出所有被避开的区域', function () {
+    const students = mkStudents(4);
+    students[0].zoneAvoid = ['front-left', 'front-right'];   // 避开整个前排
+    const seats = ['s1', 's2', 's3', 's4'];                  // s1 现在在前左
+    optimizeZones(seats, students, 2, 2);
+    const z = seatZone(seatOfStudent(seats, 's1'), 2, 2);
+    assert(['front-left', 'front-right'].indexOf(z) < 0,
+        '不应还留在被避开的前排，实际 ' + z);
+});
+
+test('J7 新旧配置混用（string + array）不报错且统计一致', function () {
+    const students = mkStudents(2);
+    students[0].zonePref = 'front-left';                    // 旧格式
+    students[1].zonePref = ['front-left', 'front-right'];   // 新格式
+    const seats = ['s1', 's2', null, null, null, null, null, null, null];
+    const st = zoneStats(seats, students, 3, 3);
+    assertEqual(st.prefTotal, 2);
+    assertEqual(st.prefMet, 1);
+    assertEqual(st.counts['front-left'].prefer, 2);
+    // 同一份数据换座优化也不该抛错
+    optimizeZones(seats, students, 3, 3);
+    assertEqual(seats.filter(Boolean).length, 2, '占座集合不变');
+});
+
+test('J8 多选下仍不丢人不添人（占座集合不变）', function () {
+    const students = mkStudents(6);
+    students.forEach(function (s, i) {
+        s.zonePref = [ZONE_IDS[i % 9], ZONE_IDS[(i * 4) % 9]];
+        s.zoneAvoid = [ZONE_IDS[(i * 7) % 9]];
+    });
+    const seats = students.map(function (s) { return s.id; });
+    optimizeZones(seats, students, 2, 3);
+    const occupied = seats.filter(Boolean).sort();
+    assertDeepEqual(occupied, students.map(function (s) { return s.id; }).sort());
+    assertEqual(seats.length, 6, '数组长度不变');
 });
 
 // ═══════════ 汇总 ═══════════

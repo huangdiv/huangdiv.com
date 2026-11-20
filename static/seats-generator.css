@@ -3525,9 +3525,9 @@ button:disabled {
 
 .zone-hint {
     font-size: 11px;
-    line-height: 1.5;
+    line-height: 1.45;
     color: var(--text-muted);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 /* 3×3 区域预览：前/中/后 三行，左/中/右 三列 */
@@ -3544,8 +3544,9 @@ button:disabled {
     align-items: center;
     justify-content: center;
     gap: 1px;
-    min-height: 34px;
-    padding: 3px 2px;
+    /* 紧凑一点，把纵向空间留给学生列表（多选面板展开时会撑高行） */
+    min-height: 28px;
+    padding: 2px;
     background: var(--surface-hover);
     border: 1px solid var(--border-light);
     border-radius: 4px;
@@ -3634,6 +3635,7 @@ button:disabled {
 .zone-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;   /* 多选面板作为 100% 宽的子项换行，就地撑高所在行 */
     gap: 4px;
     padding: 2px 4px;
     background: var(--surface);
@@ -3667,6 +3669,7 @@ button:disabled {
     font-variant-numeric: tabular-nums;
 }
 
+/* 多选触发器（v1.4.10 起是 button，不再是 select） */
 .zone-select {
     flex: none;
     width: 68px;
@@ -3674,15 +3677,113 @@ button:disabled {
     padding: 0 2px;
     border: 1px solid var(--border);
     border-radius: 3px;
+    font-family: inherit;
     font-size: 11px;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
     background: var(--surface);
     color: var(--text-primary);
     box-sizing: border-box;
+    transition: border-color .15s, background .15s;
+}
+
+.zone-select:hover {
+    border-color: var(--primary);
 }
 
 .zone-select:focus {
     outline: none;
     border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.zone-select[aria-expanded="true"] {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* ── 行内 3×3 多选面板：挂在 .zone-row 内，随列表滚动，不被 overflow 裁掉 ── */
+.zone-picker {
+    flex: 0 0 100%;
+    margin-top: 4px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface-hover);
+    box-sizing: border-box;
+}
+
+.zone-picker[hidden] {
+    display: none;
+}
+
+.zone-picker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.zone-pick-clear {
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--text-muted);
+}
+
+.zone-pick-clear:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.zone-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+}
+
+.zone-pick-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 24px;
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    background: var(--surface);
+    font-size: 11px;
+    color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.zone-pick-cell:hover {
+    border-color: var(--primary);
+}
+
+.zone-pick-cell input {
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.zone-pick-cell:has(input:checked) {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    font-weight: 600;
 }
 
 .zone-empty {

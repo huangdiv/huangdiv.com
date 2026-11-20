@@ -19,7 +19,7 @@
   另加 4 项：
    19. 同一场景重复点击结果完全一致（确定性）
    20. 按钮 title 说明「人数不整除时多出的人分给排在后面的组」
-   21. 版本号 1.4.9
+   21. 版本号 1.4.10
    22. 全程无 JS 报错
 
 运行前先起本地服务:
@@ -97,7 +97,7 @@ def make_config(n):
         "showPairLinks": True,
         "forcedPairs": [],
         "avoidPairs": [],
-        "version": "1.4.9",
+        "version": "1.4.10",
     }
 
 
@@ -203,7 +203,7 @@ async def main():
         # ═══ 21. 版本号 ═══
         print("=== 21. 版本号 ===")
         version = (await page.text_content("#appVersion") or "").strip()
-        check(version == "1.4.9", f"版本号 1.4.9（实际 {version}）")
+        check(version == "1.4.10", f"版本号 1.4.10（实际 {version}）")
 
         # ═══ 22. 无 JS 报错 ═══
         print("=== 22. 控制台 ===")

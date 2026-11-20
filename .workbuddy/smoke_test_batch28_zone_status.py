@@ -247,37 +247,60 @@ async def main():
         else:
             bad(f"汇总条不对：「{txt}」 data-state={state}（期望含 1/4、1/2 且 bad）")
 
-        # ═══ 10. 改动下拉后就地刷新 + 焦点保留 ═══
-        print("=== 10. 改下拉后就地刷新（不重建 DOM） ===")
-        sel = page.locator(".zone-popup .zone-row").nth(1).locator(".zone-pref")
-        await sel.focus()                           # 主动聚焦，才能验证「刷新后焦点没丢」
-        await sel.select_option("front-center")     # 李娜当前就坐在 front-center ⇒ 立刻 ok
-        await page.wait_for_timeout(400)
+        # ═══ 10. 改动多选后就地刷新（不重建 DOM）═══
+        print("=== 10. 改多选项后就地刷新（不重建 DOM） ===")
+        await page.locator(".zone-popup .zone-row").nth(1).locator(".zone-pref").click()
+        await page.wait_for_timeout(150)
+        old_cb = page.locator(
+            '.zone-popup .zone-picker .zone-pick-cell[data-zone-id="back-right"] input')
+        if await old_cb.is_checked():
+            await old_cb.click()                 # 取消原倾向
+            await page.wait_for_timeout(120)
+        new_cb = page.locator(
+            '.zone-popup .zone-picker .zone-pick-cell[data-zone-id="front-center"] input')
+        if not await new_cb.is_checked():
+            await new_cb.click()                 # 李娜当前就坐在 front-center ⇒ 立刻 ok
+        await page.wait_for_timeout(250)
         st = await row_state(page, 1)
-        focused = await page.evaluate(
+        dom = await page.evaluate(
             """() => {
-                const el = document.activeElement;
-                return el && el.classList ? el.className : '';
+                const picker = document.querySelector('.zone-popup .zone-picker');
+                const cb = picker && picker.querySelector(
+                    '.zone-pick-cell[data-zone-id="front-center"] input');
+                return {
+                    pickers: document.querySelectorAll('.zone-popup .zone-picker').length,
+                    checked: !!(cb && cb.checked)
+                };
             }"""
         )
-        if st["status"] == "ok" and not st["prefBad"] and "zone-pref" in focused:
-            ok("李娜 行转绿、描红清除，且焦点仍在刚操作的下拉上")
+        if st["status"] == "ok" and not st["prefBad"] and dom["pickers"] == 1 and dom["checked"]:
+            ok("李娜 行转绿、描红清除，且多选面板未被重建（勾选状态保留）")
         else:
-            bad(f"就地刷新/焦点不对：{st} 焦点={focused}")
+            bad(f"就地刷新不对：{st} DOM={dom}")
 
         # ═══ 12. 即时保存 ═══
         print("=== 12. 改动即时保存 ===")
         await page.wait_for_timeout(700)            # autoSave 防抖 500ms
         saved = await read_config(page)
         ln = next(s for s in saved["students"] if s["name"] == "李娜")
-        if ln.get("zonePref") == "front-center":
-            ok("李娜 zonePref=front-center 已写入 localStorage")
+        if ln.get("zonePref") == ["front-center"]:
+            ok("李娜 zonePref=['front-center'] 已写入 localStorage（多选数组格式）")
         else:
             bad(f"未保存：zonePref={ln.get('zonePref')}")
 
-        # 把李娜改回 back-right，方便后面看「全达成」以外的样子
-        await sel.select_option("back-right")
+        # 把李娜改回 back-right（面板仍开着，直接操作 checkbox）
+        fc = page.locator(
+            '.zone-popup .zone-picker .zone-pick-cell[data-zone-id="front-center"] input')
+        if await fc.is_checked():
+            await fc.click()
+            await page.wait_for_timeout(120)
+        br = page.locator(
+            '.zone-popup .zone-picker .zone-pick-cell[data-zone-id="back-right"] input')
+        if not await br.is_checked():
+            await br.click()
         await page.wait_for_timeout(300)
+        await page.locator(".zone-popup .zone-hint").click()   # 收起面板，Esc 才能关弹窗
+        await page.wait_for_timeout(150)
 
         # ═══ 11. 座位变化后自动重算 ═══
         print("=== 11. 智能排座后颜色自动重算 ===")
@@ -304,15 +327,20 @@ async def main():
         for idx, name in enumerate(NAMES):
             sid = f"s{idx+1}"
             s = a_by[sid]
-            pref = s.get("zonePref") or ""
-            avoid = s.get("zoneAvoid") or ""
+            pref = s.get("zonePref") or []
+            avoid = s.get("zoneAvoid") or []
+            # v1.4.10 起是区域数组；兼容旧单值字符串
+            if isinstance(pref, str):
+                pref = [pref] if pref else []
+            if isinstance(avoid, str):
+                avoid = [avoid] if avoid else []
             if not pref and not avoid:
                 expect = ""
             elif sid not in seat_of:
                 expect = "na"
             else:
                 z = seat_zone(seat_of[sid], ROWS, COLS)
-                expect = "bad" if ((pref and z != pref) or (avoid and z == avoid)) else "ok"
+                expect = "bad" if ((pref and z not in pref) or (avoid and z in avoid)) else "ok"
             got = await row_state(page, idx)
             if got["status"] != expect:
                 mismatches.append(f"{name}: 期望 {expect or '(中性)'} 实际 {got['status'] or '(中性)'}")
@@ -325,19 +353,16 @@ async def main():
         # ═══ 9'. 全满足时汇总条转 ok ═══
         print("=== 9'. 全部满足时汇总条转绿 ===")
         # 把所有人的设置改成「就按现在坐的区域」，凑满达成
-        await page.evaluate(
-            """() => {
-                const rows = Array.from(document.querySelectorAll('.zone-popup .zone-row'));
-                rows.forEach(function (row) {
-                    const sid = row.getAttribute('data-student-id');
-                    const cfg = JSON.parse(localStorage.getItem('classroomConfig') || '{}');
-                    const seatIdx = (cfg.seats || []).indexOf(sid);
-                    const pref = row.querySelector('.zone-pref');
-                    pref.value = '';
-                    pref.dispatchEvent(new Event('change', { bubbles: true }));
-                });
-            }"""
-        )
+        # v1.4.10：每行点开倾向面板 → 点「清空」→ 点面板外收起
+        for idx in range(len(NAMES)):
+            await page.locator(".zone-popup .zone-row").nth(idx).locator(".zone-pref").click()
+            await page.wait_for_timeout(60)
+            clear = page.locator(".zone-popup .zone-pick-clear")
+            if await clear.count():
+                await clear.click()
+                await page.wait_for_timeout(60)
+            await page.locator(".zone-popup .zone-hint").click()
+            await page.wait_for_timeout(60)
         await page.wait_for_timeout(400)
         line = page.locator(".zone-popup .zone-status-line")
         txt_all = (await line.inner_text()).strip()

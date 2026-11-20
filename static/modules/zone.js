@@ -3,8 +3,12 @@
 //
 // 教室「九宫格区域」——把座位按 行数三等分（前/中/后）× 列数三等分（左/中/右）
 // 划成 9 个区域，供「智能排座 → 区域设置」使用：
-//   · 倾向区域(zonePref)  ：排座时尽量把该学生安排进这个区域
-//   · 避开区域(zoneAvoid) ：排座时尽量别把该学生安排在这个区域
+//   · 倾向区域(zonePref)  ：排座时尽量把该学生安排进这些区域中的**任意一个**
+//   · 避开区域(zoneAvoid) ：排座时尽量别把该学生安排进这些区域中的**任何一个**
+//
+// v1.4.10 起两项都支持**多选**：字段值是区域 id 数组 string[]（[] = 未设置）。
+// 历史配置里是单个字符串（'' = 未设置），统一由 normalizeZoneList 兼容升级，
+// 因此本模块对「未经 migrate 的旧对象 / 单测夹具 / 手改 JSON」同样安全。
 //
 // 设计要点:
 //   · 纯函数，无 DOM、不读全局 state ⇒ 可被 Node ESM 直接 import 单测
@@ -44,6 +48,41 @@ export function zoneName(id) {
     return ZONE_NAME[id] || '';
 }
 
+// 任意输入 → 合法、去重、保序的区域 id 数组。
+// 兼容三种历史/异常形态：数组、单个字符串、null/undefined/非法值。
+export function normalizeZoneList(value) {
+    const raw = Array.isArray(value) ? value
+        : (typeof value === 'string' && value ? [value] : []);
+    const seen = new Set();
+    const out = [];
+    for (let i = 0; i < raw.length; i++) {
+        const id = raw[i];
+        if (isZoneId(id) && !seen.has(id)) {
+            seen.add(id);
+            out.push(id);
+        }
+    }
+    return out;
+}
+
+// 按九宫格固定顺序稳定化（UI 写入时用，避免数组顺序随点击次序抖动）
+export function orderZoneList(value) {
+    const set = new Set(normalizeZoneList(value));
+    return ZONE_IDS.filter(function (id) { return set.has(id); });
+}
+
+// 区域 id 数组 → 中文名数组（tooltip / toast 文案用）
+export function zoneNames(value) {
+    return normalizeZoneList(value).map(zoneName);
+}
+
+// zoneCost 的轻量入参适配：内部热路径（O(passes × 人数 × 座位数)）不做白名单过滤，
+// 调用方传进来的都已是 normalizeZoneList 的结果；这里只为兼容手写的单值字符串。
+function toList(v) {
+    if (Array.isArray(v)) return v;
+    return (typeof v === 'string' && v) ? [v] : [];
+}
+
 // 把第 i 项（行或列）归入 0/1/2 三档。
 // 只有 1 行/列时归「中」；2 行/列时归「前/后」(或「左/右」)，不产生空的中间档。
 export function bandIndex(i, total) {
@@ -75,23 +114,29 @@ export function buildZoneMap(rows, cols) {
     return map;
 }
 
-// 规范化某学生的区域设置（非法/缺失一律视为未设置）
+// 规范化某学生的区域设置（非法/缺失一律视为未设置）。
+// 返回 { prefer: string[], avoid: string[] } —— v1.4.10 起为数组。
 export function studentZonePrefs(s) {
     return {
-        prefer: isZoneId(s && s.zonePref) ? s.zonePref : '',
-        avoid: isZoneId(s && s.zoneAvoid) ? s.zoneAvoid : ''
+        prefer: normalizeZoneList(s && s.zonePref),
+        avoid: normalizeZoneList(s && s.zoneAvoid)
     };
 }
 
-// 某学生在「位于 zone 区域的座位」上的代价（0 = 完全满足）
+// 某学生在「位于 zone 区域的座位」上的代价（0 = 完全满足）。
+// 多选语义：倾向列表里**有任意一个**命中即满足；避开列表里**命中任意一个**即扣分。
 export function zoneCost(prefs, zone) {
+    const prefer = toList(prefs && prefs.prefer);
+    const avoid = toList(prefs && prefs.avoid);
     let cost = 0;
-    if (prefs.prefer && prefs.prefer !== zone) cost += PREF_WEIGHT;
-    if (prefs.avoid && prefs.avoid === zone) cost += AVOID_WEIGHT;
+    if (prefer.length > 0 && prefer.indexOf(zone) < 0) cost += PREF_WEIGHT;
+    if (avoid.indexOf(zone) >= 0) cost += AVOID_WEIGHT;
     return cost;
 }
 
-// 当前座位表的区域适配情况（供弹窗顶部预览 / 排座后 toast 使用）
+// 当前座位表的区域适配情况（供弹窗顶部预览 / 排座后 toast 使用）。
+// 多选下「达成」按**学生**计（一人一条倾向设置 / 一条避开设置），
+// 而 counts 是**按区域**计（一个学生选了 3 个区域，就给这 3 个格子各 +1）。
 export function zoneStats(seats, students, rows, cols) {
     const byId = {};
     (students || []).forEach(function (s) { if (s && s.id) byId[s.id] = s; });
@@ -112,21 +157,27 @@ export function zoneStats(seats, students, rows, cols) {
         if (!s) return;
         const prefs = studentZonePrefs(s);
 
-        if (prefs.prefer) {
+        if (prefs.prefer.length > 0) {
             prefTotal++;
-            counts[prefs.prefer].prefer++;
-            if (zone === prefs.prefer) {
+            prefs.prefer.forEach(function (z) { counts[z].prefer++; });
+            if (prefs.prefer.indexOf(zone) >= 0) {
                 prefMet++;
             } else {
-                unmet.push({ id: sid, name: s.name, kind: 'prefer', zone: prefs.prefer, at: zone });
+                unmet.push({
+                    id: sid, name: s.name, kind: 'prefer',
+                    zones: prefs.prefer.slice(), zone: prefs.prefer[0], at: zone
+                });
             }
         }
-        if (prefs.avoid) {
+        if (prefs.avoid.length > 0) {
             avoidTotal++;
-            counts[prefs.avoid].avoid++;
-            if (zone === prefs.avoid) {
+            prefs.avoid.forEach(function (z) { counts[z].avoid++; });
+            if (prefs.avoid.indexOf(zone) >= 0) {
                 avoidHit++;
-                unmet.push({ id: sid, name: s.name, kind: 'avoid', zone: prefs.avoid, at: zone });
+                unmet.push({
+                    id: sid, name: s.name, kind: 'avoid',
+                    zones: prefs.avoid.slice(), zone: prefs.avoid[0], at: zone
+                });
             }
         }
     });
@@ -158,7 +209,7 @@ export function optimizeZones(seats, students, rows, cols, options) {
         if (!s || !s.id) return;
         const p = studentZonePrefs(s);
         prefsOf[s.id] = p;
-        if (p.prefer || p.avoid) targets.push(s);
+        if (p.prefer.length > 0 || p.avoid.length > 0) targets.push(s);
     });
     if (targets.length === 0 || !seats || seats.length === 0) return { moved: 0 };
 
@@ -167,7 +218,7 @@ export function optimizeZones(seats, students, rows, cols, options) {
         if (seats[i]) seatOf[seats[i]] = i;
     }
 
-    const empty = { prefer: '', avoid: '' };
+    const empty = { prefer: [], avoid: [] };
     let moved = 0;
 
     for (let pass = 0; pass < maxPasses; pass++) {

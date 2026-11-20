@@ -13,6 +13,7 @@
 ## 测试 / 发版
 - 单测 `bash .workbuddy/run_unit_tests.sh`(Node ESM，`static/tests/unit_*.mjs`)；冒烟 Playwright `.workbuddy/smoke_test_batch*.py`，先在 `static/` 起 `python -m http.server 8123 --bind 127.0.0.1`(URL 用 127.0.0.1，别用 localhost)；服务跑久会半挂 ⇒ 重启。
 - **写完新测试必须回退验证**：临时改回旧写法确认会变红，再还原。
+- 冒烟读 localStorage 前**必须等过 `autoSave` 500ms 防抖**(统一 `saved_config()` 等 750ms)，否则连续操作下读到的永远是播种旧值；断言「被 JS 回退的 checkbox」用 `click()+is_checked()`，别用 `check()`(会抛 `did not change its state`)。
 - 改版本号 = **四处同步**：`migrate.js#APP_VERSION`、`seats-generator.js#APP_VERSION`、HTML 入口 `?v=`、两个静态兜底 span(`unit_version_sync` 钉死)；**另外还要单独搜 `.workbuddy/smoke_test_*.py` 里的硬编码版本断言**(全局 Grep 会跳过隐藏目录)。Pages `.js` 有 `max-age=600` + Cloudflare ⇒ 漏改 `?v=` 用户 10 分钟看不到新代码。
 - 判断线上是否发布：带随机查询串 curl 抓 JS 看 `APP_VERSION`，别信普通刷新。
 - 本地预览暴露 `window.__seatsTest`(rotateGroupSeats / randomSeatArrange)；`?debug=1` 暴露 `window.__undoTest`。
@@ -25,10 +26,10 @@
 
 ## 功能语义要点(细节见 ARCHIVE §3)
 - `students[i].rank` = 序号 1..N，无手工编辑入口，由导入决定；**导入 = 按姓名增量合并**(空值不覆盖、标签取并集、文件里没出现的学生连座位签到一起保留)。
-- 凡是「给学生看名单」的地方按 rank 升序(座位 CSV 例外)；配对 / 区域的学生选择框为自绘候选(`.pair-suggest`)，`mousedown + preventDefault` 防丢焦点。
+- 凡是「给学生看名单」的地方按 rank 升序(座位 CSV 例外)；配对设置的学生候选框为自绘(`.pair-suggest`)，`mousedown + preventDefault` 防丢焦点；区域设置是 3×3 复选面板(`.zone-picker`，见下)。
 - 「按排名均衡分组」= `student-rank.js#planBalancedGroupAssignment`(蛇形分批 + 批内性别/班委最优排列)；**v1.4.9 起人数不整除时余下 r 人固定按组号倒序划归**：前面的组恒 `floor(N/G)` 人，只有最后 r 组多 1 人，与批次奇偶解耦(见 ARCHIVE §3.15)。「均衡系数」= 排名 0.6 + 性别 0.2 + 班委 0.2，排名维度必须用**排名带覆盖度**(「组均值 vs 全班均值」会假满分)。
 - **按组聚座 = `group-layout.js`(v1.4.8 起按每组人数各自取最紧凑矩形)**：主目标最小化「占用行数 + 列数」，其次空位 / 面积，同等优先更窄 ⇒ 6 人得 `3行×2列`；逐组在全表搜索不与已占座位冲突的最佳落点(左上优先)，`blocked` 跳过，极端情况补位 / 退化连续排。主 IIFE `arrangeSeatsByGroup()` 先清出待移动学生(未分组锁定) → 规划 → 就地写回。
-- 九宫格区域设置 `zonePref/zoneAvoid` 是**软约束**(`optimizeZones` 只做有人↔有人交换)，硬约束(配对 / 性别 / 旧座位)优先。
+- **九宫格区域设置(v1.4.10 多选)**：`zonePref/zoneAvoid` 为区域 id **数组**(倾向命中任一即满足 / 避开命中任一即未满足)；老单值字符串由 `zone.js#normalizeZoneList` 兼容、`orderZoneList` 稳定化、`migrate` 清洗倾向∩避开交集；达成数按学生计、counts 按区域计。UI = 两个 button 触发器 + 全局共享的 3×3 复选面板 `.zone-picker`(挂在行内靠 `flex-wrap` 换行，避免被 `.zone-list` 的 overflow 裁掉；Esc 两段式收起)。仍是**软约束**(`optimizeZones` 只做有人↔有人交换)，硬约束(配对 / 性别 / 旧座位)优先。⚠️ 空数组是 truthy ⇒ `hasZonePrefs` 之类判断必须用 `.length > 0`。
 - 折叠面板「布局设置」= 旧「座位设置」(id 仍是 `seatSettings`)；行内删除叉号统一 `--icon-remove-size` 18px；三个快捷按钮两段式 `.action-btn-split`，下拉互斥走 `allDropdownCtrls` 登记表。
 - 菜单徽标 `配对设置 [N强/N避]` / `区域设置 [N]` 必须在渲染出口刷新，0 组时不出现 `[]`。
 - 配对关联线：一人只能一组强制同桌(**UI 校验 + migrate 清洗必须成对做**)；SVG 图层 `pointer-events:none` 且作 `.classroom` 首个 absolute 子节点，几何上避开所有座位矩形；**两类线都不带箭头**；同桌线全班固定同侧(`decideDeskmateSide`，不得用 `index%2`)；打印隐藏、导出图片克隆后剔除图层。开关文案「配对关联线」。
