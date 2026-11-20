@@ -56,9 +56,16 @@
 | 已隔离（可整体删除） | `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/` | 旧的 `recover-huangdiv`、`recover-huangdiv2`、`_tmp_clone_huangdiv`、原主仓 `D:/Documents/GitHub/huangdiv.com`、9/4 手工备份；见 §2.3 |
 
 ### 1.3 部署链路
-`huangdiv/huangdiv.com@master` → GitHub Actions（`reuixiy/hugo-deploy@v1`）→
-`huangdiv/huangdiv.github.io@build` → GitHub Pages → https://huangdiv.com（CNAME）。
-**`static/` 下的文件原样复制到站点根**，所以座位表线上地址即 `/seats-generator.html`。
+`huangdiv/huangdiv.com@master` → GitHub Actions（`.github/workflows/build.yml`，
+**2026-11-20 起固定 Hugo 0.169.0 extended**）→ `huangdiv/huangdiv.github.io@build`
+→ GitHub Pages（legacy，`source.branch=build`、`path=/`、CNAME `huangdiv.com`）
+→ https://huangdiv.com（座位表入口 `/seats-generator.html`）。
+**`static/` 下的文件原样复制到站点根**（已实测逐字节一致），所以核对线上产物可以直接
+拿 `git show <sha>:static/<path>` 与线上 GET 结果比 blob SHA-1 / 字节。
+> ⚠️ 线上 HTML 会被 Cloudflare 注入两段脚本（挑战 `__CF$cv$params` + `beacon.min.js`），
+> 逐字节比对 HTML 前要先剥掉这两段；JS/CSS 不受影响。
+> ⚠️ Pages 是 legacy 分支部署，没有额外构建步骤：`build` 分支更新即上线。
+> 详见 §2.4 的 Hugo 版本漂移事故。
 
 > ⚠️ 座位表曾只存在于 `workbuddy/master-93f997c3` 分支；2026-09-04 已正确合入 master 并上线。
 
@@ -184,6 +191,61 @@ git rev-list --left-right --count origin/master...master   # 期望 0	0
     以及 9/4 手工备份 `_backup_huangdiv_working_*` 全部**隔离**（非删除，可回滚）到
     `C:/Users/xingz/WorkBuddy/_cleanup_backup_seats_2026-09-20/quarantine-workarounds-2026-09-20/`。
     删除前已逐项验证：两个恢复仓与 workspace **逐字节一致**；旧备份的补丁**反向应用干净通过**（改动已在库中）。
+
+### 2.4 部署构建：Hugo 版本漂移打挂 MemE 主题（2026-11-20，已修复）
+
+**症状**：v1.4.10 的源码、单测、冒烟、文档、提交 `0dabc4d`、远端 master 全部就绪，
+但线上带随机串抓到的仍是 `APP_VERSION = '1.4.9'`。Actions run `44651930605` 为
+`completed failure`，失败在 `Building...` step；**不要急着怀疑自己的 JS/CSS**，
+先看构建日志里的 Hugo 版本。
+
+**根因**（日志逐行比对两次 run 得出）：
+| | 成功 run `42619818712`（11-09） | 失败 run `44651930605`（11-20） |
+|---|---|---|
+| Hugo | `v0.169.0+extended+withdeploy` | `v0.170.1+withdeploy`（**非 extended**） |
+| Sass | `WARN deprecated: css.Sass: libsass was deprecated in v0.153.0` 但仍可用 | `ERROR ... error calling toCSS: no Dart Sass binary found in $PATH` |
+| 结果 | `Total in 144 ms` | 每个页面 `render ... head.html:29 → style.html:4` 全挂 |
+
+原工作流用 `reuixiy/hugo-deploy@v1`，其 Dockerfile 是
+`FROM archlinux` + `RUN pacman -Syu --noconfirm hugo git openssh` ⇒ **每次构建都装最新 Hugo**，
+无法用 env 钉版本。Hugo 0.170 移除了内置 libsass，`toCSS` 改为要求 `dart-sass` 二进制，
+而镜像里没有；主题 `layouts/partials/style.html:4` 的 `resources.Get ... | toCSS` 因此返回 nil，
+报 `style is nil; wrap it in if or with`（这是**连锁错误文案**，真正的 cause 是上一行
+`no Dart Sass binary found in $PATH`，别被误导去改模板）。
+`languageCode` / `.Site.LanguageCode` 的 deprecated 只是 WARN，不致命。
+
+**修法**（提交 `6712190`，改写 `.github/workflows/build.yml`）：
+- 弃用 `reuixiy/hugo-deploy@v1`，改为 4 步自持流程：
+  `actions/checkout@v4`（`submodules: recursive` + `fetch-depth: 0`，因为 `enableGitInfo = true`）
+  → `curl` 下载 **`hugo_extended_0.169.0_linux-amd64.tar.gz`** 到 `/usr/local/bin`
+  （并用 `hugo version | grep -q "v${HUGO_VERSION}"` 断言版本）
+  → `hugo --gc --minify --cleanDestinationDir`
+  → 用原有 `secrets.DEPLOY_KEY` 把 `public/` 强推到 `huangdiv/huangdiv.github.io@build`
+  （保留 `core.quotePath false` 处理中文路径，`ssh-keyscan github.com` 不限 `-t rsa`）。
+- 额外加 `workflow_dispatch`，可在不推代码的情况下手动重跑。
+- **没有引入新 secret / 新第三方部署 action**，部署机制与旧 action 的 `entrypoint.sh` 等价。
+
+**验证链**（一次跑通，可作为以后发版核对模板）：
+1. Actions run `44654774183` = `completed success`，6 个 step 全绿，日志确认
+   `hugo v0.169.0-...+extended`、`Total in 122 ms`、`git push -f origin "HEAD:build"`。
+2. 部署仓 `build` 分支 head → `b851aa3`，78 个 blob；把 10 个关键文件
+   （`seats-generator.{js,css,html}`、4 个 modules、2 个 tests、CNAME）的 blob SHA
+   与 `git show 0dabc4d:static/...` 逐一比对 ⇒ **全部 MATCH**。
+3. 线上带随机串 GET：JS/CSS/模块/测试全部与本地 v1.4.10 **逐字节相同**；
+   HTML 剥掉 Cloudflare 注入的两段脚本后也完全相同。
+4. 语义断言：`APP_VERSION = '1.4.10'`、`zone-picker` 存在、旧 `<select class="zone-select` 消失、
+   `normalizeZoneList` / `hasZonePrefs` 空数组守卫在、`?v=1.4.10`、旧 `1.4.9` 残留 0。
+
+**兜底方案（本次没用上，留作预案）**：若 Actions 一时修不好，且改动**只在 `static/`**，
+可直接用 Git Data API 把变更文件写进 `huangdiv/huangdiv.github.io@build`：
+`POST /git/blobs` → `POST /git/trees`（`base_tree` = 当前 build tree）→
+`POST /git/commits`（parent = 当前 build head）→ `PATCH /git/refs/heads/build`。
+已实测 `static/` 是原样复制，所以 blob 内容可直接取 `git show <sha>:static/<path>`，
+不需要本地跑 Hugo。Pages legacy 分支部署会在约 1 分钟内生效。
+
+**教训**：滚动更新的 base 镜像 + 不钉版本的构建工具 = 定时炸弹；
+「线上没更新」要先分辨是**缓存**（§3.10）还是**构建失败**（本节），
+两者排查路径完全不同。带随机串 curl 只证明 origin 内容，不证明 Actions 成功。
 
 ---
 
@@ -658,6 +720,7 @@ const forward = !isPartial && batch % 2 === 0;            // 余数批一律按�
 
 | 提交 | 内容 |
 |------|------|
+| `6712190` | **部署构建修复**：`build.yml` 弃用滚动更新的 `reuixiy/hugo-deploy@v1`，固定 Hugo 0.169.0 extended（0.170.1 移除 libsass 导致 MemE `toCSS` 失败），4 步自持流程 + `workflow_dispatch`；v1.4.10 由此真正上线（见 §2.4） |
 | 本轮 | **区域设置倾向/避开均支持多选**：字段升级为区域 id 数组（老单值无损兼容）、3×3 复选面板就地展开、交集校验、多选语义下的达成/计数/颜色提示；收紧弹窗布局（v1.4.10，见 §3.16） |
 | 本轮 | **均衡分组余数按组号倒序划归**：人数不整除时只有排在后面的 r 个组多 1 人，与批次奇偶（蛇形方向）解耦；整除场景行为不变（v1.4.9，见 §3.15） |
 | 本轮 | **按组聚座按每组人数取最紧凑矩形**：取消全班统一块，主目标「占用行数+列数」最小，6 人→3行×2列；逐组全表搜索落点、占座跳过、就近补位；toast 逐组给形状（v1.4.8，见 §3.14） |
@@ -967,9 +1030,11 @@ ls  .workbuddy/memory/               # 需要逐日细节时再翻
 **⑤ 云端推送凭据**：HTTPS 推送需 **GitHub PAT**（`repo` 权限）或平台的 GitHub 连接器。
 **别把 PAT 写进仓库**（`.env` 已在 `.gitignore`）。
 
-**⑥ 部署是全自动的**：往 `master` push → `.github/workflows/build.yml`（`reuixiy/hugo-deploy@v1`）
+**⑥ 部署是全自动的**：往 `master` push → `.github/workflows/build.yml`
+（**自建 4 步流程，固定 Hugo 0.169.0 extended**，见 §2.4）
 → `huangdiv/huangdiv.github.io@build` → GitHub Pages → https://huangdiv.com/seats-generator.html
-—— **云端 push 即上线，无需手工部署**。
+—— **云端 push 即上线，无需手工部署**；若线上没变，先看 Actions run 是否 `failure`（部署失败）
+还是只是 CDN 缓存（§3.10）。
 
 **⑦ 回到电脑端收尾**（⚠️ 在**你自己的终端**做，避开 §2.2 的沙箱 ref 问题）：
 ```bash

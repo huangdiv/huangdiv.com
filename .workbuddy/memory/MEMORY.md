@@ -15,7 +15,8 @@
 - **写完新测试必须回退验证**：临时改回旧写法确认会变红，再还原。
 - 冒烟读 localStorage 前**必须等过 `autoSave` 500ms 防抖**(统一 `saved_config()` 等 750ms)，否则连续操作下读到的永远是播种旧值；断言「被 JS 回退的 checkbox」用 `click()+is_checked()`，别用 `check()`(会抛 `did not change its state`)。
 - 改版本号 = **四处同步**：`migrate.js#APP_VERSION`、`seats-generator.js#APP_VERSION`、HTML 入口 `?v=`、两个静态兜底 span(`unit_version_sync` 钉死)；**另外还要单独搜 `.workbuddy/smoke_test_*.py` 里的硬编码版本断言**(全局 Grep 会跳过隐藏目录)。Pages `.js` 有 `max-age=600` + Cloudflare ⇒ 漏改 `?v=` 用户 10 分钟看不到新代码。
-- 判断线上是否发布：带随机查询串 curl 抓 JS 看 `APP_VERSION`，别信普通刷新。
+- 判断线上是否发布：带随机查询串 curl 抓 JS 看 `APP_VERSION`，别信普通刷新；**还要先看 Actions run 是否 success**（master 有新代码 ≠ 线上已部署）。线上 HTML 会被 Cloudflare 注入两段脚本，逐字节比对前要剥掉。
+- **部署链路（2026-11-20 起）**：`master` push → 自建 `build.yml` 固定 Hugo `0.169.0 extended` → `huangdiv/huangdiv.github.io@build` → Pages legacy 分支部署。**别再用 `reuixiy/hugo-deploy@v1`**（archlinux 滚动更新，Hugo 0.170.1 移除 libsass 会打挂 MemE 主题 `toCSS`）；换 Hugo 版本前必须确认主题兼容。线上没更新先分辨「构建失败」还是「CDN 缓存」。详见 ARCHIVE §2.4。
 - 本地预览暴露 `window.__seatsTest`(rotateGroupSeats / randomSeatArrange)；`?debug=1` 暴露 `window.__undoTest`。
 
 ## 架构
